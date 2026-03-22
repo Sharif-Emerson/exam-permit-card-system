@@ -701,6 +701,45 @@ export function updateStudentAccount(profileId, updates) {
   return getProfileById(profileId)
 }
 
+export function adminUpdateStudentProfile(profileId, updates) {
+  const profileRow = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profileId)
+  const userRow = db.prepare('SELECT * FROM users WHERE id = ?').get(profileId)
+
+  if (!profileRow || !userRow) {
+    return null
+  }
+
+  const nextName = typeof updates.name === 'string' && updates.name.trim() ? updates.name.trim() : userRow.name
+  const nextEmail = typeof updates.email === 'string' && updates.email.trim() ? updates.email.trim().toLowerCase() : userRow.email
+  const nextStudentId = 'student_id' in updates ? (updates.student_id ?? null) : profileRow.student_id
+  const nextCourse = 'course' in updates ? (updates.course ?? null) : profileRow.course
+  const nextTotalFees = typeof updates.total_fees === 'number' ? updates.total_fees : profileRow.total_fees
+  const updatedAt = nowIso()
+
+  db.exec('BEGIN')
+
+  try {
+    db.prepare(`
+      UPDATE users
+      SET email = ?, name = ?, updated_at = ?
+      WHERE id = ?
+    `).run(nextEmail, nextName, updatedAt, profileId)
+
+    db.prepare(`
+      UPDATE profiles
+      SET email = ?, name = ?, student_id = ?, course = ?, total_fees = ?, updated_at = ?
+      WHERE id = ?
+    `).run(nextEmail, nextName, nextStudentId, nextCourse, nextTotalFees, updatedAt, profileId)
+
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+
+  return getProfileById(profileId)
+}
+
 export function insertActivityLog({ adminId, targetProfileId, action, details }) {
   db.prepare(`
     INSERT INTO admin_activity_logs (id, admin_id, target_profile_id, action, details, campus_id, campus_name, created_at)

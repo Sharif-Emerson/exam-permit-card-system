@@ -45,6 +45,14 @@ body {
 	background-color: rgb(34 197 94);
 }
 
+.payment-progress-warning::-webkit-progress-value {
+	background-color: rgb(251 191 36);
+}
+
+.payment-progress-warning::-moz-progress-bar {
+	background-color: rgb(251 191 36);
+}
+
 .permit-sheet {
 	position: relative;
 	overflow: hidden;

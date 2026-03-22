@@ -7,9 +7,13 @@ Exam Permit System is a React application backed by a REST API for managing stud
 - REST-based email/password authentication
 - Role-based routing for students and administrators
 - Student permit dashboard with QR code, print, and PDF download flow
+- Student dashboard sections for overview, applications, profile settings, and support
+- Student self-service profile updates for name, email, avatar URL, and password
+- Student-side permit application history and local request tracking
 - Fee breakdown showing total fees, amount paid, remaining balance, and payment progress
 - Print/download restriction until a student is fully cleared
 - Admin panel for updating payments and clearing students for printing
+- Admin panel support for editing student profile details and total fees
 - Admin panel view of recent permit print and download activity
 - Admin-side CSV export for permit print and download activity
 - Admin template download, drag-and-drop preview, and Excel/CSV bulk financial upload
@@ -87,8 +91,11 @@ The frontend expects these REST endpoints:
 - `POST /auth/login`
 - `POST /auth/logout`
 - `GET /auth/me`
+- `GET /permits/:token`
 - `GET /profiles/:id`
 - `GET /profiles?role=student`
+- `PATCH /profiles/:id/account`
+- `PATCH /profiles/:id/admin`
 - `PATCH /profiles/:id/financials`
 - `POST /admin-activity-logs`
 - `GET /admin-activity-logs`
@@ -99,6 +106,11 @@ Expected login response fields:
 
 - a token in `token`, `accessToken`, or `access_token`
 - a user id in `user.id`, `userId`, or `id`
+
+Expected login request fields:
+
+- `identifier` containing either an email address or registration number
+- `password`
 
 ## Included Backend
 
@@ -124,18 +136,20 @@ The backend starter includes:
 
 1. Sign in with a student account
 2. The app loads the student profile from the active REST API
-3. The student sees exam details, QR verification data, and current fee status
-4. Printing and PDF download remain disabled until `feesBalance === 0`
+4. The student can review permit status, recent application history, and profile settings
+5. The student sees exam details, QR verification data, and current fee status
+6. Printing and PDF download remain disabled until `feesBalance === 0`
 
 ### Admin
 
 1. Sign in with an admin account
 2. View student profiles
-3. Update amount paid for a student
-4. Clear a student automatically by setting `amount_paid` equal to `total_fees`
-5. Upload .xlsx or .csv files to bulk-update financial records
-6. Each admin financial action is written to `admin_activity_logs`
-7. Recent student print and download activity can be exported to CSV for reconciliation or audit work
+3. Edit a student's profile details, registration number, course, and total fees
+4. Update amount paid for a student
+5. Clear a student automatically by setting `amount_paid` equal to `total_fees`
+6. Upload .xlsx or .csv files to bulk-update financial records
+7. Each admin financial action is written to `admin_activity_logs`
+8. Recent student print and download activity can be exported to CSV for reconciliation or audit work
 
 ### Admin Import Template
 
@@ -217,5 +231,6 @@ To deploy:
 
 ## Notes
 
-- The QR code encodes the loaded student permit record.
+- Student application history and dark-mode preference are stored locally in the browser.
+- The QR code encodes a permit verification URL/token for the public permit endpoint.
 - The example REST backend uses Node's built-in SQLite support, which is still marked experimental in current Node releases.

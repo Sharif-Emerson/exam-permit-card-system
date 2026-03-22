@@ -51,13 +51,21 @@ VITE_API_BASE_URL=http://localhost:4000
 - `POST /auth/login`
 - `POST /auth/logout`
 - `GET /auth/me`
+- `GET /permits/:token`
 - `GET /profiles/:id`
 - `GET /profiles?role=student`
+- `PATCH /profiles/:id/account`
+- `PATCH /profiles/:id/admin`
 - `PATCH /profiles/:id/financials`
 - `POST /admin-activity-logs`
 - `GET /admin-activity-logs`
 - `POST /imports/financials/preview`
 - `POST /imports/financials/apply`
+
+Login requests must send:
+
+- `identifier`: email address or registration number
+- `password`
 
 ## Persistence
 
@@ -70,7 +78,7 @@ VITE_API_BASE_URL=http://localhost:4000
 npm run reset-data
 ```
 
-- Run an end-to-end import smoke test with:
+- Run an end-to-end backend smoke test with:
 
 ```bash
 npm run smoke-test

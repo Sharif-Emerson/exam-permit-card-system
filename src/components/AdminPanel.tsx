@@ -1,16 +1,16 @@
-﻿import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useState } from 'react'
+import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useState } from 'react'
 import {
   BarChart2, Bell, CheckCircle2, CreditCard, Download, FileCheck,
   FileSpreadsheet, FileUp, LayoutDashboard, LogOut, Menu,
-  QrCode, RefreshCcw, Save, Search, Settings, Shield, Upload, Users, X,
+  Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Upload, Users, X,
 } from 'lucide-react'
 import BrandMark from './BrandMark'
 import { useAuth } from '../context/AuthContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { clearStudentBalance, fetchAdminActivityLogs, fetchAllStudentProfiles, importStudentFinancials, updateStudentFinancials } from '../services/profileService'
+import { adminUpdateStudentProfile, clearStudentBalance, fetchAdminActivityLogs, fetchAllStudentProfiles, importStudentFinancials, updateStudentFinancials } from '../services/profileService'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
-import type { AdminActivityLog, FinancialImportRow, FinancialImportUpdate, StudentProfile } from '../types'
+import type { AdminActivityLog, AdminProfileUpdateInput, FinancialImportRow, FinancialImportUpdate, StudentProfile } from '../types'
 
 type PaymentDrafts = Record<string, string>
 type ImportPreviewRow = {
@@ -33,6 +33,14 @@ function getActivityTimestamp(value: string | null | undefined) {
   return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
+function getPaymentCompletionPercent(amountPaid: number, totalFees: number) {
+  if (totalFees <= 0) {
+    return 0
+  }
+
+  return Math.min(Math.max((amountPaid / totalFees) * 100, 0), 100)
+}
+
 export default function AdminPanel() {
   const { user, signOut } = useAuth()
   const [students, setStudents] = useState<StudentProfile[]>([])
@@ -51,6 +59,11 @@ export default function AdminPanel() {
   const [activeSection, setActiveSection] = useState<NavSection>('students')
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'outstanding'>('all')
+  const [editingStudent, setEditingStudent] = useState<StudentProfile | null>(null)
+  const [editDraft, setEditDraft] = useState<Omit<AdminProfileUpdateInput, 'totalFees'> & { totalFees: string }>({
+    name: '', email: '', studentId: '', course: '', totalFees: '',
+  })
+  const [savingEdit, setSavingEdit] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
@@ -206,6 +219,57 @@ export default function AdminPanel() {
       setError(nextError)
     } finally {
       setSavingId(null)
+    }
+  }
+
+  function handleEditStudent(student: StudentProfile) {
+    setEditingStudent(student)
+    setEditDraft({
+      name: student.name,
+      email: student.email,
+      studentId: student.studentId ?? '',
+      course: student.course ?? '',
+      totalFees: student.totalFees.toFixed(2),
+    })
+  }
+
+  async function handleSaveEdit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+
+    if (!editingStudent || !user) {
+      return
+    }
+
+    const totalFeesNum = Number(editDraft.totalFees)
+
+    if (Number.isNaN(totalFeesNum) || totalFeesNum < 0) {
+      setError('Total fees must be a valid positive number.')
+      return
+    }
+
+    try {
+      setSavingEdit(true)
+      setError('')
+      setSuccessMessage('')
+      await adminUpdateStudentProfile(
+        editingStudent.id,
+        {
+          name: editDraft.name,
+          email: editDraft.email,
+          studentId: editDraft.studentId,
+          course: editDraft.course,
+          totalFees: totalFeesNum,
+        },
+        user.id,
+      )
+      await loadStudents()
+      setSuccessMessage(`Student profile updated for ${editDraft.name}.`)
+      setEditingStudent(null)
+    } catch (saveError) {
+      const nextError = saveError instanceof Error ? saveError.message : 'Unable to update student profile'
+      setError(nextError)
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -418,6 +482,8 @@ export default function AdminPanel() {
           />
           <button
             type="button"
+            title="Close sidebar"
+            aria-label="Close sidebar"
             className="ml-auto text-gray-400 hover:text-gray-600 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           >
@@ -488,6 +554,8 @@ export default function AdminPanel() {
         <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 sm:px-6">
           <button
             type="button"
+            title="Open sidebar"
+            aria-label="Open sidebar"
             className="text-gray-500 hover:text-gray-700 lg:hidden"
             onClick={() => setSidebarOpen(true)}
           >
@@ -499,6 +567,7 @@ export default function AdminPanel() {
             <Search className="h-4 w-4 flex-shrink-0 text-gray-400" />
             <input
               type="text"
+              aria-label="Search students"
               placeholder="Search students..."
               value={searchQuery}
               onChange={(e) => {
@@ -508,7 +577,13 @@ export default function AdminPanel() {
               className="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
             />
             {searchQuery && (
-              <button type="button" onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600">
+              <button
+                type="button"
+                title="Clear search"
+                aria-label="Clear search"
+                onClick={() => setSearchQuery('')}
+                className="text-gray-400 hover:text-gray-600"
+              >
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
@@ -551,7 +626,13 @@ export default function AdminPanel() {
             {error && (
               <div className="mb-2 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                 <span className="flex-1">{error}</span>
-                <button type="button" onClick={() => setError('')} className="text-red-400 hover:text-red-600">
+                <button
+                  type="button"
+                  title="Dismiss error"
+                  aria-label="Dismiss error"
+                  onClick={() => setError('')}
+                  className="text-red-400 hover:text-red-600"
+                >
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -559,7 +640,13 @@ export default function AdminPanel() {
             {successMessage && (
               <div className="mb-2 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
                 <span className="flex-1">{successMessage}</span>
-                <button type="button" onClick={() => setSuccessMessage('')} className="text-green-400 hover:text-green-600">
+                <button
+                  type="button"
+                  title="Dismiss message"
+                  aria-label="Dismiss message"
+                  onClick={() => setSuccessMessage('')}
+                  className="text-green-400 hover:text-green-600"
+                >
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -790,6 +877,9 @@ export default function AdminPanel() {
                                   onChange={(e) =>
                                     setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
                                   }
+                                  aria-label={`Payment amount for ${student.name}`}
+                                  title={`Payment amount for ${student.name}`}
+                                  placeholder="0.00"
                                   className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
                                 />
                                 <button
@@ -810,6 +900,14 @@ export default function AdminPanel() {
                                   <CheckCircle2 className="h-3.5 w-3.5" />
                                 </button>
                               </form>
+                                                          <button
+                                                            type="button"
+                                                            onClick={() => handleEditStudent(student)}
+                                                            title="Edit student profile"
+                                                            className="rounded bg-blue-500 p-1.5 text-white hover:bg-blue-600"
+                                                          >
+                                                            <Pencil className="h-3.5 w-3.5" />
+                                                          </button>
                             </td>
                           </tr>
                         )
@@ -1027,18 +1125,23 @@ export default function AdminPanel() {
                       {courseNames.map((course) => {
                         const { total, cleared } = courseBreakdown[course]
                         const barPct = Math.round((total / maxCourseCount) * 100)
-                        const clearedPct = total > 0 ? Math.round((cleared / total) * 100) : 0
                         return (
                           <div key={course}>
                             <div className="mb-1 flex items-center justify-between text-xs text-gray-600">
                               <span className="truncate font-medium">{course}</span>
                               <span>{cleared}/{total} cleared</span>
                             </div>
-                            <div className="h-5 w-full overflow-hidden rounded-full bg-gray-100">
-                              <div className="flex h-full overflow-hidden rounded-full" style={{ width: `${barPct}%` }}>
-                                <div className="h-full bg-emerald-500" style={{ width: `${clearedPct}%` }} />
-                                <div className="h-full bg-amber-400" style={{ width: `${100 - clearedPct}%` }} />
+                            <div className="space-y-1">
+                              <div className="h-5 rounded-full bg-gray-100 p-1">
+                                <progress
+                                  className="payment-progress payment-progress-clear h-full"
+                                  max={total || 1}
+                                  value={cleared}
+                                  aria-label={`${course} clearance progress`}
+                                  title={`${cleared} of ${total} students cleared in ${course}`}
+                                />
                               </div>
+                              <p className="text-[11px] text-gray-400">Relative class size: {barPct}% of the largest course cohort</p>
                             </div>
                           </div>
                         )
@@ -1177,6 +1280,7 @@ export default function AdminPanel() {
                 {students.map((student) => {
                   const summary = getStudentPrintSummary(student.id)
                   const cleared = student.feesBalance === 0
+
                   return (
                     <div
                       key={student.id}
@@ -1187,7 +1291,7 @@ export default function AdminPanel() {
                       <div className="mb-3 flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate font-semibold text-gray-900">{student.name}</p>
-                          <p className="text-xs text-gray-400">{student.studentId} · {student.course || 'No course'}</p>
+                          <p className="text-xs text-gray-400">{student.studentId} - {student.course || 'No course'}</p>
                         </div>
                         <span
                           className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -1198,7 +1302,6 @@ export default function AdminPanel() {
                         </span>
                       </div>
 
-                      {/* QR placeholder or blocked indicator */}
                       <div
                         className={`mb-3 flex h-24 items-center justify-center rounded-lg ${
                           cleared ? 'bg-gray-50' : 'bg-amber-50'
@@ -1217,32 +1320,80 @@ export default function AdminPanel() {
                         )}
                       </div>
 
-                      {/* Fees progress bar */}
+                      <div className="mb-3 flex items-center gap-2">
+                        <form
+                          className="flex items-center gap-2"
+                          onSubmit={(e) => void handleSavePayment(e, student)}
+                        >
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={paymentDrafts[student.id] ?? ''}
+                            onChange={(e) =>
+                              setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
+                            }
+                            aria-label={`Payment amount for ${student.name}`}
+                            title={`Payment amount for ${student.name}`}
+                            placeholder="0.00"
+                            className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                          />
+                          <button
+                            type="submit"
+                            disabled={savingId === student.id}
+                            title="Save payment"
+                            aria-label={`Save payment for ${student.name}`}
+                            className="rounded bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            <Save className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingId === student.id || student.feesBalance === 0}
+                            onClick={() => void handleClear(student)}
+                            title="Clear balance"
+                            aria-label={`Clear balance for ${student.name}`}
+                            className="rounded bg-green-500 p-1.5 text-white hover:bg-green-600 disabled:opacity-50"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          </button>
+                        </form>
+                        <button
+                          type="button"
+                          onClick={() => handleEditStudent(student)}
+                          title="Edit student profile"
+                          aria-label={`Edit profile for ${student.name}`}
+                          className="rounded bg-blue-500 p-1.5 text-white hover:bg-blue-600"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
                       <div className="mb-3">
                         <div className="mb-1 flex justify-between text-xs text-gray-500">
                           <span>Paid: ${student.amountPaid.toFixed(2)}</span>
                           <span>Total: ${student.totalFees.toFixed(2)}</span>
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              cleared ? 'bg-emerald-500' : 'bg-amber-400'
-                            }`}
-                            style={{ width: `${Math.min(student.totalFees > 0 ? (student.amountPaid / student.totalFees) * 100 : 0, 100)}%` }}
+                          <progress
+                            className={`payment-progress h-full ${cleared ? 'payment-progress-clear' : 'payment-progress-warning'}`}
+                            max={student.totalFees > 0 ? student.totalFees : 1}
+                            value={Math.min(student.amountPaid, student.totalFees > 0 ? student.totalFees : 1)}
+                            aria-label={`${student.name} payment completion`}
+                            title={`${Math.round(getPaymentCompletionPercent(student.amountPaid, student.totalFees))}% fees paid`}
                           />
                         </div>
                       </div>
 
-                      {/* Activity badges */}
                       <div className="flex flex-wrap gap-1.5">
                         {summary.printCount > 0 && (
                           <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
-                            Printed {summary.printCount}×
+                            Printed {summary.printCount}x
                           </span>
                         )}
                         {summary.downloadCount > 0 && (
                           <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">
-                            Downloaded {summary.downloadCount}×
+                            Downloaded {summary.downloadCount}x
                           </span>
                         )}
                         {summary.total === 0 && (
@@ -1371,8 +1522,108 @@ export default function AdminPanel() {
             </div>
           )}
 
+
         </main>
       </div>
+
+      {editingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-base font-semibold text-gray-900">Edit Student Profile</h2>
+              <button
+                type="button"
+                title="Close edit student dialog"
+                aria-label="Close edit student dialog"
+                onClick={() => setEditingStudent(null)}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form onSubmit={(e) => void handleSaveEdit(e)} className="px-6 py-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="edit-student-name" className="mb-1 block text-xs font-medium text-gray-700">Full Name</label>
+                  <input
+                    id="edit-student-name"
+                    type="text"
+                    required
+                    minLength={2}
+                    maxLength={120}
+                    value={editDraft.name}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-student-email" className="mb-1 block text-xs font-medium text-gray-700">Email</label>
+                  <input
+                    id="edit-student-email"
+                    type="email"
+                    required
+                    value={editDraft.email}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, email: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-student-id" className="mb-1 block text-xs font-medium text-gray-700">Registration No.</label>
+                  <input
+                    id="edit-student-id"
+                    type="text"
+                    value={editDraft.studentId}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, studentId: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="e.g. STU-001"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-student-course" className="mb-1 block text-xs font-medium text-gray-700">Course</label>
+                  <input
+                    id="edit-student-course"
+                    type="text"
+                    value={editDraft.course}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, course: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="e.g. BSc Computer Science"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">Total Fees ($)</label>
+                  <input
+                    id="edit-student-total-fees"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value={editDraft.totalFees}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, totalFees: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingStudent(null)}
+                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {savingEdit ? 'Saving\u2026' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+

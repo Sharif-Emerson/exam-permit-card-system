@@ -12,6 +12,7 @@ import {
   getProfileById,
   getSessionUser,
   getUploadsDir,
+  adminUpdateStudentProfile,
   getUserByEmail,
   getUserByStudentId,
   insertActivityLog,
@@ -253,6 +254,65 @@ app.post('/auth/login', (request, response) => {
       name: user.name,
     },
   })
+})
+
+app.patch('/profiles/:id/admin', authenticate, requireAdmin, (request, response) => {
+  const profile = getProfileById(request.params.id)
+
+  if (!profile) {
+    response.status(404).json({ message: 'Profile not found.' })
+    return
+  }
+
+  const name = typeof request.body.name === 'string' ? request.body.name.trim() : undefined
+  const email = typeof request.body.email === 'string' ? request.body.email.trim().toLowerCase() : undefined
+  const studentId = typeof request.body.student_id === 'string' ? request.body.student_id.trim() : undefined
+  const course = typeof request.body.course === 'string' ? request.body.course.trim() : undefined
+  const totalFees = typeof request.body.total_fees === 'number' ? request.body.total_fees : undefined
+
+  if (typeof name !== 'undefined' && (name.length < 2 || name.length > 120)) {
+    response.status(400).json({ message: 'Name must be between 2 and 120 characters long.' })
+    return
+  }
+
+  if (typeof email !== 'undefined' && !isValidEmailAddress(email)) {
+    response.status(400).json({ message: 'A valid email address is required.' })
+    return
+  }
+
+  if (typeof totalFees !== 'undefined' && !isValidCurrencyAmount(totalFees)) {
+    response.status(400).json({ message: 'Total fees must be a valid non-negative amount.' })
+    return
+  }
+
+  const updates = {}
+  if (typeof name !== 'undefined') updates.name = name
+  if (typeof email !== 'undefined') updates.email = email
+  if (typeof studentId !== 'undefined') updates.student_id = studentId || null
+  if (typeof course !== 'undefined') updates.course = course || null
+  if (typeof totalFees !== 'undefined') updates.total_fees = totalFees
+
+  try {
+    const updatedProfile = adminUpdateStudentProfile(request.params.id, updates)
+
+    if (!updatedProfile) {
+      response.status(404).json({ message: 'Profile not found.' })
+      return
+    }
+
+    insertActivityLog({
+      adminId: request.userId,
+      targetProfileId: request.params.id,
+      action: 'admin_update_student_profile',
+      details: updates,
+    })
+
+    response.json(updatedProfile)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to update student profile.'
+    const nextMessage = /unique/i.test(message) ? 'That email address or registration number is already in use.' : message
+    response.status(400).json({ message: nextMessage })
+  }
 })
 
 app.post('/auth/logout', authenticate, (request, response) => {

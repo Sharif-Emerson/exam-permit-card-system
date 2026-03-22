@@ -1,5 +1,5 @@
 import { apiBaseUrl } from '../../config/provider'
-import type { AdminActivityLog, AppProfile, DatabaseProfileRow, PermitActivityAction, StudentAccountUpdateInput, StudentExam, StudentProfile } from '../../types'
+import type { AdminActivityLog, AdminProfileUpdateInput, AppProfile, DatabaseProfileRow, PermitActivityAction, StudentAccountUpdateInput, StudentExam, StudentProfile } from '../../types'
 import { getStoredAuthToken } from '../rest/tokenStorage'
 import { ensureStudentProfile, mapProfile } from '../shared/profileMapper'
 import type { DataAdapter, FinancialUpdateValues } from './types'
@@ -166,6 +166,27 @@ export const restDataAdapter: DataAdapter = {
     })
 
     return ensureStudentProfile(mapProfile(toDatabaseProfileRow(payload)))
+  },
+  async adminUpdateStudentProfile(studentId: string, values: AdminProfileUpdateInput, adminId: string): Promise<StudentProfile> {
+    const payload: Record<string, unknown> = {}
+    if (typeof values.name === 'string') payload.name = values.name
+    if (typeof values.email === 'string') payload.email = values.email
+    if (typeof values.studentId === 'string') payload.student_id = values.studentId || null
+    if (typeof values.course === 'string') payload.course = values.course || null
+    if (typeof values.totalFees === 'number') payload.total_fees = Number(values.totalFees.toFixed(2))
+
+    const result = await request(`/profiles/${studentId}/admin`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+
+    try {
+      await logAdminAction(adminId, studentId, { ...(typeof values.totalFees === 'number' && { totalFees: values.totalFees }) })
+    } catch {
+      // Ignore audit logging failures
+    }
+
+    return ensureStudentProfile(mapProfile(toDatabaseProfileRow(result)))
   },
   async updateStudentFinancials(studentId: string, values: FinancialUpdateValues, adminId: string) {
     const payload: Record<string, number> = {}

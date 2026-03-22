@@ -1,6 +1,6 @@
 import { activeDataAdapter } from '../adapters/data'
 import type { FinancialUpdateValues } from '../adapters/data/types'
-import type { AdminActivityLog, AppProfile, FinancialImportResult, FinancialImportUpdate, PermitActivityAction, StudentAccountUpdateInput, StudentProfile } from '../types'
+import type { AdminActivityLog, AdminProfileUpdateInput, AppProfile, FinancialImportResult, FinancialImportUpdate, PermitActivityAction, StudentAccountUpdateInput, StudentProfile } from '../types'
 
 export function getDataConfigError() {
   return activeDataAdapter.getConfigError()
@@ -24,6 +24,10 @@ export async function fetchAdminActivityLogs(): Promise<AdminActivityLog[]> {
 
 export async function updateStudentAccount(studentId: string, values: StudentAccountUpdateInput): Promise<StudentProfile> {
   return activeDataAdapter.updateStudentAccount(studentId, values)
+}
+
+export async function adminUpdateStudentProfile(studentId: string, values: AdminProfileUpdateInput, adminId: string): Promise<StudentProfile> {
+  return activeDataAdapter.adminUpdateStudentProfile(studentId, values, adminId)
 }
 
 export async function updateStudentFinancials(studentId: string, values: FinancialUpdateValues, adminId: string) {

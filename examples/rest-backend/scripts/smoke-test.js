@@ -35,7 +35,7 @@ await fs.writeFile(smokeCsvPath, 'student_id,amount_paid,total_fees\nSTU001,2800
 const login = await request('/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email: 'admin@example.com', password: 'Permit@2026' }),
+  body: JSON.stringify({ identifier: 'admin@example.com', password: 'Permit@2026' }),
 })
 
 const formData = new FormData()
@@ -62,13 +62,13 @@ const publicPermit = await request(`/permits/${profile.permit_token}`)
 const studentLogin = await request('/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email: 'student1@example.com', password: 'Permit@2026' }),
+  body: JSON.stringify({ identifier: 'student1@example.com', password: 'Permit@2026' }),
 })
 
 const otherStudentLogin = await request('/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email: 'student2@example.com', password: 'Permit@2026' }),
+  body: JSON.stringify({ identifier: 'student2@example.com', password: 'Permit@2026' }),
 })
 
 const forbiddenProfileAccess = await requestRaw('/profiles/student-1', {
@@ -85,6 +85,36 @@ const accountUpdated = await request('/profiles/student-1/account', {
     name: 'John Doe Updated',
     email: 'student1@example.com',
     profileImage: 'https://example.com/avatar.png',
+  }),
+})
+
+const adminUpdatedProfile = await request('/profiles/student-1/admin', {
+  method: 'PATCH',
+  headers: {
+    Authorization: `Bearer ${login.token}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    name: 'John Doe Admin Updated',
+    email: 'student1@example.com',
+    student_id: 'STU001-UPDATED',
+    course: 'Computer Science',
+    total_fees: 3200,
+  }),
+})
+
+const adminRestoredProfile = await request('/profiles/student-1/admin', {
+  method: 'PATCH',
+  headers: {
+    Authorization: `Bearer ${login.token}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    name: 'John Doe',
+    email: 'student1@example.com',
+    student_id: 'STU001',
+    course: 'Computer Science',
+    total_fees: 3000,
   }),
 })
 
@@ -111,5 +141,7 @@ console.log(JSON.stringify({
   otherStudentLogin,
   forbiddenProfileAccess,
   accountUpdated,
+  adminUpdatedProfile,
+  adminRestoredProfile,
   accountRestored,
 }, null, 2))

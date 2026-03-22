@@ -75,6 +75,14 @@ export interface StudentAccountUpdateInput {
   profileImage?: string | null
 }
 
+export interface AdminProfileUpdateInput {
+  name?: string
+  email?: string
+  studentId?: string
+  course?: string
+  totalFees?: number
+}
+
 export interface FinancialImportRow {
   rowNumber: number
   studentId?: string
