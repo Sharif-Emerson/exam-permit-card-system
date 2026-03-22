@@ -1,5 +1,9 @@
-import { ChangeEvent, DragEvent, FormEvent, useEffect, useState } from 'react'
-import { CheckCircle2, Download, FileSpreadsheet, LogOut, RefreshCcw, Save, Upload } from 'lucide-react'
+﻿import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useState } from 'react'
+import {
+  BarChart2, Bell, CheckCircle2, Download, FileCheck,
+  FileSpreadsheet, FileUp, LayoutDashboard, LogOut, Menu,
+  RefreshCcw, Save, Search, Upload, Users, X,
+} from 'lucide-react'
 import BrandMark from './BrandMark'
 import { useAuth } from '../context/AuthContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
@@ -18,6 +22,7 @@ type ImportPreviewRow = {
   reason?: string
   studentName?: string
 }
+type NavSection = 'dashboard' | 'students' | 'permits' | 'import' | 'reports'
 
 function getActivityTimestamp(value: string | null | undefined) {
   if (!value) {
@@ -43,6 +48,10 @@ export default function AdminPanel() {
   const [showPrintedOnly, setShowPrintedOnly] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [activeSection, setActiveSection] = useState<NavSection>('students')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'outstanding'>('all')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     void loadStudents()
@@ -107,6 +116,37 @@ export default function AdminPanel() {
   const visibleStudents = showPrintedOnly
     ? students.filter((student) => getStudentPrintSummary(student.id).hasPrinted)
     : students
+
+  const filteredStudents = visibleStudents
+    .filter((s) => {
+      if (filterStatus === 'paid') return s.feesBalance === 0
+      if (filterStatus === 'outstanding') return s.feesBalance > 0
+      return true
+    })
+    .filter((s) => {
+      if (!searchQuery.trim()) return true
+      const q = searchQuery.toLowerCase()
+      return (
+        s.name.toLowerCase().includes(q) ||
+        s.email.toLowerCase().includes(q) ||
+        s.studentId.toLowerCase().includes(q)
+      )
+    })
+
+  const totalStudents = students.length
+  const clearedStudents = students.filter((s) => s.feesBalance === 0).length
+  const outstandingStudents = students.filter((s) => s.feesBalance > 0).length
+  const permitEventCount = permitActivityLogs.length
+
+  const courseBreakdown = students.reduce<Record<string, { total: number; cleared: number }>>((acc, s) => {
+    const course = s.course || 'Unknown'
+    if (!acc[course]) acc[course] = { total: 0, cleared: 0 }
+    acc[course].total++
+    if (s.feesBalance === 0) acc[course].cleared++
+    return acc
+  }, {})
+  const courseNames = Object.keys(courseBreakdown)
+  const maxCourseCount = Math.max(...courseNames.map((c) => courseBreakdown[c].total), 1)
 
   function handleExportPermitActivity() {
     if (permitActivityLogs.length === 0) {
@@ -301,6 +341,19 @@ export default function AdminPanel() {
     setPendingImportUpdates([])
   }
 
+  const navItems: { key: NavSection; label: string; icon: ReactNode; badge?: number }[] = [
+    { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { key: 'students', label: 'Students', icon: <Users className="w-5 h-5" />, badge: outstandingStudents > 0 ? outstandingStudents : undefined },
+    { key: 'permits', label: 'Permit Activity', icon: <FileCheck className="w-5 h-5" />, badge: permitEventCount > 0 ? permitEventCount : undefined },
+    { key: 'import', label: 'Bulk Import', icon: <FileUp className="w-5 h-5" /> },
+    { key: 'reports', label: 'Reports', icon: <BarChart2 className="w-5 h-5" /> },
+  ]
+
+  function navigate(section: NavSection) {
+    setActiveSection(section)
+    setSidebarOpen(false)
+  }
+
   function handleDragEnter(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault()
     setDragActive(true)
@@ -331,326 +384,765 @@ export default function AdminPanel() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-emerald-50 p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+      <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-700 mx-auto mb-4"></div>
-          <p className="text-emerald-700">Loading student accounts...</p>
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-b-2 border-emerald-600" />
+          <p className="text-gray-500">Loading student accounts...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-emerald-50 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
-          <div>
-            <BrandMark
-              titleClassName="text-2xl sm:text-3xl font-bold text-gray-900"
-              subtitleClassName="text-sm text-emerald-700"
-            />
-            <p className="mt-3 text-sm text-emerald-700">Student clearance control</p>
+    <div className="flex h-screen overflow-hidden bg-gray-50">
+
+      {/* Mobile sidebar backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* â”€â”€ Sidebar â”€â”€ */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-white shadow-lg transition-transform duration-300 lg:static lg:translate-x-0 lg:shadow-none lg:border-r lg:border-gray-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        {/* Logo */}
+        <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-5">
+          <BrandMark
+            titleClassName="text-base font-bold text-gray-900 leading-tight"
+            subtitleClassName="text-xs text-emerald-600"
+          />
+          <button
+            type="button"
+            className="ml-auto text-gray-400 hover:text-gray-600 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-gray-400">Menu</p>
+          <ul className="space-y-1">
+            {navItems.map((item) => (
+              <li key={item.key}>
+                <button
+                  type="button"
+                  onClick={() => navigate(item.key)}
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                    activeSection === item.key
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  <span className={activeSection === item.key ? 'text-emerald-600' : 'text-gray-400'}>
+                    {item.icon}
+                  </span>
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {item.badge !== undefined && (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        activeSection === item.key ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        {/* Admin profile + logout at bottom */}
+        <div className="border-t border-gray-200 p-4">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
+              {user?.name?.[0]?.toUpperCase() ?? 'A'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-gray-900">{user?.name ?? 'Admin'}</p>
+              <p className="text-[11px] text-gray-400">Administrator</p>
+            </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-50 hover:text-red-600"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
+        </div>
+      </aside>
+
+      {/* â”€â”€ Main area â”€â”€ */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+
+        {/* Top header */}
+        <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 sm:px-6">
+          <button
+            type="button"
+            className="text-gray-500 hover:text-gray-700 lg:hidden"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+
+          {/* Search */}
+          <div className="flex max-w-sm flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+            <Search className="h-4 w-4 flex-shrink-0 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search students..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                if (activeSection !== 'students') setActiveSection('students')
+              }}
+              className="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
+            />
+            {searchQuery && (
+              <button type="button" onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="ml-auto flex items-center gap-3">
+            {/* Notification bell */}
+            <button type="button" className="relative text-gray-500 hover:text-gray-700" title="Outstanding balances">
+              <Bell className="h-5 w-5" />
+              {outstandingStudents > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+                  {outstandingStudents > 9 ? '9+' : String(outstandingStudents)}
+                </span>
+              )}
+            </button>
+
+            {/* Refresh */}
             <button
               type="button"
               onClick={() => void loadStudents()}
-              className="flex items-center justify-center px-3 sm:px-4 py-2 bg-white border border-emerald-200 text-emerald-900 rounded-lg hover:bg-emerald-50 transition-colors text-sm sm:text-base"
+              className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
             >
-              <RefreshCcw className="w-4 h-4 mr-2" />
-              Refresh
+              <RefreshCcw className="h-4 w-4" />
+              <span className="hidden sm:inline">Refresh</span>
             </button>
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="flex items-center justify-center px-3 sm:px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 transition-colors text-sm sm:text-base"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </button>
-          </div>
-        </div>
-        {error && (
-          <div className="mb-4 p-4 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">
-            {error}
-          </div>
-        )}
-        {successMessage && (
-          <div className="mb-4 p-4 rounded-lg border border-green-200 bg-green-50 text-green-700 text-sm">
-            {successMessage}
-          </div>
-        )}
-        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow border border-emerald-200">
-          <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-emerald-900">Recent Permit Activity</h2>
-                <p className="text-sm text-emerald-700">Students who have printed or downloaded permits.</p>
+
+            {/* Profile chip */}
+            <div className="hidden items-center gap-2 sm:flex">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
+                {user?.name?.[0]?.toUpperCase() ?? 'A'}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-emerald-800 border border-emerald-200">
-                  {permitActivityLogs.length} tracked event(s)
-                </span>
+              <span className="text-sm font-medium text-gray-700">{user?.name ?? 'Admin'}</span>
+            </div>
+          </div>
+        </header>
+
+        {/* Alert banners */}
+        {(error || successMessage) && (
+          <div className="flex-shrink-0 px-6 pt-4">
+            {error && (
+              <div className="mb-2 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <span className="flex-1">{error}</span>
+                <button type="button" onClick={() => setError('')} className="text-red-400 hover:text-red-600">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+            {successMessage && (
+              <div className="mb-2 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                <span className="flex-1">{successMessage}</span>
+                <button type="button" onClick={() => setSuccessMessage('')} className="text-green-400 hover:text-green-600">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Scrollable content */}
+        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+
+          {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ DASHBOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {activeSection === 'dashboard' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+                <p className="text-sm text-gray-500">Overview of student clearance and permit status.</p>
+              </div>
+
+              {/* Analytics cards */}
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Total Students</p>
+                    <Users className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <p className="mt-2 text-3xl font-bold text-blue-700">{totalStudents}</p>
+                  <p className="mt-1 text-xs text-blue-400">enrolled accounts</p>
+                </div>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Cleared</p>
+                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                  </div>
+                  <p className="mt-2 text-3xl font-bold text-emerald-700">{clearedStudents}</p>
+                  <p className="mt-1 text-xs text-emerald-400">fees fully paid</p>
+                </div>
+                <div className="rounded-xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-500">Outstanding</p>
+                    <FileSpreadsheet className="h-5 w-5 text-amber-400" />
+                  </div>
+                  <p className="mt-2 text-3xl font-bold text-amber-700">{outstandingStudents}</p>
+                  <p className="mt-1 text-xs text-amber-400">balance remaining</p>
+                </div>
+                <div className="rounded-xl border border-purple-100 bg-purple-50 p-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-purple-500">Permit Events</p>
+                    <FileCheck className="h-5 w-5 text-purple-400" />
+                  </div>
+                  <p className="mt-2 text-3xl font-bold text-purple-700">{permitEventCount}</p>
+                  <p className="mt-1 text-xs text-purple-400">prints &amp; downloads</p>
+                </div>
+              </div>
+
+              {/* Recent permit activity table */}
+              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                  <h2 className="font-semibold text-gray-800">Recent Permit Activity</h2>
+                  <button
+                    type="button"
+                    onClick={handleExportPermitActivity}
+                    disabled={permitActivityLogs.length === 0}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Export CSV
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <tr>
+                        <th className="px-5 py-3 text-left">Student</th>
+                        <th className="px-5 py-3 text-left">Action</th>
+                        <th className="px-5 py-3 text-left">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {permitActivityLogs.slice(0, 8).map((log) => {
+                        const student = students.find((s) => s.id === log.targetProfileId)
+                        return (
+                          <tr key={log.id} className="hover:bg-gray-50">
+                            <td className="px-5 py-3 font-medium text-gray-800">{student?.name ?? log.targetProfileId}</td>
+                            <td className="px-5 py-3">
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.action === 'print_permit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                {log.action === 'print_permit' ? 'Printed' : 'Downloaded'}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-gray-500">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</td>
+                          </tr>
+                        )
+                      })}
+                      {permitActivityLogs.length === 0 && (
+                        <tr>
+                          <td className="px-5 py-6 text-center text-gray-400" colSpan={3}>No permit activity recorded yet.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Quick navigation tiles */}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                {navItems
+                  .filter((n) => n.key !== 'dashboard')
+                  .map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => navigate(item.key)}
+                      className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-emerald-300 hover:bg-emerald-50"
+                    >
+                      <span className="text-emerald-600">{item.icon}</span>
+                      <span className="text-xs font-medium text-gray-700">{item.label}</span>
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ STUDENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {activeSection === 'students' && (
+            <div className="space-y-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Students</h1>
+                  <p className="text-sm text-gray-500">{filteredStudents.length} student(s) shown</p>
+                </div>
                 <button
                   type="button"
                   onClick={handleExportPermitActivity}
                   disabled={permitActivityLogs.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-900 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-2 self-start rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Export CSV
+                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {(['all', 'paid', 'outstanding'] as const).map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => setFilterStatus(status)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize ${
+                        filterStatus === status
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                          : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {status === 'all'
+                        ? `All (${totalStudents})`
+                        : status === 'paid'
+                          ? `Cleared (${clearedStudents})`
+                          : `Outstanding (${outstandingStudents})`}
+                    </button>
+                  ))}
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={showPrintedOnly}
+                      onChange={(e) => setShowPrintedOnly(e.target.checked)}
+                      className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600"
+                    />
+                    Show printed students only
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <tr>
+                        <th className="px-5 py-3 text-left">Student</th>
+                        <th className="px-5 py-3 text-left">Course</th>
+                        <th className="px-5 py-3 text-left">Total Fees</th>
+                        <th className="px-5 py-3 text-left">Amount Paid</th>
+                        <th className="px-5 py-3 text-left">Balance</th>
+                        <th className="px-5 py-3 text-left">Status</th>
+                        <th className="px-5 py-3 text-left">Permit Activity</th>
+                        <th className="px-5 py-3 text-left">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredStudents.map((student) => {
+                        const summary = getStudentPrintSummary(student.id)
+                        return (
+                          <tr key={student.id} className="hover:bg-gray-50">
+                            <td className="px-5 py-3">
+                              <div className="font-medium text-gray-900">{student.name}</div>
+                              <div className="text-xs text-gray-400">{student.studentId} Â· {student.email}</div>
+                            </td>
+                            <td className="px-5 py-3 text-gray-600">{student.course || '-'}</td>
+                            <td className="px-5 py-3 text-gray-700">${student.totalFees.toFixed(2)}</td>
+                            <td className="px-5 py-3 font-medium text-green-700">${student.amountPaid.toFixed(2)}</td>
+                            <td className="px-5 py-3">
+                              <span className={`font-semibold ${student.feesBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                ${student.feesBalance.toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3">
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${student.feesBalance === 0 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                {student.feesBalance === 0 ? 'Cleared' : 'Outstanding'}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-xs text-gray-500">
+                              {summary.total === 0
+                                ? 'None'
+                                : (
+                                  <>
+                                    {summary.printCount > 0 && <span>Printed {summary.printCount}x</span>}
+                                    {summary.printCount > 0 && summary.downloadCount > 0 && <span>, </span>}
+                                    {summary.downloadCount > 0 && <span>Downloaded {summary.downloadCount}x</span>}
+                                  </>
+                                )}
+                            </td>
+                            <td className="px-5 py-3">
+                              <form
+                                className="flex items-center gap-2"
+                                onSubmit={(e) => void handleSavePayment(e, student)}
+                              >
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={paymentDrafts[student.id] ?? ''}
+                                  onChange={(e) =>
+                                    setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
+                                  }
+                                  className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                                />
+                                <button
+                                  type="submit"
+                                  disabled={savingId === student.id}
+                                  title="Save payment"
+                                  className="rounded bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  <Save className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={savingId === student.id || student.feesBalance === 0}
+                                  onClick={() => void handleClear(student)}
+                                  title="Clear balance"
+                                  className="rounded bg-green-500 p-1.5 text-white hover:bg-green-600 disabled:opacity-50"
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                </button>
+                              </form>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {filteredStudents.length === 0 && (
+                        <tr>
+                          <td className="px-5 py-8 text-center text-gray-400" colSpan={8}>
+                            {searchQuery
+                              ? `No students match "${searchQuery}"`
+                              : showPrintedOnly
+                                ? 'No students have printed a permit yet.'
+                                : 'No students found.'}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ PERMIT ACTIVITY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {activeSection === 'permits' && (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Permit Activity</h1>
+                  <p className="text-sm text-gray-500">{permitActivityLogs.length} event(s) tracked</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleExportPermitActivity}
+                  disabled={permitActivityLogs.length === 0}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
                 >
                   <Download className="h-4 w-4" />
                   Export CSV
                 </button>
               </div>
-            </div>
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="text-emerald-700">
-                  <tr>
-                    <th className="px-3 py-2">Student</th>
-                    <th className="px-3 py-2">Action</th>
-                    <th className="px-3 py-2">Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {permitActivityLogs.slice(0, 8).map((log) => {
-                    const student = students.find((entry) => entry.id === log.targetProfileId)
-                    return (
-                      <tr key={log.id} className="border-t border-emerald-100">
-                        <td className="px-3 py-2">{student?.name ?? log.targetProfileId}</td>
-                        <td className="px-3 py-2">{log.action === 'print_permit' ? 'Printed permit' : 'Downloaded permit'}</td>
-                        <td className="px-3 py-2">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</td>
-                      </tr>
-                    )
-                  })}
-                  {permitActivityLogs.length === 0 && (
-                    <tr>
-                      <td className="px-3 py-3 text-emerald-700" colSpan={3}>No permit activity has been recorded yet.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-emerald-900 font-medium">
-                  <FileSpreadsheet className="h-4 w-4" />
-                  Bulk Financial Import
-                </div>
-                <p className="mt-1 text-sm text-emerald-700">
-                  Upload a .xlsx or .csv file with columns such as <strong>student_id</strong> or <strong>email</strong>, plus <strong>amount_paid</strong> and optional <strong>total_fees</strong>.
-                </p>
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={downloadFinancialImportTemplate}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-900 hover:bg-emerald-100"
-                >
-                  <Download className="h-4 w-4" />
-                  Download Template
-                </button>
-                <label
-                  className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white ${importing ? 'bg-emerald-400' : dragActive ? 'bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700'} cursor-pointer`}
-                  onDragEnter={handleDragEnter}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(event) => void handleDrop(event)}
-                >
-                  <Upload className="h-4 w-4" />
-                  {importing ? 'Importing...' : dragActive ? 'Drop File Here' : 'Upload Spreadsheet'}
-                  <input
-                    type="file"
-                    accept=".xlsx,.csv"
-                    className="hidden"
-                    disabled={importing}
-                    onChange={(event) => void handleImportFile(event)}
-                  />
-                </label>
-              </div>
-            </div>
-            {importPreviewRows.length > 0 && (
-              <div className="mt-4 rounded-lg border border-emerald-200 bg-white p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-emerald-900">Import Preview</h3>
-                    <p className="text-xs text-emerald-700">
-                      Reviewing {importPreviewRows.length} row(s) from {importFileName}. {pendingImportUpdates.length} row(s) are ready to apply.
-                    </p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={clearImportPreview}
-                      className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-900 hover:bg-emerald-100"
-                    >
-                      Clear Preview
-                    </button>
-                    <button
-                      type="button"
-                      disabled={importing || pendingImportUpdates.length === 0}
-                      onClick={() => void handleApplyImport()}
-                      className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
-                    >
-                      Apply Import
-                    </button>
-                  </div>
-                </div>
-                <div className="mt-4 overflow-x-auto">
-                  <table className="min-w-full text-left text-sm">
-                    <thead className="text-emerald-700">
+
+              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                       <tr>
-                        <th className="px-3 py-2">Row</th>
-                        <th className="px-3 py-2">Match Key</th>
-                        <th className="px-3 py-2">Student</th>
-                        <th className="px-3 py-2">Amount Paid</th>
-                        <th className="px-3 py-2">Total Fees</th>
-                        <th className="px-3 py-2">Status</th>
+                        <th className="px-5 py-3 text-left">Student</th>
+                        <th className="px-5 py-3 text-left">Student ID</th>
+                        <th className="px-5 py-3 text-left">Action</th>
+                        <th className="px-5 py-3 text-left">Time</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {importPreviewRows.slice(0, 12).map((row) => (
-                        <tr key={`${row.rowNumber}-${row.matcher}`} className="border-t border-emerald-100">
-                          <td className="px-3 py-2">{row.rowNumber}</td>
-                          <td className="px-3 py-2">{row.matcher}</td>
-                          <td className="px-3 py-2">{row.studentName ?? '-'}</td>
-                          <td className="px-3 py-2">{typeof row.amountPaid === 'number' ? `$${row.amountPaid.toFixed(2)}` : '-'}</td>
-                          <td className="px-3 py-2">{typeof row.totalFees === 'number' ? `$${row.totalFees.toFixed(2)}` : '-'}</td>
-                          <td className="px-3 py-2">
-                            <span className={`rounded px-2 py-1 text-xs font-medium ${row.status === 'ready' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                              {row.status === 'ready' ? 'Ready' : row.reason ?? 'Skipped'}
-                            </span>
-                          </td>
+                    <tbody className="divide-y divide-gray-100">
+                      {permitActivityLogs.map((log) => {
+                        const student = students.find((s) => s.id === log.targetProfileId)
+                        return (
+                          <tr key={log.id} className="hover:bg-gray-50">
+                            <td className="px-5 py-3 font-medium text-gray-800">{student?.name ?? log.targetProfileId}</td>
+                            <td className="px-5 py-3 text-gray-500">{student?.studentId ?? '-'}</td>
+                            <td className="px-5 py-3">
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.action === 'print_permit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                {log.action === 'print_permit' ? 'Printed' : 'Downloaded'}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-gray-500">
+                              {log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {permitActivityLogs.length === 0 && (
+                        <tr>
+                          <td className="px-5 py-8 text-center text-gray-400" colSpan={4}>No permit activity has been recorded yet.</td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
-                  {importPreviewRows.length > 12 && (
-                    <p className="mt-2 text-xs text-emerald-700">Showing the first 12 rows in the preview.</p>
-                  )}
                 </div>
               </div>
-            )}
-          </div>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-lg sm:text-xl">Students</h2>
-            <label className="inline-flex items-center gap-2 text-sm text-emerald-800">
-              <input
-                type="checkbox"
-                checked={showPrintedOnly}
-                onChange={(event) => setShowPrintedOnly(event.target.checked)}
-                className="h-4 w-4 rounded border-emerald-300 text-emerald-700 focus:ring-emerald-400"
-              />
-              Show printed students only
-            </label>
-          </div>
-          <div className="space-y-3 sm:space-y-2">
-            {visibleStudents.map(student => (
-              <div key={student.id} className="p-4 sm:p-5 bg-emerald-50 rounded-xl border border-emerald-200">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    {(() => {
-                      const printSummary = getStudentPrintSummary(student.id)
+            </div>
+          )}
 
-                      return (
-                        <>
-                    <div className="font-medium text-sm sm:text-base truncate">{student.name}</div>
-                    <div className="text-xs sm:text-sm text-emerald-700 mb-2">ID: {student.id} | {student.email}</div>
-                    <div className="text-xs sm:text-sm text-emerald-700 mb-2">
-                      Permit activity: {printSummary.total === 0
-                        ? 'No print/download activity yet'
-                        : `${printSummary.printCount} print(s), ${printSummary.downloadCount} download(s), last ${printSummary.lastAction === 'print_permit' ? 'print' : 'download'} on ${printSummary.lastAt ? new Date(printSummary.lastAt).toLocaleString() : 'unknown time'}`}
-                    </div>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${printSummary.hasPrinted ? 'bg-emerald-100 text-emerald-800' : 'bg-emerald-100 text-emerald-700'}`}>
-                        {printSummary.hasPrinted ? `Printed ${printSummary.printCount}x` : 'Not printed'}
-                      </span>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${printSummary.downloadCount > 0 ? 'bg-green-100 text-green-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                        {printSummary.downloadCount > 0 ? `Downloaded ${printSummary.downloadCount}x` : 'Not downloaded'}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm">
-                      <div>
-                        <span className="text-emerald-700">Total:</span>
-                        <span className="font-semibold ml-1">${student.totalFees.toFixed(2)}</span>
-                      </div>
-                      <div>
-                        <span className="text-emerald-700">Paid:</span>
-                        <span className="font-semibold ml-1 text-green-600">${student.amountPaid.toFixed(2)}</span>
-                      </div>
-                      <div>
-                        <span className="text-emerald-700">Balance:</span>
-                        <span className={`font-semibold ml-1 ${student.feesBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          ${student.feesBalance.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
-                      <progress
-                        className={`payment-progress ${student.feesBalance > 0 ? 'payment-progress-danger' : 'payment-progress-clear'}`}
-                        value={Math.min((student.amountPaid / student.totalFees) * 100, 100)}
-                        max={100}
+          {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ BULK IMPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          <div className={activeSection !== 'import' ? 'hidden' : 'block'}>
+            <div className="space-y-5">
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Bulk Financial Import</h1>
+                <p className="text-sm text-gray-500">Upload a .xlsx or .csv file to update student financial data in bulk.</p>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <p className="max-w-sm text-sm text-gray-600">
+                    Use columns such as{' '}
+                    <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_id</code> or{' '}
+                    <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">email</code>, plus{' '}
+                    <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">amount_paid</code> and optional{' '}
+                    <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">total_fees</code>.
+                  </p>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={downloadFinancialImportTemplate}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download Template
+                    </button>
+                    <label
+                      className={`inline-flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white ${importing ? 'bg-emerald-400' : dragActive ? 'bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                      onDragEnter={handleDragEnter}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => void handleDrop(e)}
+                    >
+                      <Upload className="h-4 w-4" />
+                      {importing ? 'Importing...' : dragActive ? 'Drop File Here' : 'Upload Spreadsheet'}
+                      <input
+                        type="file"
+                        accept=".xlsx,.csv"
+                        className="hidden"
+                        disabled={importing}
+                        onChange={(e) => void handleImportFile(e)}
                       />
-                    </div>
-                    <form className="mt-4 flex flex-col lg:flex-row gap-3" onSubmit={(event) => void handleSavePayment(event, student)}>
-                      <label className="flex-1">
-                        <span className="block text-xs font-medium text-emerald-700 mb-1">Amount Paid</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={paymentDrafts[student.id] ?? ''}
-                          onChange={(event) => setPaymentDrafts((current) => ({ ...current, [student.id]: event.target.value }))}
-                          className="w-full rounded-lg border border-emerald-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                        />
-                      </label>
-                      <div className="flex gap-3 items-end">
+                    </label>
+                  </div>
+                </div>
+
+                {importPreviewRows.length > 0 && (
+                  <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="font-semibold text-gray-800">Import Preview</h3>
+                        <p className="text-xs text-gray-500">
+                          {importPreviewRows.length} row(s) from {importFileName}. â€” {pendingImportUpdates.length} row(s) are ready to apply.
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
                         <button
-                          type="submit"
-                          disabled={savingId === student.id}
-                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
+                          type="button"
+                          onClick={clearImportPreview}
+                          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
                         >
-                          <Save className="w-4 h-4" />
-                          Save
+                          Clear
                         </button>
                         <button
                           type="button"
-                          disabled={savingId === student.id || student.feesBalance === 0}
-                          onClick={() => void handleClear(student)}
-                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
+                          disabled={importing || pendingImportUpdates.length === 0}
+                          onClick={() => void handleApplyImport()}
+                          className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
                         >
-                          <CheckCircle2 className="w-4 h-4" />
-                          Clear Student
+                          Apply Import
                         </button>
                       </div>
-                    </form>
-                        </>
-                      )
-                    })()}
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Row</th>
+                            <th className="px-3 py-2 text-left">Key</th>
+                            <th className="px-3 py-2 text-left">Student</th>
+                            <th className="px-3 py-2 text-left">Amount Paid</th>
+                            <th className="px-3 py-2 text-left">Total Fees</th>
+                            <th className="px-3 py-2 text-left">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {importPreviewRows.slice(0, 12).map((row) => (
+                            <tr key={`${row.rowNumber}-${row.matcher}`} className="bg-white">
+                              <td className="px-3 py-2 text-gray-500">{row.rowNumber}</td>
+                              <td className="px-3 py-2 text-gray-700">{row.matcher}</td>
+                              <td className="px-3 py-2 text-gray-700">{row.studentName ?? '-'}</td>
+                              <td className="px-3 py-2 text-gray-700">
+                                {typeof row.amountPaid === 'number' ? `$${row.amountPaid.toFixed(2)}` : '-'}
+                              </td>
+                              <td className="px-3 py-2 text-gray-700">
+                                {typeof row.totalFees === 'number' ? `$${row.totalFees.toFixed(2)}` : '-'}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className={`rounded px-2 py-1 text-xs font-medium ${row.status === 'ready' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                  {row.status === 'ready' ? 'Ready' : (row.reason ?? 'Skipped')}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {importPreviewRows.length > 12 && (
+                        <p className="mt-2 text-xs text-gray-400">Showing the first 12 rows.</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-shrink-0">
-                    {student.feesBalance > 0 && (
-                      <span className="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded whitespace-nowrap">
-                        Outstanding
-                      </span>
-                    )}
-                    {student.feesBalance === 0 && (
-                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded whitespace-nowrap">
-                        Paid
-                      </span>
-                    )}
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ REPORTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          {activeSection === 'reports' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Reports &amp; Analytics</h1>
+                <p className="text-sm text-gray-500">Financial clearance breakdown and permit issuance trends.</p>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Bar chart: students by course */}
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <h2 className="mb-4 font-semibold text-gray-800">Students by Course</h2>
+                  {courseNames.length === 0 ? (
+                    <p className="text-sm text-gray-400">No course data available.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {courseNames.map((course) => {
+                        const { total, cleared } = courseBreakdown[course]
+                        const barPct = Math.round((total / maxCourseCount) * 100)
+                        const clearedPct = total > 0 ? Math.round((cleared / total) * 100) : 0
+                        return (
+                          <div key={course}>
+                            <div className="mb-1 flex items-center justify-between text-xs text-gray-600">
+                              <span className="truncate font-medium">{course}</span>
+                              <span>{cleared}/{total} cleared</span>
+                            </div>
+                            <div className="h-5 w-full overflow-hidden rounded-full bg-gray-100">
+                              <div className="flex h-full overflow-hidden rounded-full" style={{ width: `${barPct}%` }}>
+                                <div className="h-full bg-emerald-500" style={{ width: `${clearedPct}%` }} />
+                                <div className="h-full bg-amber-400" style={{ width: `${100 - clearedPct}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                      Cleared
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />
+                      Outstanding
+                    </span>
+                  </div>
+                </div>
+
+                {/* Donut chart: clearance ratio */}
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <h2 className="mb-4 font-semibold text-gray-800">Clearance Status</h2>
+                  {totalStudents === 0 ? (
+                    <p className="text-sm text-gray-400">No student data yet.</p>
+                  ) : (
+                    (() => {
+                      const r = 60
+                      const cx = 80
+                      const cy = 80
+                      const clearedAngle = (clearedStudents / totalStudents) * 360
+                      function toCartesian(angleDeg: number) {
+                        const rad = ((angleDeg - 90) * Math.PI) / 180
+                        return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }
+                      }
+                      const start = toCartesian(0)
+                      const end = toCartesian(clearedAngle)
+                      const largeArc = clearedAngle > 180 ? 1 : 0
+                      const dCleared =
+                        clearedStudents === totalStudents
+                          ? `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`
+                          : `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y} Z`
+                      return (
+                        <div className="flex items-center gap-6">
+                          <svg width="160" height="160" viewBox="0 0 160 160">
+                            <circle cx={cx} cy={cy} r={r} fill="#fef3c7" />
+                            <path d={dCleared} fill="#10b981" />
+                            <circle cx={cx} cy={cy} r={r * 0.55} fill="white" />
+                            <text x={cx} y={cy - 5} textAnchor="middle" fontSize="18" fontWeight="bold" fill="#111827">
+                              {Math.round((clearedStudents / totalStudents) * 100)}%
+                            </text>
+                            <text x={cx} y={cy + 12} textAnchor="middle" fontSize="9" fill="#6b7280">cleared</text>
+                          </svg>
+                          <div className="space-y-3 text-sm">
+                            <div>
+                              <p className="text-xs uppercase tracking-wide text-gray-400">Cleared</p>
+                              <p className="text-2xl font-bold text-emerald-600">{clearedStudents}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wide text-gray-400">Outstanding</p>
+                              <p className="text-2xl font-bold text-amber-500">{outstandingStudents}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wide text-gray-400">Total</p>
+                              <p className="text-2xl font-bold text-gray-700">{totalStudents}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()
+                  )}
+                </div>
+
+                {/* Permit issuance summary */}
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
+                  <h2 className="mb-4 font-semibold text-gray-800">Permit Issuance Summary</h2>
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <div className="rounded-lg bg-blue-50 p-4 text-center">
+                      <p className="text-2xl font-bold text-blue-700">
+                        {permitActivityLogs.filter((l) => l.action === 'print_permit').length}
+                      </p>
+                      <p className="mt-1 text-xs text-blue-500">Total Prints</p>
+                    </div>
+                    <div className="rounded-lg bg-purple-50 p-4 text-center">
+                      <p className="text-2xl font-bold text-purple-700">
+                        {permitActivityLogs.filter((l) => l.action === 'download_permit').length}
+                      </p>
+                      <p className="mt-1 text-xs text-purple-500">Total Downloads</p>
+                    </div>
+                    <div className="rounded-lg bg-emerald-50 p-4 text-center">
+                      <p className="text-2xl font-bold text-emerald-700">
+                        {new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
+                      </p>
+                      <p className="mt-1 text-xs text-emerald-500">Students with Activity</p>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 p-4 text-center">
+                      <p className="text-2xl font-bold text-gray-700">
+                        {totalStudents - new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">No Activity Yet</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
-            {visibleStudents.length === 0 && (
-              <div className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50 px-4 py-6 text-center text-sm text-emerald-700">
-                {showPrintedOnly ? 'No students have printed a permit yet.' : 'No students found.'}
-              </div>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
+
+        </main>
       </div>
     </div>
   )
