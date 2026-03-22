@@ -2,21 +2,24 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
-import Login from './Login'
 
 const { signIn } = vi.hoisted(() => ({
   signIn: vi.fn().mockResolvedValue({ role: 'student' }),
 }))
 
-vi.mock('../context/AuthContext', () => ({
-  useAuth: () => ({
-    signIn,
-    configError: null,
-  }),
-}))
-
 describe('Login', () => {
   it('submits the entered credentials through the auth provider', async () => {
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: null,
+      loading: false,
+      configError: null,
+      signIn,
+      signOut: vi.fn(),
+      refreshUser: vi.fn().mockResolvedValue(undefined),
+    })
+
+    const { default: Login } = await import('./Login')
     const user = userEvent.setup()
 
     render(

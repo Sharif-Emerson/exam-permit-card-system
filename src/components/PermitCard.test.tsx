@@ -1,0 +1,49 @@
+import { render, screen } from '@testing-library/react'
+import { vi } from 'vitest'
+import PermitCard from './PermitCard'
+
+describe('PermitCard', () => {
+  it('renders permit details and a verification qr image', () => {
+    render(
+      <PermitCard
+        studentData={{
+          id: 'student-id',
+          email: 'student@example.com',
+          role: 'student',
+          name: 'John Doe',
+          studentId: 'STU001',
+          course: 'Computer Science',
+          examDate: '2026-04-15',
+          examTime: '10:00 AM',
+          venue: 'Hall A',
+          seatNumber: 'A-001',
+          instructions: 'Bring ID.',
+          profileImage: 'https://via.placeholder.com/150',
+          permitToken: 'permit-token-1',
+          exams: [
+            {
+              id: 'exam-1',
+              title: 'Computer Science Theory',
+              examDate: '2026-04-15',
+              examTime: '10:00 AM',
+              venue: 'Hall A',
+              seatNumber: 'A-001',
+            },
+          ],
+          totalFees: 3000,
+          amountPaid: 3000,
+          feesBalance: 0,
+        }}
+        qrCodeUrl="data:image/png;base64,permit-qr"
+        onRefresh={vi.fn()}
+        onSignOut={vi.fn()}
+        onPrint={vi.fn()}
+        onDownload={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('John Doe')).toBeTruthy()
+    expect(screen.getByText('Computer Science Theory')).toBeTruthy()
+    expect(screen.getByAltText('Verification QR code')).toBeTruthy()
+  })
+})

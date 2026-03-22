@@ -1,5 +1,14 @@
 export type Role = 'admin' | 'student'
 
+export interface StudentExam {
+  id: string
+  title: string
+  examDate: string
+  examTime: string
+  venue: string
+  seatNumber: string
+}
+
 export interface DatabaseProfileRow {
   id: string
   email: string
@@ -13,6 +22,9 @@ export interface DatabaseProfileRow {
   seat_number: string | null
   instructions: string | null
   profile_image: string | null
+  permit_token: string | null
+  exams_json: string | null
+  exams?: StudentExam[] | null
   total_fees: number
   amount_paid: number
 }
@@ -30,6 +42,8 @@ export interface StudentProfile {
   seatNumber: string
   instructions: string
   profileImage: string
+  permitToken: string
+  exams: StudentExam[]
   totalFees: number
   amountPaid: number
   feesBalance: number
@@ -52,4 +66,43 @@ export interface AuthUser {
   email: string
   role: Role
   name: string
+}
+
+export interface StudentAccountUpdateInput {
+  name?: string
+  email?: string
+  password?: string
+  profileImage?: string | null
+}
+
+export interface FinancialImportRow {
+  rowNumber: number
+  studentId?: string
+  email?: string
+  userId?: string
+  amountPaid?: number
+  totalFees?: number
+}
+
+export interface FinancialImportUpdate {
+  rowNumber: number
+  studentId: string
+  amountPaid?: number
+  totalFees?: number
+}
+
+export interface FinancialImportResult {
+  updatedCount: number
+  skippedRows: Array<{ rowNumber: number; reason: string }>
+}
+
+export type PermitActivityAction = 'print_permit' | 'download_permit'
+
+export interface AdminActivityLog {
+  id: string
+  adminId: string
+  targetProfileId: string
+  action: string
+  details: Record<string, unknown>
+  createdAt: string
 }

@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -55,12 +54,12 @@ body {
 	content: '';
 	position: absolute;
 	inset: 0;
-	background: linear-gradient(135deg, rgb(248 250 252) 0%, rgb(255 255 255) 45%, rgb(241 245 249) 100%);
-	opacity: 0.75;
+	background: linear-gradient(135deg, rgb(254 249 195) 0%, rgb(254 252 232) 45%, rgb(253 230 138) 100%);
+	opacity: 0.55;
 	pointer-events: none;
 }
 
-.permit-sheet > * {
+.permit-sheet>* {
 	position: relative;
 	z-index: 1;
 }
@@ -70,14 +69,23 @@ body {
 		background: white;
 	}
 
+	@page {
+		size: auto;
+		margin: 12mm;
+	}
+
 	.permit-sheet {
+		max-width: 88mm;
+		margin: 0 auto;
 		box-shadow: none;
-		border: 0;
-		padding: 0;
+		border: 1px solid rgb(253 224 71);
+		border-radius: 16px;
+		padding: 12px;
+		overflow: visible;
+		background: rgb(254 252 232);
 	}
 
 	.permit-sheet::before {
 		display: none;
 	}
 }
-  

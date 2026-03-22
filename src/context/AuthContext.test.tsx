@@ -1,50 +1,42 @@
 
 import { render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
-import { AuthProvider, useAuth } from './AuthContext'
 
-const { getSession, onAuthStateChange, signInWithPassword, signOut, fetchProfileById } = vi.hoisted(() => ({
+const { getSession, onAuthStateChange, signIn, signOut, fetchProfileById } = vi.hoisted(() => ({
   getSession: vi.fn(),
   onAuthStateChange: vi.fn(),
-  signInWithPassword: vi.fn(),
+  signIn: vi.fn(),
   signOut: vi.fn(),
   fetchProfileById: vi.fn(),
 }))
 
-vi.mock('../supabaseClient', () => ({
-  isSupabaseConfigured: true,
-  assertSupabaseConfigured: vi.fn(),
-  supabase: {
-    auth: {
-      getSession,
-      onAuthStateChange,
-      signInWithPassword,
-      signOut,
-    },
-  },
-}))
-
-vi.mock('../services/profileService', () => ({
-  fetchProfileById,
-}))
-
-function Consumer() {
-  const { user, loading } = useAuth()
-
-  if (loading) {
-    return <div>Loading</div>
-  }
-
-  return <div>{user ? `${user.name}:${user.role}` : 'No session'}</div>
-}
-
 describe('AuthProvider', () => {
-  it('restores the session from Supabase on startup', async () => {
-    getSession.mockResolvedValue({
-      data: { session: { user: { id: 'student-id' } } },
-      error: null,
-    })
-    onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } })
+  it('restores the session from the active auth adapter on startup', async () => {
+    const authAdaptersModule = await import('../adapters/auth')
+    authAdaptersModule.activeAuthAdapter.isConfigured = true
+    authAdaptersModule.activeAuthAdapter.getConfigError = vi.fn(() => null)
+    authAdaptersModule.activeAuthAdapter.getSession = getSession
+    authAdaptersModule.activeAuthAdapter.onAuthStateChange = onAuthStateChange
+    authAdaptersModule.activeAuthAdapter.signIn = signIn
+    authAdaptersModule.activeAuthAdapter.signOut = signOut
+
+    const profileServiceModule = await import('../services/profileService')
+    vi.spyOn(profileServiceModule, 'fetchProfileById').mockImplementation(fetchProfileById)
+
+    const { AuthProvider, useAuth } = await import('./AuthContext')
+
+    function Consumer() {
+      const { user, loading } = useAuth()
+
+      if (loading) {
+        return <div>Loading</div>
+      }
+
+      return <div>{user ? `${user.name}:${user.role}` : 'No session'}</div>
+    }
+
+    getSession.mockResolvedValue({ userId: 'student-id' })
+    onAuthStateChange.mockReturnValue(vi.fn())
     fetchProfileById.mockResolvedValue({
       id: 'student-id',
       email: 'student@example.com',
@@ -59,7 +51,7 @@ describe('AuthProvider', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('John Doe:student')).toBeInTheDocument()
+      expect(screen.getByText('John Doe:student')).toBeTruthy()
     })
   })
 })

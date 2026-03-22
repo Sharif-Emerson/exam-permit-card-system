@@ -4,27 +4,33 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "node scripts/run-vite-rest.mjs dev",
+    "dev:rest": "node scripts/dev-rest-stack.mjs",
+    "dev:rest:backend": "npm --prefix examples/rest-backend run dev",
+    "dev:rest:frontend": "node scripts/run-vite-rest.mjs dev",
+    "build": "node scripts/run-vite-rest.mjs build",
+    "build:rest": "node scripts/run-vite-rest.mjs build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --max-warnings 0",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "node scripts/run-vite-rest.mjs preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
     "lucide-react": "^0.264.0",
+    "papaparse": "^5.5.3",
+    "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-qr-code": "^2.0.3",
     "react-router-dom": "^7.13.1",
-    "react-to-print": "^2.14.11"
+    "read-excel-file": "^7.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/papaparse": "^5.5.2",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.11",
     "@typescript-eslint/eslint-plugin": "^8.26.1",

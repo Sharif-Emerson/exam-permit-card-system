@@ -16,7 +16,11 @@ build/
 .env.production.local
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 .vs/
 .idea/
 *.swp
@@ -33,3 +37,9 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+
+# Example backend runtime artifacts
+examples/rest-backend/data/*.sqlite
+examples/rest-backend/data/*.sqlite-shm
+examples/rest-backend/data/*.sqlite-wal
+examples/rest-backend/uploads/*.csv

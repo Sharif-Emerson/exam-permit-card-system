@@ -1,0 +1,19 @@
+{
+    "name": "exam-permit-rest-backend-example",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "node --watch server.js",
+        "start": "node server.js",
+        "reset-data": "node scripts/reset-data.js",
+        "smoke-test": "node scripts/smoke-test.js"
+    },
+    "dependencies": {
+        "cors": "^2.8.5",
+        "express": "^5.1.0",
+        "multer": "^2.0.2",
+        "papaparse": "^5.5.3",
+        "read-excel-file": "^7.0.2"
+    }
+}

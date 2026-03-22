@@ -1,6 +1,5 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react'
-import type { Session } from '@supabase/supabase-js'
-import { assertSupabaseConfigured, isSupabaseConfigured, supabase } from '../supabaseClient'
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
+import { activeAuthAdapter } from '../adapters/auth'
 import { fetchProfileById } from '../services/profileService'
 import type { AuthUser } from '../types'
 
@@ -10,6 +9,7 @@ interface AuthContextValue {
   configError: string | null
   signIn: (email: string, password: string) => Promise<AuthUser>
   signOut: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -28,35 +28,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [configError, setConfigError] = useState<string | null>(null)
 
+  async function loadUserProfile(userId: string) {
+    const profile = await fetchProfileById(userId)
+    const nextUser = mapAuthUser(profile)
+    setUser(nextUser)
+    setConfigError(null)
+    return nextUser
+  }
+
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setConfigError('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.')
+    const nextConfigError = activeAuthAdapter.getConfigError()
+
+    if (!activeAuthAdapter.isConfigured || nextConfigError) {
+      setConfigError(nextConfigError)
       setLoading(false)
       return
     }
 
     let isMounted = true
 
-    async function applySession(session: Session | null) {
+    async function applySession(session: { userId: string } | null) {
       if (!isMounted) {
         return
       }
 
-      if (!session?.user) {
+      if (!session) {
         setUser(null)
         setLoading(false)
         return
       }
 
       try {
-        const profile = await fetchProfileById(session.user.id)
+        const nextUser = await loadUserProfile(session.userId)
 
         if (!isMounted) {
           return
         }
 
-        setUser(mapAuthUser(profile))
-        setConfigError(null)
+        setUser(nextUser)
       } catch (profileError) {
         const nextError = profileError instanceof Error ? profileError.message : 'Unable to load the current profile'
 
@@ -73,76 +82,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    void supabase.auth.getSession().then(({ data, error }) => {
-      if (error) {
-        setConfigError(error.message)
-        setLoading(false)
+    void activeAuthAdapter.getSession().then((session) => {
+      void applySession(session)
+    }).catch((sessionError) => {
+      if (!isMounted) {
         return
       }
 
-      void applySession(data.session)
+      if (sessionError instanceof Error) {
+        setConfigError(sessionError.message)
+        setLoading(false)
+      }
     })
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const unsubscribe = activeAuthAdapter.onAuthStateChange((session) => {
       void applySession(session)
     })
 
     return () => {
       isMounted = false
-      subscription.unsubscribe()
+
+      if (typeof unsubscribe === 'function') {
+        unsubscribe()
+      }
     }
   }, [])
 
   async function signIn(email: string, password: string) {
-    assertSupabaseConfigured()
     setLoading(true)
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (error) {
-      setLoading(false)
-      throw new Error(error.message)
-    }
-
-    if (!data.user) {
-      setLoading(false)
-      throw new Error('No authenticated user was returned by Supabase.')
-    }
-
-    const profile = await fetchProfileById(data.user.id)
-    const nextUser = mapAuthUser(profile)
-    setUser(nextUser)
+    const session = await activeAuthAdapter.signIn(email, password)
+    const nextUser = await loadUserProfile(session.userId)
     setLoading(false)
     return nextUser
   }
 
   async function signOut() {
-    if (!isSupabaseConfigured) {
+    if (!activeAuthAdapter.isConfigured) {
       setUser(null)
       return
     }
 
-    const { error } = await supabase.auth.signOut()
-
-    if (error) {
-      throw new Error(error.message)
-    }
-
+    await activeAuthAdapter.signOut()
     setUser(null)
   }
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      loading,
-      configError,
-      signIn,
-      signOut,
-    }),
-    [configError, loading, user],
-  )
+  async function refreshUser() {
+    if (!user) {
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      await loadUserProfile(user.id)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const value: AuthContextValue = {
+    user,
+    loading,
+    configError,
+    signIn,
+    signOut,
+    refreshUser,
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -1,17 +1,20 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
-import ProtectedRoute from './ProtectedRoute'
-
-const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
-
-vi.mock('../context/AuthContext', () => ({
-  useAuth: () => useAuth(),
-}))
 
 describe('ProtectedRoute', () => {
-  it('redirects unauthenticated users to the login page', () => {
-    useAuth.mockReturnValue({ user: null, loading: false })
+  it('redirects unauthenticated users to the login page', async () => {
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: null,
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+      refreshUser: vi.fn().mockResolvedValue(undefined),
+    })
+
+    const { default: ProtectedRoute } = await import('./ProtectedRoute')
 
     render(
       <MemoryRouter initialEntries={['/student']}>
@@ -29,6 +32,6 @@ describe('ProtectedRoute', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByText('Login Page')).toBeInTheDocument()
+    expect(screen.getByText('Login Page')).toBeTruthy()
   })
 })

@@ -11,6 +11,14 @@ export default [
   },
   js.configs.recommended,
   {
+    files: ['scripts/**/*.js', 'scripts/**/*.mjs', 'examples/**/*.js', 'examples/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       parser: tsParser,
