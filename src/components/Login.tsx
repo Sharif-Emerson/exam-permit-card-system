@@ -56,7 +56,7 @@ export default function Login() {
           <div className="space-y-3 sm:space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-emerald-900">
-                Email
+                Email or Registration No.
               </label>
               <div className="relative mt-1">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -65,10 +65,10 @@ export default function Login() {
                 <input
                   id="email"
                   name="email"
-                  type="email"
+                  type="text"
                   required
                   className="block w-full pl-9 sm:pl-10 pr-3 py-2 sm:py-2 border border-emerald-200 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 text-sm sm:text-base bg-emerald-50/40"
-                  placeholder="name@university.edu"
+                  placeholder="name@university.edu or REG-001"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />

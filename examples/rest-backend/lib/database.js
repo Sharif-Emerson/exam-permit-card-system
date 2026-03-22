@@ -548,6 +548,16 @@ export function getUserByEmail(email) {
   return db.prepare('SELECT * FROM users WHERE email = ?').get(email)
 }
 
+export function getUserByStudentId(studentId) {
+  return db
+    .prepare(
+      `SELECT users.* FROM users
+       JOIN profiles ON profiles.email = users.email
+       WHERE profiles.student_id = ?`,
+    )
+    .get(studentId)
+}
+
 export function createSession(userId, sessionTtlHours) {
   pruneExpiredSessions()
   const token = randomBytes(32).toString('hex')

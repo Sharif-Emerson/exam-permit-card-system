@@ -136,7 +136,7 @@ export const restAuthAdapter: AuthAdapter = {
 
     const payload = await authenticatedRequest('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifier: email, password }),
     })
 
     const token = extractToken(payload)

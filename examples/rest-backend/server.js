@@ -13,6 +13,7 @@ import {
   getSessionUser,
   getUploadsDir,
   getUserByEmail,
+  getUserByStudentId,
   insertActivityLog,
   listActivityLogs,
   listProfiles,
@@ -224,15 +225,18 @@ app.get('/permits/:token', (request, response) => {
 })
 
 app.post('/auth/login', (request, response) => {
-  const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : ''
+  const identifier = typeof request.body?.identifier === 'string' ? request.body.identifier.trim() : ''
   const password = typeof request.body?.password === 'string' ? request.body.password : ''
 
-  if (!isValidEmailAddress(email) || password.length < 8 || password.length > 128) {
-    response.status(400).json({ message: 'A valid email address and password are required.' })
+  if (!identifier || password.length < 8 || password.length > 128) {
+    response.status(400).json({ message: 'Email or registration number and password are required.' })
     return
   }
 
-  const user = getUserByEmail(email)
+  const isEmail = isValidEmailAddress(identifier.toLowerCase())
+  const user = isEmail
+    ? getUserByEmail(identifier.toLowerCase())
+    : getUserByStudentId(identifier)
 
   if (!user || !verifyPassword(password, user.password_hash)) {
     response.status(401).json({ message: 'Invalid login credentials.' })
