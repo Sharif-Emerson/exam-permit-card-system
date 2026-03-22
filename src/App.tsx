@@ -1,62 +1,74 @@
 
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import AdminPanel from './components/AdminPanel'
-import Dashboard from './components/Dashboard'
+import { useEffect, useState } from 'react'
 import Login from './components/Login'
-import ProtectedRoute from './components/ProtectedRoute'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import Dashboard from './components/Dashboard'
+import AdminPanel from './components/AdminPanel'
 
-function HomeRedirect() {
-  const { user, loading } = useAuth()
-
-  if (loading) {
-    return <div className="min-h-screen bg-gray-100" />
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
-
-  return <Navigate to={user.role === 'admin' ? '/admin' : '/student'} replace />
+interface User {
+  id: string | number
+  role: 'admin' | 'student'
 }
 
-function LoginRoute() {
-  const { user } = useAuth()
-
-  if (user) {
-    return <Navigate to={user.role === 'admin' ? '/admin' : '/student'} replace />
+function isValidUser(value: unknown): value is User {
+  if (typeof value !== 'object' || value === null) {
+    return false
   }
 
-  return <Login />
+  const candidate = value as { id?: unknown; role?: unknown }
+
+  return (
+    (typeof candidate.id === 'string' || typeof candidate.id === 'number') &&
+    (candidate.role === 'admin' || candidate.role === 'student')
+  )
 }
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem('user')
+
+      if (!storedUser) {
+        return
+      }
+
+      const parsedUser: unknown = JSON.parse(storedUser)
+
+      if (isValidUser(parsedUser)) {
+        setUser(parsedUser)
+      } else {
+        localStorage.removeItem('user')
+      }
+    } catch (error) {
+      console.warn('Failed to restore session from localStorage:', error)
+      localStorage.removeItem('user')
+    }
+  }, [])
+
+  const handleLogin = (userData: { id: string | number; role: 'admin' | 'student' }) => {
+    setUser(userData)
+  }
+
+  const handleLogout = () => {
+    setUser(null)
+    try {
+      localStorage.removeItem('user')
+    } catch (error) {
+      console.warn('Failed to clear localStorage:', error)
+    }
+  }
+
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<HomeRedirect />} />
-          <Route path="/login" element={<LoginRoute />} />
-          <Route
-            path="/student"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminPanel />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <div className="min-h-screen bg-gray-100">
+      {!user ? (
+        <Login onLogin={handleLogin} />
+      ) : user.role === 'admin' ? (
+        <AdminPanel onLogout={handleLogout} />
+      ) : (
+        <Dashboard user={user} />
+      )}
+    </div>
   )
 }
   
