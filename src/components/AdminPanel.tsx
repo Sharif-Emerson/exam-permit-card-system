@@ -1,8 +1,8 @@
 ﻿import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useState } from 'react'
 import {
-  BarChart2, Bell, CheckCircle2, Download, FileCheck,
+  BarChart2, Bell, CheckCircle2, CreditCard, Download, FileCheck,
   FileSpreadsheet, FileUp, LayoutDashboard, LogOut, Menu,
-  RefreshCcw, Save, Search, Upload, Users, X,
+  QrCode, RefreshCcw, Save, Search, Settings, Shield, Upload, Users, X,
 } from 'lucide-react'
 import BrandMark from './BrandMark'
 import { useAuth } from '../context/AuthContext'
@@ -22,7 +22,7 @@ type ImportPreviewRow = {
   reason?: string
   studentName?: string
 }
-type NavSection = 'dashboard' | 'students' | 'permits' | 'import' | 'reports'
+type NavSection = 'dashboard' | 'students' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'settings'
 
 function getActivityTimestamp(value: string | null | undefined) {
   if (!value) {
@@ -345,8 +345,10 @@ export default function AdminPanel() {
     { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { key: 'students', label: 'Students', icon: <Users className="w-5 h-5" />, badge: outstandingStudents > 0 ? outstandingStudents : undefined },
     { key: 'permits', label: 'Permit Activity', icon: <FileCheck className="w-5 h-5" />, badge: permitEventCount > 0 ? permitEventCount : undefined },
+    { key: 'permit-cards', label: 'Permit Cards', icon: <CreditCard className="w-5 h-5" />, badge: clearedStudents > 0 ? clearedStudents : undefined },
     { key: 'import', label: 'Bulk Import', icon: <FileUp className="w-5 h-5" /> },
     { key: 'reports', label: 'Reports', icon: <BarChart2 className="w-5 h-5" /> },
+    { key: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
   ]
 
   function navigate(section: NavSection) {
@@ -465,7 +467,7 @@ export default function AdminPanel() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-gray-900">{user?.name ?? 'Admin'}</p>
-              <p className="text-[11px] text-gray-400">Administrator</p>
+              <p className="text-[11px] text-gray-400">{user?.role === 'admin' ? 'Administrator' : 'Staff'}</p>
             </div>
           </div>
           <button
@@ -1136,6 +1138,233 @@ export default function AdminPanel() {
                       </p>
                       <p className="mt-1 text-xs text-gray-500">No Activity Yet</p>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── PERMIT CARDS ── */}
+          {activeSection === 'permit-cards' && (
+            <div className="space-y-5">
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Permit Card Management</h1>
+                <p className="text-sm text-gray-500">
+                  {clearedStudents} cleared student(s) eligible to print. {outstandingStudents} still have outstanding balances.
+                </p>
+              </div>
+
+              {/* Summary strip */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center">
+                  <p className="text-2xl font-bold text-emerald-700">{clearedStudents}</p>
+                  <p className="mt-1 text-xs text-emerald-500">Cleared — Can Print</p>
+                </div>
+                <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-center">
+                  <p className="text-2xl font-bold text-amber-700">{outstandingStudents}</p>
+                  <p className="mt-1 text-xs text-amber-500">Outstanding — Blocked</p>
+                </div>
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-center">
+                  <p className="text-2xl font-bold text-blue-700">
+                    {new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
+                  </p>
+                  <p className="mt-1 text-xs text-blue-500">Have Printed / Downloaded</p>
+                </div>
+              </div>
+
+              {/* Card grid */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {students.map((student) => {
+                  const summary = getStudentPrintSummary(student.id)
+                  const cleared = student.feesBalance === 0
+                  return (
+                    <div
+                      key={student.id}
+                      className={`rounded-xl border bg-white p-5 shadow-sm ${
+                        cleared ? 'border-emerald-200' : 'border-amber-200'
+                      }`}
+                    >
+                      <div className="mb-3 flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-gray-900">{student.name}</p>
+                          <p className="text-xs text-gray-400">{student.studentId} · {student.course || 'No course'}</p>
+                        </div>
+                        <span
+                          className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            cleared ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {cleared ? 'Cleared' : 'Blocked'}
+                        </span>
+                      </div>
+
+                      {/* QR placeholder or blocked indicator */}
+                      <div
+                        className={`mb-3 flex h-24 items-center justify-center rounded-lg ${
+                          cleared ? 'bg-gray-50' : 'bg-amber-50'
+                        }`}
+                      >
+                        {cleared ? (
+                          <div className="flex flex-col items-center gap-1 text-gray-400">
+                            <QrCode className="h-10 w-10" />
+                            <span className="text-[10px]">QR generated on permit</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1 text-amber-400">
+                            <Shield className="h-10 w-10" />
+                            <span className="text-[10px] font-medium">Balance: ${student.feesBalance.toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Fees progress bar */}
+                      <div className="mb-3">
+                        <div className="mb-1 flex justify-between text-xs text-gray-500">
+                          <span>Paid: ${student.amountPaid.toFixed(2)}</span>
+                          <span>Total: ${student.totalFees.toFixed(2)}</span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              cleared ? 'bg-emerald-500' : 'bg-amber-400'
+                            }`}
+                            style={{ width: `${Math.min(student.totalFees > 0 ? (student.amountPaid / student.totalFees) * 100 : 0, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Activity badges */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {summary.printCount > 0 && (
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                            Printed {summary.printCount}×
+                          </span>
+                        )}
+                        {summary.downloadCount > 0 && (
+                          <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">
+                            Downloaded {summary.downloadCount}×
+                          </span>
+                        )}
+                        {summary.total === 0 && (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-400">
+                            No print activity
+                          </span>
+                        )}
+                        {summary.lastAt && (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-400">
+                            Last: {new Date(summary.lastAt).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+                {students.length === 0 && (
+                  <div className="col-span-3 rounded-xl border border-dashed border-gray-300 py-12 text-center text-sm text-gray-400">
+                    No students found.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── SETTINGS ── */}
+          {activeSection === 'settings' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Settings</h1>
+                <p className="text-sm text-gray-500">System configuration and account information.</p>
+              </div>
+
+              {/* Account info */}
+              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-100 px-6 py-4">
+                  <h2 className="font-semibold text-gray-800">Account</h2>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Name</p>
+                      <p className="text-xs text-gray-400">Display name for this session</p>
+                    </div>
+                    <p className="text-sm text-gray-900">{user?.name ?? '—'}</p>
+                  </div>
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Email</p>
+                      <p className="text-xs text-gray-400">Registered account email</p>
+                    </div>
+                    <p className="text-sm text-gray-900">{user?.email ?? '—'}</p>
+                  </div>
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Role</p>
+                      <p className="text-xs text-gray-400">Access level for this account</p>
+                    </div>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        user?.role === 'admin'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}
+                    >
+                      {user?.role === 'admin' ? 'Administrator' : 'Staff'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* System info */}
+              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-100 px-6 py-4">
+                  <h2 className="font-semibold text-gray-800">System</h2>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Backend</p>
+                      <p className="text-xs text-gray-400">REST API base URL</p>
+                    </div>
+                    <code className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                      {window.location.hostname === 'localhost' ? 'http://localhost:4000' : '/api'}
+                    </code>
+                  </div>
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Total Students</p>
+                      <p className="text-xs text-gray-400">Currently loaded in system</p>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-900">{totalStudents}</p>
+                  </div>
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Permit Events Logged</p>
+                      <p className="text-xs text-gray-400">Print and download actions tracked</p>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-900">{permitEventCount}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Danger zone */}
+              <div className="rounded-xl border border-red-200 bg-white shadow-sm">
+                <div className="border-b border-red-100 px-6 py-4">
+                  <h2 className="font-semibold text-red-700">Session</h2>
+                </div>
+                <div className="px-6 py-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Sign out</p>
+                      <p className="text-xs text-gray-400">End your current admin session</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void signOut()}
+                      className="inline-flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sign out
+                    </button>
                   </div>
                 </div>
               </div>
