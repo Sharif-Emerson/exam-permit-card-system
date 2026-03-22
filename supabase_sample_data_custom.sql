@@ -1,38 +1,17 @@
--- Sample data for the Exam Permit System
+-- Custom Supabase seed for the Exam Permit System
 --
--- Before running this file:
--- 1. Run supabase_setup.sql first.
--- 2. Create matching users in Supabase Auth.
--- 3. Replace the UUID values below with the real auth.users IDs from your Supabase project.
+-- Filled with the real UUIDs provided so far:
+--   admin    = 876af05d-da9a-479f-b9a1-73640ab02017
+--   student1 = e1489bd8-1687-4465-9b57-7bedf6865e8f
+--   student2 = 424425eb-4026-465d-82b6-458f3c7b7573
+--   student3 = 30f00bfb-0847-45e4-a410-022348705432
 --
--- Placeholder UUID map:
---   11111111-1111-1111-1111-111111111111 = admin@example.com
---   22222222-2222-2222-2222-222222222222 = student1@example.com
---   33333333-3333-3333-3333-333333333333 = student2@example.com
---   44444444-4444-4444-4444-444444444444 = student3@example.com
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM auth.users
-    WHERE id = '11111111-1111-1111-1111-111111111111'
-  ) OR NOT EXISTS (
-    SELECT 1
-    FROM auth.users
-    WHERE id = '22222222-2222-2222-2222-222222222222'
-  ) OR NOT EXISTS (
-    SELECT 1
-    FROM auth.users
-    WHERE id = '33333333-3333-3333-3333-333333333333'
-  ) OR NOT EXISTS (
-    SELECT 1
-    FROM auth.users
-    WHERE id = '44444444-4444-4444-4444-444444444444'
-  ) THEN
-    RAISE EXCEPTION 'Sample auth.users IDs were not found. Create the users in Supabase Auth first, then replace the placeholder UUIDs in supabase_sample_data.sql with the real IDs.';
-  END IF;
-END $$;
+-- All required UUIDs are now filled.
+--
+-- Run order:
+-- 1. Run supabase_setup.sql
+-- 2. Create the matching auth users in Supabase Authentication
+-- 3. Run this file in the Supabase SQL editor
 
 INSERT INTO profiles (
   id,
@@ -51,7 +30,7 @@ INSERT INTO profiles (
   amount_paid
 ) VALUES
   (
-    '11111111-1111-1111-1111-111111111111',
+    '876af05d-da9a-479f-b9a1-73640ab02017',
     'admin@example.com',
     'admin',
     'Administrator',
@@ -67,7 +46,7 @@ INSERT INTO profiles (
     0.00
   ),
   (
-    '22222222-2222-2222-2222-222222222222',
+    'e1489bd8-1687-4465-9b57-7bedf6865e8f',
     'student1@example.com',
     'student',
     'John Doe',
@@ -83,7 +62,7 @@ INSERT INTO profiles (
     500.00
   ),
   (
-    '33333333-3333-3333-3333-333333333333',
+    '424425eb-4026-465d-82b6-458f3c7b7573',
     'student2@example.com',
     'student',
     'Jane Smith',
@@ -99,7 +78,7 @@ INSERT INTO profiles (
     3000.00
   ),
   (
-    '44444444-4444-4444-4444-444444444444',
+    '30f00bfb-0847-45e4-a410-022348705432',
     'student3@example.com',
     'student',
     'Bob Johnson',
@@ -129,20 +108,14 @@ ON CONFLICT (id) DO UPDATE SET
   total_fees = EXCLUDED.total_fees,
   amount_paid = EXCLUDED.amount_paid;
 
--- Optional sample admin activity log.
--- Replace the IDs below if you changed the sample UUIDs above.
 INSERT INTO admin_activity_logs (
   admin_id,
   target_profile_id,
   action,
   details
 ) VALUES (
-  '11111111-1111-1111-1111-111111111111',
-  '22222222-2222-2222-2222-222222222222',
+  '876af05d-da9a-479f-b9a1-73640ab02017',
+  'e1489bd8-1687-4465-9b57-7bedf6865e8f',
   'update_student_financials',
   '{"amount_paid": 500.00}'::jsonb
-)
-ON CONFLICT DO NOTHING;
-
--- Optional verification query:
--- SELECT email, role, name, student_id, total_fees, amount_paid FROM profiles ORDER BY role, name;
+);

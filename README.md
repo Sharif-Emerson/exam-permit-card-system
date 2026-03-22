@@ -82,6 +82,8 @@ The SQL also enables row-level security so:
 
 Sample admin and student records are provided in [supabase_sample_data.sql](c:/Users/kabuy/OneDrive/Desktop/project/supabase_sample_data.sql).
 
+If you prefer obvious named placeholders instead of numeric placeholder UUIDs, use [supabase_sample_data_template.sql](c:/Users/kabuy/OneDrive/Desktop/project/supabase_sample_data_template.sql).
+
 It includes:
 
 - 1 admin account profile
@@ -90,6 +92,13 @@ It includes:
 - an optional sample admin activity log
 
 Before running it, replace the placeholder UUID values with the real IDs from your Supabase Auth users.
+
+The seed file now includes a preflight check that throws a clear error if you forgot to create the auth users or forgot to replace the placeholder UUIDs.
+
+Recommended usage:
+
+- Use [supabase_sample_data.sql](c:/Users/kabuy/OneDrive/Desktop/project/supabase_sample_data.sql) if you want a safer seed with a built-in preflight validation block.
+- Use [supabase_sample_data_template.sql](c:/Users/kabuy/OneDrive/Desktop/project/supabase_sample_data_template.sql) if you want a more manual but more readable placeholder-based template.
 
 ## Application Flow
 
