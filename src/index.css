@@ -1,0 +1,83 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+	background: rgb(241 245 249);
+	color: rgb(15 23 42);
+}
+
+.payment-progress {
+	width: 100%;
+	height: 100%;
+	display: block;
+	appearance: none;
+	border: 0;
+	background: transparent;
+}
+
+.payment-progress::-webkit-progress-bar {
+	background-color: rgb(229 231 235);
+	border-radius: 9999px;
+}
+
+.payment-progress::-webkit-progress-value {
+	border-radius: 9999px;
+}
+
+.payment-progress::-moz-progress-bar {
+	border-radius: 9999px;
+}
+
+.payment-progress-danger::-webkit-progress-value {
+	background-color: rgb(239 68 68);
+}
+
+.payment-progress-danger::-moz-progress-bar {
+	background-color: rgb(239 68 68);
+}
+
+.payment-progress-clear::-webkit-progress-value {
+	background-color: rgb(34 197 94);
+}
+
+.payment-progress-clear::-moz-progress-bar {
+	background-color: rgb(34 197 94);
+}
+
+.permit-sheet {
+	position: relative;
+	overflow: hidden;
+}
+
+.permit-sheet::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(135deg, rgb(248 250 252) 0%, rgb(255 255 255) 45%, rgb(241 245 249) 100%);
+	opacity: 0.75;
+	pointer-events: none;
+}
+
+.permit-sheet > * {
+	position: relative;
+	z-index: 1;
+}
+
+@media print {
+	body {
+		background: white;
+	}
+
+	.permit-sheet {
+		box-shadow: none;
+		border: 0;
+		padding: 0;
+	}
+
+	.permit-sheet::before {
+		display: none;
+	}
+}
+  
