@@ -34,4 +34,36 @@ describe('ProtectedRoute', () => {
 
     expect(screen.getByText('Login Page')).toBeTruthy()
   })
+
+  it('redirects authenticated users without the required role', async () => {
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: { id: 'student-1', email: 'student@example.com', role: 'student', name: 'John Doe' },
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+      refreshUser: vi.fn().mockResolvedValue(undefined),
+    })
+
+    const { default: ProtectedRoute } = await import('./ProtectedRoute')
+
+    render(
+      <MemoryRouter initialEntries={['/admin']}>
+        <Routes>
+          <Route path="/student" element={<div>Student Dashboard</div>} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <div>Admin Area</div>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Student Dashboard')).toBeTruthy()
+  })
 })

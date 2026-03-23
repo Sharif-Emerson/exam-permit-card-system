@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.gitignore
+npm-debug.log*
+coverage
+examples/rest-backend/node_modules
+examples/rest-backend/uploads
+examples/rest-backend/data/*.sqlite-shm
+examples/rest-backend/data/*.sqlite-wal

@@ -77,6 +77,36 @@ body {
 		background: white;
 	}
 
+	.no-print {
+		display: none !important;
+	}
+
+	.student-dashboard-app {
+		display: none !important;
+	}
+
+	.admin-theme-shell {
+		display: none !important;
+	}
+
+	.print-permit-sheet-wrapper {
+		display: block !important;
+	}
+
+	.admin-bulk-print-wrapper {
+		display: block !important;
+	}
+
+	.admin-bulk-print-item {
+		break-after: page;
+		page-break-after: always;
+	}
+
+	.admin-bulk-print-item:last-child {
+		break-after: auto;
+		page-break-after: auto;
+	}
+
 	@page {
 		size: auto;
 		margin: 12mm;

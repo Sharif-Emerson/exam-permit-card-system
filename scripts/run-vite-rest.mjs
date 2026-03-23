@@ -17,7 +17,8 @@ const child = spawn(process.execPath, [viteBinary, ...args], {
   env: {
     ...process.env,
     VITE_BACKEND_PROVIDER: 'rest',
-    VITE_API_BASE_URL: process.env.VITE_API_BASE_URL ?? 'http://localhost:4000',
+    ...(process.env.VITE_API_BASE_URL ? { VITE_API_BASE_URL: process.env.VITE_API_BASE_URL } : {}),
+    ...(process.env.VITE_DEV_PROXY_TARGET ? { VITE_DEV_PROXY_TARGET: process.env.VITE_DEV_PROXY_TARGET } : {}),
   },
 })
 

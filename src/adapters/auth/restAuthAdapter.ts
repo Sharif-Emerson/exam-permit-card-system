@@ -1,5 +1,7 @@
 import { apiBaseUrl } from '../../config/provider'
+import { requestWithApiFallback } from '../rest/request'
 import { clearStoredAuthToken, getStoredAuthToken, setStoredAuthToken } from '../rest/tokenStorage'
+import type { AuthUser } from '../../types'
 import type { AuthAdapter, AuthSession } from './types'
 
 const listeners = new Set<(session: AuthSession | null) => void>()
@@ -12,16 +14,6 @@ function notify(session: AuthSession | null) {
 
 function getConfigError() {
   return apiBaseUrl ? null : 'REST API is not configured. Add VITE_API_BASE_URL to your .env file.'
-}
-
-async function parseJsonResponse(response: Response) {
-  const contentType = response.headers.get('content-type') ?? ''
-
-  if (!contentType.includes('application/json')) {
-    return null
-  }
-
-  return response.json()
 }
 
 function extractUserId(payload: unknown): string | null {
@@ -73,6 +65,56 @@ function extractToken(payload: unknown): string | null {
   return null
 }
 
+function extractAuthUser(payload: unknown): AuthUser | null {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+
+  const record = payload as Record<string, unknown>
+  const candidate = record.user && typeof record.user === 'object'
+    ? record.user as Record<string, unknown>
+    : record
+
+  if (
+    typeof candidate.id !== 'string'
+    || typeof candidate.email !== 'string'
+    || typeof candidate.role !== 'string'
+    || typeof candidate.name !== 'string'
+  ) {
+    return null
+  }
+
+  if (candidate.role !== 'admin' && candidate.role !== 'student') {
+    return null
+  }
+
+  const nextUser: AuthUser = {
+    id: candidate.id,
+    email: candidate.email,
+    role: candidate.role,
+    name: candidate.name,
+  }
+
+  if (candidate.role === 'admin') {
+    if (
+      candidate.scope === 'super-admin'
+      || candidate.scope === 'registrar'
+      || candidate.scope === 'finance'
+      || candidate.scope === 'operations'
+    ) {
+      nextUser.scope = candidate.scope
+    }
+
+    if (Array.isArray(candidate.permissions)) {
+      nextUser.permissions = candidate.permissions.filter((permission): permission is NonNullable<AuthUser['permissions']>[number] => {
+        return typeof permission === 'string'
+      })
+    }
+  }
+
+  return nextUser
+}
+
 async function authenticatedRequest(path: string, init?: RequestInit) {
   const token = getStoredAuthToken()
   const headers = new Headers(init?.headers)
@@ -85,17 +127,7 @@ async function authenticatedRequest(path: string, init?: RequestInit) {
     headers.set('Content-Type', 'application/json')
   }
 
-  const response = await fetch(`${apiBaseUrl}${path}`, { ...init, headers })
-  const payload = await parseJsonResponse(response)
-
-  if (!response.ok) {
-    const message = payload && typeof payload === 'object' && 'message' in payload && typeof payload.message === 'string'
-      ? payload.message
-      : `Request failed with status ${response.status}`
-    throw new Error(message)
-  }
-
-  return payload
+  return requestWithApiFallback(path, { ...init, headers })
 }
 
 export const restAuthAdapter: AuthAdapter = {
@@ -115,8 +147,9 @@ export const restAuthAdapter: AuthAdapter = {
 
     try {
       const payload = await authenticatedRequest('/auth/me', { method: 'GET' })
-      const userId = extractUserId(payload)
-      return userId ? { userId } : null
+      const authUser = extractAuthUser(payload)
+      const userId = authUser?.id ?? extractUserId(payload)
+      return userId ? { userId, user: authUser ?? undefined } : null
     } catch {
       clearStoredAuthToken()
       return null
@@ -140,14 +173,15 @@ export const restAuthAdapter: AuthAdapter = {
     })
 
     const token = extractToken(payload)
-    const userId = extractUserId(payload)
+    const authUser = extractAuthUser(payload)
+    const userId = authUser?.id ?? extractUserId(payload)
 
     if (!token || !userId) {
       throw new Error('The login API response is missing a token or user id.')
     }
 
     setStoredAuthToken(token)
-    const session = { userId }
+    const session = { userId, user: authUser ?? undefined }
     notify(session)
     return session
   },

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
+import { institutionName } from '../config/branding'
 
 const { signIn } = vi.hoisted(() => ({
   signIn: vi.fn().mockResolvedValue({ role: 'student' }),
@@ -33,5 +34,6 @@ describe('Login', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     expect(signIn).toHaveBeenCalledWith('student@example.com', 'password123')
+    expect(screen.getAllByText(institutionName)).toHaveLength(2)
   })
 })

@@ -1,13 +1,18 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
+import type { AuthUser } from '../types'
 
 const {
   signOut,
   refreshUser,
-  fetchAllStudentProfiles,
-  fetchAdminActivityLogs,
+  fetchStudentProfilesPage,
+  fetchAdminActivityLogsPage,
+  fetchSystemFeeSettings,
+  updateSystemFeeSettings,
+  updateStudentAccount,
   adminUpdateStudentProfile,
+  createStudentProfile,
   updateStudentFinancials,
   clearStudentBalance,
   importStudentFinancials,
@@ -17,9 +22,13 @@ const {
 } = vi.hoisted(() => ({
   signOut: vi.fn(),
   refreshUser: vi.fn().mockResolvedValue(undefined),
-  fetchAllStudentProfiles: vi.fn(),
-  fetchAdminActivityLogs: vi.fn(),
+  fetchStudentProfilesPage: vi.fn(),
+  fetchAdminActivityLogsPage: vi.fn(),
+  fetchSystemFeeSettings: vi.fn(),
+  updateSystemFeeSettings: vi.fn(),
+  updateStudentAccount: vi.fn(),
   adminUpdateStudentProfile: vi.fn(),
+  createStudentProfile: vi.fn(),
   updateStudentFinancials: vi.fn(),
   clearStudentBalance: vi.fn(),
   importStudentFinancials: vi.fn(),
@@ -28,11 +37,68 @@ const {
   downloadPermitActivityCsv: vi.fn(),
 }))
 
+function createStudentPage(items: Array<Record<string, unknown>>) {
+  const clearedStudents = items.filter((item) => Number(item.feesBalance ?? 0) === 0).length
+
+  return {
+    items,
+    page: 1,
+    pageSize: 24,
+    totalItems: items.length,
+    totalPages: 1,
+    totalStudents: items.length,
+    clearedStudents,
+    outstandingStudents: items.length - clearedStudents,
+  }
+}
+
+function createActivityPage(items: Array<Record<string, unknown>>) {
+  return {
+    items,
+    page: 1,
+    pageSize: 12,
+    totalItems: items.length,
+    totalPages: 1,
+  }
+}
+
+function createAdminUser(overrides?: Partial<AuthUser>): AuthUser {
+  return {
+    id: 'admin-1',
+    email: 'admin@example.com',
+    role: 'admin',
+    name: 'Administrator',
+    scope: 'super-admin',
+    permissions: [
+      'view_students',
+      'manage_student_profiles',
+      'manage_financials',
+      'manage_support_requests',
+      'view_audit_logs',
+      'export_reports',
+      'write_audit_logs',
+    ],
+    ...overrides,
+  }
+}
+
 describe('AdminPanel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    fetchSystemFeeSettings.mockResolvedValue({
+      localStudentFee: 3000,
+      internationalStudentFee: 6000,
+    })
+    updateSystemFeeSettings.mockResolvedValue({
+      localStudentFee: 3500,
+      internationalStudentFee: 7000,
+    })
+  })
+
   it('previews spreadsheet rows before applying the import', async () => {
     const authContextModule = await import('../context/AuthContext')
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
-      user: { id: 'admin-1', email: 'admin@example.com', role: 'admin', name: 'Administrator' },
+      user: createAdminUser(),
       loading: false,
       configError: null,
       signIn: vi.fn(),
@@ -41,8 +107,11 @@ describe('AdminPanel', () => {
     })
 
     const profileServiceModule = await import('../services/profileService')
-    vi.spyOn(profileServiceModule, 'fetchAllStudentProfiles').mockImplementation(fetchAllStudentProfiles)
-    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogs').mockImplementation(fetchAdminActivityLogs)
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
     vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
     vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
     vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
@@ -60,13 +129,14 @@ describe('AdminPanel', () => {
     const { default: AdminPanel } = await import('./AdminPanel')
     const user = userEvent.setup()
 
-    fetchAllStudentProfiles.mockResolvedValue([
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage([
       {
         id: 'student-1',
         email: 'student1@example.com',
         role: 'student',
         name: 'John Doe',
         studentId: 'STU001',
+        phoneNumber: '+256700123456',
         course: 'Computer Science',
         examDate: '2026-04-15',
         examTime: '10:00 AM',
@@ -88,9 +158,9 @@ describe('AdminPanel', () => {
         amountPaid: 500,
         feesBalance: 2500,
       },
-    ])
+    ]))
 
-    fetchAdminActivityLogs.mockResolvedValue([])
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([]))
 
     parseFinancialSpreadsheet.mockResolvedValue([
       { rowNumber: 2, studentId: 'STU001', amountPaid: 2500, totalFees: 3000 },
@@ -98,13 +168,15 @@ describe('AdminPanel', () => {
 
     importStudentFinancials.mockResolvedValue({
       updatedCount: 1,
+      createdCount: 0,
+      createdStudents: [],
       skippedRows: [],
     })
 
     const { container } = render(<AdminPanel />)
 
     await waitFor(() => {
-      expect(fetchAllStudentProfiles).toHaveBeenCalled()
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
     })
 
     const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null
@@ -120,16 +192,16 @@ describe('AdminPanel', () => {
 
     await waitFor(() => {
       expect(importStudentFinancials).toHaveBeenCalledWith(
-        [{ rowNumber: 2, studentId: 'student-1', amountPaid: 2500, totalFees: 3000 }],
+        [{ rowNumber: 2, action: 'update', studentId: 'student-1', amountPaid: 2500, totalFees: 3000 }],
         'admin-1',
       )
     })
-  })
+  }, 20000)
 
-  it('shows print and download status for each student', async () => {
+  it('prepares unmatched spreadsheet rows as new student creations when required details are present', async () => {
     const authContextModule = await import('../context/AuthContext')
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
-      user: { id: 'admin-1', email: 'admin@example.com', role: 'admin', name: 'Administrator' },
+      user: createAdminUser(),
       loading: false,
       configError: null,
       signIn: vi.fn(),
@@ -138,8 +210,119 @@ describe('AdminPanel', () => {
     })
 
     const profileServiceModule = await import('../services/profileService')
-    vi.spyOn(profileServiceModule, 'fetchAllStudentProfiles').mockImplementation(fetchAllStudentProfiles)
-    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogs').mockImplementation(fetchAdminActivityLogs)
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
+    vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
+    vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
+    vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
+    vi.spyOn(profileServiceModule, 'importStudentFinancials').mockImplementation(importStudentFinancials)
+
+    const spreadsheetImportModule = await import('../services/spreadsheetImport')
+    vi.spyOn(spreadsheetImportModule, 'parseFinancialSpreadsheet').mockImplementation(parseFinancialSpreadsheet)
+
+    const adminTemplateModule = await import('../services/adminImportTemplate')
+    vi.spyOn(adminTemplateModule, 'downloadFinancialImportTemplate').mockImplementation(downloadFinancialImportTemplate)
+
+    const permitActivityExportModule = await import('../services/permitActivityExport')
+    vi.spyOn(permitActivityExportModule, 'downloadPermitActivityCsv').mockImplementation(downloadPermitActivityCsv)
+
+    const { default: AdminPanel } = await import('./AdminPanel')
+    const user = userEvent.setup()
+
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage([]))
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([]))
+
+    parseFinancialSpreadsheet.mockResolvedValue([
+      {
+        rowNumber: 2,
+        studentName: 'Imported Student',
+        studentId: 'IMP001',
+        email: 'imported.student@example.com',
+        course: 'Computer Science',
+        department: 'Computer Science',
+        semester: 'Semester 1 2026/2027',
+        amountPaid: 500,
+        totalFees: 3000,
+      },
+    ])
+
+    importStudentFinancials.mockResolvedValue({
+      updatedCount: 0,
+      createdCount: 1,
+      createdStudents: [
+        {
+          rowNumber: 2,
+          name: 'Imported Student',
+          email: 'imported.student@example.com',
+          studentId: 'IMP001',
+          password: 'Permit-IMP001',
+        },
+      ],
+      skippedRows: [],
+    })
+
+    const { container } = render(<AdminPanel />)
+
+    await waitFor(() => {
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
+    })
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null
+    expect(fileInput).not.toBeNull()
+
+    const file = new File(['student_name,student_id,email,course,amount_paid,total_fees'], 'new-students.csv', { type: 'text/csv' })
+    await user.upload(fileInput!, file)
+
+    expect(await screen.findByText(/import preview/i)).toBeTruthy()
+    expect(await screen.findByText(/new student account will be created/i)).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: /apply import/i }))
+
+    await waitFor(() => {
+      expect(importStudentFinancials).toHaveBeenCalledWith(
+        [
+          {
+            rowNumber: 2,
+            action: 'create',
+            createStudent: {
+              name: 'Imported Student',
+              email: 'imported.student@example.com',
+              password: 'Permit-IMP001',
+              studentId: 'IMP001',
+              studentCategory: 'local',
+              course: 'Computer Science',
+              department: 'Computer Science',
+              semester: 'Semester 1 2026/2027',
+              totalFees: 3000,
+              amountPaid: 500,
+            },
+          },
+        ],
+        'admin-1',
+      )
+    })
+  }, 20000)
+
+  it('shows print and download status for each student', async () => {
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: createAdminUser(),
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signOut,
+      refreshUser,
+    })
+
+    const profileServiceModule = await import('../services/profileService')
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
     vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
     vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
     vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
@@ -156,13 +339,14 @@ describe('AdminPanel', () => {
 
     const { default: AdminPanel } = await import('./AdminPanel')
 
-    fetchAllStudentProfiles.mockResolvedValue([
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage([
       {
         id: 'student-1',
         email: 'student1@example.com',
         role: 'student',
         name: 'John Doe',
         studentId: 'STU001',
+        studentCategory: 'local',
         course: 'Computer Science',
         examDate: '2026-04-15',
         examTime: '10:00 AM',
@@ -184,9 +368,9 @@ describe('AdminPanel', () => {
         amountPaid: 3000,
         feesBalance: 0,
       },
-    ])
+    ]))
 
-    fetchAdminActivityLogs.mockResolvedValue([
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([
       {
         id: 'log-1',
         adminId: 'student-1',
@@ -203,13 +387,13 @@ describe('AdminPanel', () => {
         details: { source: 'student-portal' },
         createdAt: '2026-03-22T12:18:07.151Z',
       },
-    ])
+    ]))
 
     render(<AdminPanel />)
 
     await waitFor(() => {
-      expect(fetchAllStudentProfiles).toHaveBeenCalled()
-      expect(fetchAdminActivityLogs).toHaveBeenCalled()
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
+      expect(fetchAdminActivityLogsPage).toHaveBeenCalled()
     })
 
     expect(await screen.findByText(/printed 1x/i)).toBeTruthy()
@@ -219,7 +403,7 @@ describe('AdminPanel', () => {
   it('filters the student list to only printed students', async () => {
     const authContextModule = await import('../context/AuthContext')
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
-      user: { id: 'admin-1', email: 'admin@example.com', role: 'admin', name: 'Administrator' },
+      user: createAdminUser(),
       loading: false,
       configError: null,
       signIn: vi.fn(),
@@ -228,8 +412,11 @@ describe('AdminPanel', () => {
     })
 
     const profileServiceModule = await import('../services/profileService')
-    vi.spyOn(profileServiceModule, 'fetchAllStudentProfiles').mockImplementation(fetchAllStudentProfiles)
-    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogs').mockImplementation(fetchAdminActivityLogs)
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
     vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
     vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
     vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
@@ -247,7 +434,7 @@ describe('AdminPanel', () => {
     const { default: AdminPanel } = await import('./AdminPanel')
     const user = userEvent.setup()
 
-    fetchAllStudentProfiles.mockResolvedValue([
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage([
       {
         id: 'student-1',
         email: 'student1@example.com',
@@ -302,9 +489,9 @@ describe('AdminPanel', () => {
         amountPaid: 3000,
         feesBalance: 0,
       },
-    ])
+    ]))
 
-    fetchAdminActivityLogs.mockResolvedValue([
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([
       {
         id: 'log-1',
         adminId: 'student-1',
@@ -313,13 +500,13 @@ describe('AdminPanel', () => {
         details: { source: 'student-portal' },
         createdAt: '2026-03-22T12:17:07.151Z',
       },
-    ])
+    ]))
 
     render(<AdminPanel />)
 
     await waitFor(() => {
-      expect(fetchAllStudentProfiles).toHaveBeenCalled()
-      expect(fetchAdminActivityLogs).toHaveBeenCalled()
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
+      expect(fetchAdminActivityLogsPage).toHaveBeenCalled()
     })
 
     expect((await screen.findAllByText('John Doe')).length > 0).toBe(true)
@@ -334,7 +521,7 @@ describe('AdminPanel', () => {
   it('edits a student profile from the permit card view', async () => {
     const authContextModule = await import('../context/AuthContext')
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
-      user: { id: 'admin-1', email: 'admin@example.com', role: 'admin', name: 'Administrator' },
+      user: createAdminUser(),
       loading: false,
       configError: null,
       signIn: vi.fn(),
@@ -343,8 +530,11 @@ describe('AdminPanel', () => {
     })
 
     const profileServiceModule = await import('../services/profileService')
-    vi.spyOn(profileServiceModule, 'fetchAllStudentProfiles').mockImplementation(fetchAllStudentProfiles)
-    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogs').mockImplementation(fetchAdminActivityLogs)
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
     vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
     vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
     vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
@@ -362,7 +552,7 @@ describe('AdminPanel', () => {
     const { default: AdminPanel } = await import('./AdminPanel')
     const user = userEvent.setup()
 
-    fetchAllStudentProfiles.mockResolvedValue([
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage([
       {
         id: 'student-1',
         email: 'student1@example.com',
@@ -390,15 +580,22 @@ describe('AdminPanel', () => {
         amountPaid: 1500,
         feesBalance: 1500,
       },
-    ])
-    fetchAdminActivityLogs.mockResolvedValue([])
+    ]))
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([]))
     adminUpdateStudentProfile.mockResolvedValue({
       id: 'student-1',
       email: 'student1@example.com',
       role: 'student',
       name: 'John Doe Updated',
       studentId: 'STU001-NEW',
+      studentCategory: 'local',
+      phoneNumber: '+256700123456',
       course: 'Software Engineering',
+      program: 'BSc Software Engineering',
+      college: 'College of Computing and Digital Innovation',
+      department: 'Department of Software Engineering',
+      semester: 'Semester 2 2026/2027',
+      courseUnits: ['SWE 401 Secure Coding', 'SWE 403 DevOps Engineering'],
       examDate: '2026-04-15',
       examTime: '10:00 AM',
       venue: 'Hall A',
@@ -423,7 +620,7 @@ describe('AdminPanel', () => {
     render(<AdminPanel />)
 
     await waitFor(() => {
-      expect(fetchAllStudentProfiles).toHaveBeenCalled()
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
     })
 
     await user.click(screen.getByRole('button', { name: /permit cards/i }))
@@ -434,6 +631,11 @@ describe('AdminPanel', () => {
     fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'John Doe Updated' } })
     fireEvent.change(screen.getByLabelText(/registration no\./i), { target: { value: 'STU001-NEW' } })
     fireEvent.change(screen.getByLabelText(/^course$/i), { target: { value: 'Software Engineering' } })
+    fireEvent.change(screen.getByLabelText(/program/i), { target: { value: 'BSc Software Engineering' } })
+    fireEvent.change(screen.getByLabelText(/college/i), { target: { value: 'College of Computing and Digital Innovation' } })
+    fireEvent.change(screen.getByLabelText(/department/i), { target: { value: 'Department of Software Engineering' } })
+    fireEvent.change(screen.getByLabelText(/semester/i), { target: { value: 'Semester 2 2026/2027' } })
+    fireEvent.change(screen.getByLabelText(/course units/i), { target: { value: 'SWE 401 Secure Coding\nSWE 403 DevOps Engineering' } })
     fireEvent.change(screen.getByLabelText(/total fees/i), { target: { value: '3200' } })
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
@@ -444,7 +646,15 @@ describe('AdminPanel', () => {
           name: 'John Doe Updated',
           email: 'student1@example.com',
           studentId: 'STU001-NEW',
+          studentCategory: 'local',
+          phoneNumber: '',
+          profileImage: 'https://via.placeholder.com/150',
           course: 'Software Engineering',
+          program: 'BSc Software Engineering',
+          college: 'College of Computing and Digital Innovation',
+          department: 'Department of Software Engineering',
+          semester: 'Semester 2 2026/2027',
+          courseUnits: ['SWE 401 Secure Coding', 'SWE 403 DevOps Engineering'],
           totalFees: 3200,
         },
         'admin-1',
@@ -452,12 +662,12 @@ describe('AdminPanel', () => {
     })
 
     expect(await screen.findByText(/student profile updated for john doe updated\./i)).toBeTruthy()
-  })
+  }, 10000)
 
-  it('exports permit activity as csv', async () => {
+  it('creates a student profile from the students view', async () => {
     const authContextModule = await import('../context/AuthContext')
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
-      user: { id: 'admin-1', email: 'admin@example.com', role: 'admin', name: 'Administrator' },
+      user: createAdminUser(),
       loading: false,
       configError: null,
       signIn: vi.fn(),
@@ -466,8 +676,202 @@ describe('AdminPanel', () => {
     })
 
     const profileServiceModule = await import('../services/profileService')
-    vi.spyOn(profileServiceModule, 'fetchAllStudentProfiles').mockImplementation(fetchAllStudentProfiles)
-    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogs').mockImplementation(fetchAdminActivityLogs)
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
+    vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
+    vi.spyOn(profileServiceModule, 'createStudentProfile').mockImplementation(createStudentProfile)
+    vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
+    vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
+    vi.spyOn(profileServiceModule, 'importStudentFinancials').mockImplementation(importStudentFinancials)
+
+    const spreadsheetImportModule = await import('../services/spreadsheetImport')
+    vi.spyOn(spreadsheetImportModule, 'parseFinancialSpreadsheet').mockImplementation(parseFinancialSpreadsheet)
+
+    const adminTemplateModule = await import('../services/adminImportTemplate')
+    vi.spyOn(adminTemplateModule, 'downloadFinancialImportTemplate').mockImplementation(downloadFinancialImportTemplate)
+
+    const permitActivityExportModule = await import('../services/permitActivityExport')
+    vi.spyOn(permitActivityExportModule, 'downloadPermitActivityCsv').mockImplementation(downloadPermitActivityCsv)
+
+    const { default: AdminPanel } = await import('./AdminPanel')
+    const user = userEvent.setup()
+
+    fetchStudentProfilesPage
+      .mockResolvedValueOnce(createStudentPage([]))
+      .mockResolvedValueOnce(createStudentPage([
+        {
+          id: 'student-99',
+          email: 'newstudent@example.com',
+          role: 'student',
+          name: 'New Student',
+          studentId: 'STU099',
+          studentCategory: 'international',
+          phoneNumber: '+256700111222',
+          course: 'Computer Science',
+          program: 'BSc Computer Science',
+          college: 'College of Computing',
+          department: 'Computer Science',
+          semester: 'Semester 1 2026/2027',
+          courseUnits: ['CSC 101', 'MAT 110'],
+          examDate: '2026-11-04',
+          examTime: '9:00 AM',
+          venue: 'Main Hall',
+          seatNumber: 'B-12',
+          instructions: 'Bring your ID card.',
+          profileImage: 'https://example.com/photo.jpg',
+          permitToken: 'permit-token-99',
+          exams: [
+            {
+              id: 'student-99-exam-1',
+              title: 'Computer Science Exam',
+              examDate: '2026-11-04',
+              examTime: '9:00 AM',
+              venue: 'Main Hall',
+              seatNumber: 'B-12',
+            },
+          ],
+          totalFees: 9000,
+          amountPaid: 1000,
+          feesBalance: 8000,
+        },
+      ]))
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([]))
+    fetchSystemFeeSettings.mockResolvedValue({
+      localStudentFee: 4500,
+      internationalStudentFee: 9000,
+    })
+    createStudentProfile.mockResolvedValue({
+      id: 'student-99',
+      email: 'newstudent@example.com',
+      role: 'student',
+      name: 'New Student',
+      studentId: 'STU099',
+      studentCategory: 'international',
+      phoneNumber: '+256700111222',
+      course: 'Computer Science',
+      program: 'BSc Computer Science',
+      college: 'College of Computing',
+      department: 'Computer Science',
+      semester: 'Semester 1 2026/2027',
+      courseUnits: ['CSC 101', 'MAT 110'],
+      examDate: '2026-11-04',
+      examTime: '9:00 AM',
+      venue: 'Main Hall',
+      seatNumber: 'B-12',
+      instructions: 'Bring your ID card.',
+      profileImage: 'https://example.com/photo.jpg',
+      permitToken: 'permit-token-99',
+      exams: [
+        {
+          id: 'student-99-exam-1',
+          title: 'Computer Science Exam',
+          examDate: '2026-11-04',
+          examTime: '9:00 AM',
+          venue: 'Main Hall',
+          seatNumber: 'B-12',
+        },
+      ],
+      totalFees: 9000,
+      amountPaid: 1000,
+      feesBalance: 8000,
+    })
+
+    render(<AdminPanel />)
+
+    await waitFor(() => {
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
+    })
+
+    await user.click(screen.getByRole('button', { name: /add student/i }))
+    expect(await screen.findByRole('heading', { name: /add new student/i })).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText(/^full name$/i), { target: { value: 'New Student' } })
+    fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: 'newstudent@example.com' } })
+    await user.click(screen.getByRole('button', { name: /generate/i }))
+    const generatedPassword = (screen.getByLabelText(/initial password/i) as HTMLInputElement).value
+    expect(generatedPassword).toMatch(/^Permit-/)
+    fireEvent.change(screen.getByLabelText(/registration no\./i), { target: { value: 'STU099' } })
+    fireEvent.change(screen.getByLabelText(/^phone number$/i), { target: { value: '+256700111222' } })
+    fireEvent.change(screen.getByLabelText(/^course$/i), { target: { value: 'Computer Science' } })
+    fireEvent.change(screen.getByLabelText(/^program$/i), { target: { value: 'BSc Computer Science' } })
+    fireEvent.change(screen.getByLabelText(/^college$/i), { target: { value: 'College of Computing' } })
+    fireEvent.change(screen.getByLabelText(/^department$/i), { target: { value: 'Computer Science' } })
+    fireEvent.change(screen.getByLabelText(/^semester$/i), { target: { value: 'Semester 1 2026/2027' } })
+    fireEvent.change(screen.getByLabelText(/student category/i), { target: { value: 'international' } })
+    fireEvent.change(screen.getByLabelText(/amount paid/i), { target: { value: '1000' } })
+    fireEvent.change(screen.getByLabelText(/profile photo url/i), { target: { value: 'https://example.com/photo.jpg' } })
+    fireEvent.change(screen.getByLabelText(/^exam date$/i), { target: { value: '2026-11-04' } })
+    fireEvent.change(screen.getByLabelText(/^exam time$/i), { target: { value: '9:00 AM' } })
+    fireEvent.change(screen.getByLabelText(/^venue$/i), { target: { value: 'Main Hall' } })
+    fireEvent.change(screen.getByLabelText(/seat number/i), { target: { value: 'B-12' } })
+    fireEvent.change(screen.getByLabelText(/course units/i), { target: { value: 'CSC 101\nMAT 110' } })
+    fireEvent.change(screen.getByLabelText(/permit instructions/i), { target: { value: 'Bring your ID card.' } })
+
+    await user.click(screen.getByRole('button', { name: /create student/i }))
+
+    await waitFor(() => {
+      expect(createStudentProfile).toHaveBeenCalledWith(
+        {
+          name: 'New Student',
+          email: 'newstudent@example.com',
+          password: generatedPassword,
+          studentId: 'STU099',
+          studentCategory: 'international',
+          phoneNumber: '+256700111222',
+          course: 'Computer Science',
+          program: 'BSc Computer Science',
+          college: 'College of Computing',
+          department: 'Computer Science',
+          semester: 'Semester 1 2026/2027',
+          courseUnits: ['CSC 101', 'MAT 110'],
+          profileImage: 'https://example.com/photo.jpg',
+          totalFees: 9000,
+          amountPaid: 1000,
+          instructions: 'Bring your ID card.',
+          examDate: '2026-11-04',
+          examTime: '9:00 AM',
+          venue: 'Main Hall',
+          seatNumber: 'B-12',
+        },
+        'admin-1',
+      )
+    })
+
+    await waitFor(() => {
+      expect(fetchStudentProfilesPage).toHaveBeenLastCalledWith({
+        page: 1,
+        pageSize: 24,
+        search: 'STU099',
+        status: 'all',
+      })
+    })
+
+    expect(await screen.findByText(/student profile created for new student\./i)).toBeTruthy()
+    expect(await screen.findByText(/new student account ready/i)).toBeTruthy()
+    expect(await screen.findByText(/temporary password/i)).toBeTruthy()
+    expect(await screen.findByText(generatedPassword)).toBeTruthy()
+  }, 20000)
+
+  it('exports permit activity as csv', async () => {
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: createAdminUser(),
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signOut,
+      refreshUser,
+    })
+
+    const profileServiceModule = await import('../services/profileService')
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
     vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
     vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
     vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
@@ -526,14 +930,14 @@ describe('AdminPanel', () => {
       },
     ]
 
-    fetchAllStudentProfiles.mockResolvedValue(students)
-    fetchAdminActivityLogs.mockResolvedValue(activityLogs)
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage(students))
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage(activityLogs))
 
     render(<AdminPanel />)
 
     await waitFor(() => {
-      expect(fetchAllStudentProfiles).toHaveBeenCalled()
-      expect(fetchAdminActivityLogs).toHaveBeenCalled()
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
+      expect(fetchAdminActivityLogsPage).toHaveBeenCalled()
     })
 
     await user.click(screen.getByRole('button', { name: /export csv/i }))
@@ -541,4 +945,460 @@ describe('AdminPanel', () => {
     expect(downloadPermitActivityCsv).toHaveBeenCalledWith(activityLogs, students)
     expect(await screen.findByText(/exported 1 permit activity row\(s\)\./i)).toBeTruthy()
   })
+
+  it('updates received amount and clears the student balance', async () => {
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: createAdminUser(),
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signOut,
+      refreshUser,
+    })
+
+    const profileServiceModule = await import('../services/profileService')
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
+    vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
+    vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
+    vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
+    vi.spyOn(profileServiceModule, 'importStudentFinancials').mockImplementation(importStudentFinancials)
+
+    const spreadsheetImportModule = await import('../services/spreadsheetImport')
+    vi.spyOn(spreadsheetImportModule, 'parseFinancialSpreadsheet').mockImplementation(parseFinancialSpreadsheet)
+
+    const adminTemplateModule = await import('../services/adminImportTemplate')
+    vi.spyOn(adminTemplateModule, 'downloadFinancialImportTemplate').mockImplementation(downloadFinancialImportTemplate)
+
+    const permitActivityExportModule = await import('../services/permitActivityExport')
+    vi.spyOn(permitActivityExportModule, 'downloadPermitActivityCsv').mockImplementation(downloadPermitActivityCsv)
+
+    const { default: AdminPanel } = await import('./AdminPanel')
+    const user = userEvent.setup()
+
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage([
+      {
+        id: 'student-1',
+        email: 'student1@example.com',
+        role: 'student',
+        name: 'John Doe',
+        studentId: 'STU001',
+        course: 'Computer Science',
+        examDate: '2026-04-15',
+        examTime: '10:00 AM',
+        venue: 'Hall A',
+        seatNumber: 'A-001',
+        instructions: 'Bring valid ID.',
+        profileImage: 'https://via.placeholder.com/150',
+        exams: [],
+        totalFees: 3000,
+        amountPaid: 1000,
+        feesBalance: 2000,
+      },
+    ]))
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([]))
+
+    render(<AdminPanel />)
+
+    await waitFor(() => {
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
+    })
+
+    fireEvent.change(screen.getByLabelText(/amount received for john doe/i), { target: { value: '2800' } })
+    await user.click(screen.getByTitle(/save received amount/i))
+
+    await waitFor(() => {
+      expect(updateStudentFinancials).toHaveBeenCalledWith('student-1', { amountPaid: 2800 }, 'admin-1')
+    })
+
+    await user.click(screen.getByTitle(/mark fully paid/i))
+
+    await waitFor(() => {
+      expect(clearStudentBalance).toHaveBeenCalledWith('student-1', 'admin-1')
+    })
+
+    expect(await screen.findByText(/john doe has been cleared for printing\./i)).toBeTruthy()
+  }, 10000)
+
+  it('shows a scoped finance admin view with permit generation restricted', async () => {
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: createAdminUser({
+        id: 'admin-3',
+        email: 'finance@example.com',
+        name: 'Finance Office',
+        scope: 'finance',
+        permissions: ['view_students', 'manage_financials', 'view_audit_logs', 'export_reports', 'write_audit_logs'],
+      }),
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signOut,
+      refreshUser,
+    })
+
+    const profileServiceModule = await import('../services/profileService')
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
+    vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
+    vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
+    vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
+    vi.spyOn(profileServiceModule, 'importStudentFinancials').mockImplementation(importStudentFinancials)
+
+    const spreadsheetImportModule = await import('../services/spreadsheetImport')
+    vi.spyOn(spreadsheetImportModule, 'parseFinancialSpreadsheet').mockImplementation(parseFinancialSpreadsheet)
+
+    const adminTemplateModule = await import('../services/adminImportTemplate')
+    vi.spyOn(adminTemplateModule, 'downloadFinancialImportTemplate').mockImplementation(downloadFinancialImportTemplate)
+
+    const permitActivityExportModule = await import('../services/permitActivityExport')
+    vi.spyOn(permitActivityExportModule, 'downloadPermitActivityCsv').mockImplementation(downloadPermitActivityCsv)
+
+    const { default: AdminPanel } = await import('./AdminPanel')
+
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage([
+      {
+        id: 'student-1',
+        email: 'student1@example.com',
+        role: 'student',
+        name: 'John Doe',
+        studentId: 'STU001',
+        course: 'Computer Science',
+        examDate: '2026-04-15',
+        examTime: '10:00 AM',
+        venue: 'Hall A',
+        seatNumber: 'A-001',
+        instructions: 'Bring valid ID.',
+        profileImage: 'https://via.placeholder.com/150',
+        exams: [],
+        totalFees: 3000,
+        amountPaid: 1000,
+        feesBalance: 2000,
+      },
+    ]))
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([]))
+
+    render(<AdminPanel />)
+
+    await waitFor(() => {
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
+    })
+
+    expect(screen.getByRole('button', { name: /open bulk import/i })).toBeEnabled()
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /^dashboard$/i }))
+
+    expect(screen.getAllByText(/finance desk/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /^bulk import$/i }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /^permit cards$/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /generate bulk permits/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /send reminders/i })).toBeEnabled()
+  })
+
+  it('derives navigation and quick actions from permissions instead of scope defaults', async () => {
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: createAdminUser({
+        id: 'admin-4',
+        email: 'operations@example.com',
+        name: 'Operations Office',
+        scope: 'operations',
+        permissions: ['view_students', 'manage_student_profiles', 'export_reports'],
+      }),
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signOut,
+      refreshUser,
+    })
+
+    const profileServiceModule = await import('../services/profileService')
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
+    vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
+    vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
+    vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
+    vi.spyOn(profileServiceModule, 'importStudentFinancials').mockImplementation(importStudentFinancials)
+
+    const spreadsheetImportModule = await import('../services/spreadsheetImport')
+    vi.spyOn(spreadsheetImportModule, 'parseFinancialSpreadsheet').mockImplementation(parseFinancialSpreadsheet)
+
+    const adminTemplateModule = await import('../services/adminImportTemplate')
+    vi.spyOn(adminTemplateModule, 'downloadFinancialImportTemplate').mockImplementation(downloadFinancialImportTemplate)
+
+    const permitActivityExportModule = await import('../services/permitActivityExport')
+    vi.spyOn(permitActivityExportModule, 'downloadPermitActivityCsv').mockImplementation(downloadPermitActivityCsv)
+
+    const { default: AdminPanel } = await import('./AdminPanel')
+
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage([
+      {
+        id: 'student-1',
+        email: 'student1@example.com',
+        role: 'student',
+        name: 'John Doe',
+        studentId: 'STU001',
+        course: 'Computer Science',
+        examDate: '2026-04-15',
+        examTime: '10:00 AM',
+        venue: 'Hall A',
+        seatNumber: 'A-001',
+        instructions: 'Bring valid ID.',
+        profileImage: 'https://via.placeholder.com/150',
+        exams: [],
+        totalFees: 3000,
+        amountPaid: 3000,
+        feesBalance: 0,
+      },
+    ]))
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([]))
+
+    render(<AdminPanel />)
+
+    await waitFor(() => {
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
+    })
+
+    expect(screen.getByRole('button', { name: /permit cards/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^bulk import$/i })).toBeNull()
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /^dashboard$/i }))
+
+    expect(screen.getByRole('button', { name: /generate bulk permits/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /send reminders/i })).toBeEnabled()
+  })
+
+  it('disables mutating student actions for report-only admins', async () => {
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: createAdminUser({
+        id: 'admin-5',
+        email: 'auditor@example.com',
+        name: 'Audit Office',
+        scope: 'operations',
+        permissions: ['view_students', 'export_reports'],
+      }),
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signOut,
+      refreshUser,
+    })
+
+    const profileServiceModule = await import('../services/profileService')
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
+    vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
+    vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
+    vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
+    vi.spyOn(profileServiceModule, 'importStudentFinancials').mockImplementation(importStudentFinancials)
+
+    const spreadsheetImportModule = await import('../services/spreadsheetImport')
+    vi.spyOn(spreadsheetImportModule, 'parseFinancialSpreadsheet').mockImplementation(parseFinancialSpreadsheet)
+
+    const adminTemplateModule = await import('../services/adminImportTemplate')
+    vi.spyOn(adminTemplateModule, 'downloadFinancialImportTemplate').mockImplementation(downloadFinancialImportTemplate)
+
+    const permitActivityExportModule = await import('../services/permitActivityExport')
+    vi.spyOn(permitActivityExportModule, 'downloadPermitActivityCsv').mockImplementation(downloadPermitActivityCsv)
+
+    const { default: AdminPanel } = await import('./AdminPanel')
+
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage([
+      {
+        id: 'student-1',
+        email: 'student1@example.com',
+        role: 'student',
+        name: 'John Doe',
+        studentId: 'STU001',
+        course: 'Computer Science',
+        examDate: '2026-04-15',
+        examTime: '10:00 AM',
+        venue: 'Hall A',
+        seatNumber: 'A-001',
+        instructions: 'Bring valid ID.',
+        profileImage: 'https://via.placeholder.com/150',
+        exams: [],
+        totalFees: 3000,
+        amountPaid: 1000,
+        feesBalance: 2000,
+      },
+    ]))
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([]))
+
+    render(<AdminPanel />)
+
+    await waitFor(() => {
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
+    })
+
+    expect(screen.getByTitle(/save received amount/i)).toBeDisabled()
+    expect(screen.getByTitle(/mark fully paid/i)).toBeDisabled()
+    expect(screen.getByTitle(/edit student profile/i)).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /^bulk import$/i })).toBeNull()
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /^reports$/i }))
+
+    expect(screen.getByRole('button', { name: /^export csv$/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /export excel/i })).toBeEnabled()
+  })
+
+  it('lets finance-capable admins update the fee structure from settings', async () => {
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: createAdminUser(),
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signOut,
+      refreshUser,
+    })
+
+    const profileServiceModule = await import('../services/profileService')
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
+    vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
+    vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
+    vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
+    vi.spyOn(profileServiceModule, 'importStudentFinancials').mockImplementation(importStudentFinancials)
+
+    const spreadsheetImportModule = await import('../services/spreadsheetImport')
+    vi.spyOn(spreadsheetImportModule, 'parseFinancialSpreadsheet').mockImplementation(parseFinancialSpreadsheet)
+
+    const adminTemplateModule = await import('../services/adminImportTemplate')
+    vi.spyOn(adminTemplateModule, 'downloadFinancialImportTemplate').mockImplementation(downloadFinancialImportTemplate)
+
+    const permitActivityExportModule = await import('../services/permitActivityExport')
+    vi.spyOn(permitActivityExportModule, 'downloadPermitActivityCsv').mockImplementation(downloadPermitActivityCsv)
+
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage([]))
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([]))
+    fetchSystemFeeSettings.mockResolvedValue({
+      localStudentFee: 3000,
+      internationalStudentFee: 6000,
+    })
+    updateSystemFeeSettings.mockResolvedValue({
+      localStudentFee: 3500,
+      internationalStudentFee: 7200,
+    })
+
+    const { default: AdminPanel } = await import('./AdminPanel')
+    const user = userEvent.setup()
+
+    render(<AdminPanel />)
+
+    await waitFor(() => {
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
+    })
+
+    await user.click(screen.getByRole('button', { name: /^settings$/i }))
+    await user.clear(screen.getByLabelText(/local student fee/i))
+    await user.type(screen.getByLabelText(/local student fee/i), '3500')
+    await user.clear(screen.getByLabelText(/international student fee/i))
+    await user.type(screen.getByLabelText(/international student fee/i), '7200')
+    await user.click(screen.getByRole('button', { name: /save fee structure/i }))
+
+    await waitFor(() => {
+      expect(updateSystemFeeSettings).toHaveBeenCalledWith({
+        localStudentFee: 3500,
+        internationalStudentFee: 7200,
+      })
+    })
+
+    expect(await screen.findByText(/fee structure settings updated successfully/i)).toBeTruthy()
+  }, 20000)
+
+  it('lets admins update their own account credentials from settings', async () => {
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: createAdminUser({ name: 'Administrator', email: 'admin@example.com' }),
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signOut,
+      refreshUser,
+    })
+
+    const profileServiceModule = await import('../services/profileService')
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
+    vi.spyOn(profileServiceModule, 'adminUpdateStudentProfile').mockImplementation(adminUpdateStudentProfile)
+    vi.spyOn(profileServiceModule, 'updateStudentFinancials').mockImplementation(updateStudentFinancials)
+    vi.spyOn(profileServiceModule, 'clearStudentBalance').mockImplementation(clearStudentBalance)
+    vi.spyOn(profileServiceModule, 'importStudentFinancials').mockImplementation(importStudentFinancials)
+
+    const spreadsheetImportModule = await import('../services/spreadsheetImport')
+    vi.spyOn(spreadsheetImportModule, 'parseFinancialSpreadsheet').mockImplementation(parseFinancialSpreadsheet)
+
+    const adminTemplateModule = await import('../services/adminImportTemplate')
+    vi.spyOn(adminTemplateModule, 'downloadFinancialImportTemplate').mockImplementation(downloadFinancialImportTemplate)
+
+    const permitActivityExportModule = await import('../services/permitActivityExport')
+    vi.spyOn(permitActivityExportModule, 'downloadPermitActivityCsv').mockImplementation(downloadPermitActivityCsv)
+
+    updateStudentAccount.mockResolvedValue({
+      id: 'admin-1',
+      email: 'registrar.office@example.com',
+      role: 'admin',
+      name: 'Registrar Office',
+      totalFees: 0,
+      amountPaid: 0,
+      feesBalance: 0,
+    })
+
+    const { default: AdminPanel } = await import('./AdminPanel')
+    const user = userEvent.setup()
+
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage([]))
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([]))
+
+    render(<AdminPanel />)
+
+    await waitFor(() => {
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
+    })
+
+    await user.click(screen.getByRole('button', { name: /^settings$/i }))
+    await user.clear(screen.getByLabelText(/full name/i))
+    await user.type(screen.getByLabelText(/full name/i), 'Registrar Office')
+    await user.clear(screen.getByLabelText(/email address/i))
+    await user.type(screen.getByLabelText(/email address/i), 'registrar.office@example.com')
+    await user.type(screen.getByLabelText(/phone number/i), '+256700123456')
+    await user.type(screen.getByLabelText(/current password/i), 'Permit@2026')
+    await user.type(screen.getByLabelText(/^new password$/i), 'Permit@2027')
+    await user.type(screen.getByLabelText(/confirm password/i), 'Permit@2027')
+    await user.click(screen.getByRole('button', { name: /save account settings/i }))
+
+    await waitFor(() => {
+      expect(updateStudentAccount).toHaveBeenCalledWith('admin-1', {
+        name: 'Registrar Office',
+        email: 'registrar.office@example.com',
+        phoneNumber: '+256700123456',
+        currentPassword: 'Permit@2026',
+        password: 'Permit@2027',
+      })
+    })
+
+    expect(refreshUser).toHaveBeenCalled()
+    expect(await screen.findByText(/admin account settings updated successfully/i)).toBeTruthy()
+  }, 20000)
 })

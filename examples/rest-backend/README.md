@@ -38,12 +38,27 @@ VITE_BACKEND_PROVIDER=rest
 VITE_API_BASE_URL=http://localhost:4000
 ```
 
-## Demo Accounts
+## Bootstrap Admin Accounts
 
-- `admin@example.com` / `Permit@2026`
-- `student1@example.com` / `Permit@2026`
-- `student2@example.com` / `Permit@2026`
-- `student3@example.com` / `Permit@2026` (fees fully cleared)
+- First startup seeds these bootstrap admin IDs:
+	- `admin-1` as super-admin
+	- `admin-2` as registrar
+	- `admin-3` as finance
+- On a brand new database, the default login credentials are:
+	- `admin@example.com` / `Permit@2026`
+	- `registrar@example.com` / `Permit@2026`
+	- `finance@example.com` / `Permit@2026`
+- After you change a bootstrap admin's email, phone number, or password in the app, `npm run reset-data` preserves those customized values for the same bootstrap admin ID while still clearing students, permits, uploads, and activity data.
+
+No student accounts are seeded by default. Create students from the admin panel or import real records into the backend.
+
+## Admin Scopes
+
+- `admin@example.com`: `super-admin` with full access
+- `registrar@example.com`: can view students, manage student profiles, handle support requests, and view audit activity
+- `finance@example.com`: can view students, manage financial records and imports, and view audit activity
+
+Admin login and session responses include `scope` and `permissions` for admin accounts so the frontend can align its UI with backend-enforced access rules.
 
 ## Included Endpoints
 
@@ -67,6 +82,8 @@ Login requests must send:
 - `identifier`: email address or registration number
 - `password`
 
+Financial import spreadsheets may include `student_name`, `student_id`, `email`, `amount_paid`, and optional `total_fees`. The preview endpoint preserves `student_name` in the returned rows.
+
 ## Persistence
 
 - Data is stored in SQLite at `data/app.sqlite` by default
@@ -83,6 +100,8 @@ npm run reset-data
 ```bash
 npm run smoke-test
 ```
+
+`npm run reset-data` clears student records, generated permit artifacts, uploads, sessions, and activity logs. It preserves the customized identity of the three bootstrap admin accounts by ID so admin access is not forced back to the original seed email and password after every reset.
 
 ## Uploads
 

@@ -15,6 +15,19 @@ function parseNumber(value: unknown): number | undefined {
   return Number.isFinite(numericValue) ? numericValue : undefined
 }
 
+function parseList(value: unknown): string[] | undefined {
+  if (typeof value !== 'string' || !value.trim()) {
+    return undefined
+  }
+
+  const items = value
+    .split(/\r?\n|,|;/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+  return items.length > 0 ? items : undefined
+}
+
 function mapRowsToFinancialImportRows(rows: unknown[][]): FinancialImportRow[] {
   const [headerRow, ...dataRows] = rows
 
@@ -37,8 +50,50 @@ function mapRowsToFinancialImportRows(rows: unknown[][]): FinancialImportRow[] {
       const studentId = typeof normalizedEntries.studentid === 'string' && normalizedEntries.studentid.trim()
         ? normalizedEntries.studentid.trim()
         : undefined
+      const studentName = typeof normalizedEntries.studentname === 'string' && normalizedEntries.studentname.trim()
+        ? normalizedEntries.studentname.trim()
+        : undefined
       const email = typeof normalizedEntries.email === 'string' && normalizedEntries.email.trim()
         ? normalizedEntries.email.trim()
+        : undefined
+      const phoneNumber = typeof normalizedEntries.phonenumber === 'string' && normalizedEntries.phonenumber.trim()
+        ? normalizedEntries.phonenumber.trim()
+        : typeof normalizedEntries.phone === 'string' && normalizedEntries.phone.trim()
+          ? normalizedEntries.phone.trim()
+          : undefined
+      const course = typeof normalizedEntries.course === 'string' && normalizedEntries.course.trim()
+        ? normalizedEntries.course.trim()
+        : undefined
+      const program = typeof normalizedEntries.program === 'string' && normalizedEntries.program.trim()
+        ? normalizedEntries.program.trim()
+        : undefined
+      const college = typeof normalizedEntries.college === 'string' && normalizedEntries.college.trim()
+        ? normalizedEntries.college.trim()
+        : undefined
+      const department = typeof normalizedEntries.department === 'string' && normalizedEntries.department.trim()
+        ? normalizedEntries.department.trim()
+        : undefined
+      const semester = typeof normalizedEntries.semester === 'string' && normalizedEntries.semester.trim()
+        ? normalizedEntries.semester.trim()
+        : undefined
+      const password = typeof normalizedEntries.password === 'string' && normalizedEntries.password.trim()
+        ? normalizedEntries.password.trim()
+        : undefined
+      const courseUnits = parseList(normalizedEntries.courseunits ?? normalizedEntries.units)
+      const instructions = typeof normalizedEntries.instructions === 'string' && normalizedEntries.instructions.trim()
+        ? normalizedEntries.instructions.trim()
+        : undefined
+      const examDate = typeof normalizedEntries.examdate === 'string' && normalizedEntries.examdate.trim()
+        ? normalizedEntries.examdate.trim()
+        : undefined
+      const examTime = typeof normalizedEntries.examtime === 'string' && normalizedEntries.examtime.trim()
+        ? normalizedEntries.examtime.trim()
+        : undefined
+      const venue = typeof normalizedEntries.venue === 'string' && normalizedEntries.venue.trim()
+        ? normalizedEntries.venue.trim()
+        : undefined
+      const seatNumber = typeof normalizedEntries.seatnumber === 'string' && normalizedEntries.seatnumber.trim()
+        ? normalizedEntries.seatnumber.trim()
         : undefined
       const userId = typeof normalizedEntries.id === 'string' && normalizedEntries.id.trim()
         ? normalizedEntries.id.trim()
@@ -55,14 +110,32 @@ function mapRowsToFinancialImportRows(rows: unknown[][]): FinancialImportRow[] {
 
       return {
         rowNumber: index + 2,
+        studentName,
         studentId,
         email,
         userId,
+        phoneNumber,
+        course,
+        program,
+        college,
+        department,
+        semester,
+        password,
+        courseUnits,
+        instructions,
+        examDate,
+        examTime,
+        venue,
+        seatNumber,
         amountPaid,
         totalFees,
       }
     })
-    .filter((row) => (row.studentId || row.email || row.userId) && (typeof row.amountPaid === 'number' || typeof row.totalFees === 'number'))
+    .filter((row) => {
+      const canUpdate = (row.studentId || row.email || row.userId) && (typeof row.amountPaid === 'number' || typeof row.totalFees === 'number')
+      const canCreate = row.studentName && row.studentId && row.email && row.course && typeof row.totalFees === 'number'
+      return Boolean(canUpdate || canCreate)
+    })
 }
 
 async function parseCsvFile(file: File) {

@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: ./examples/rest-backend
+      dockerfile: Dockerfile
+    environment:
+      PORT: 4000
+      APP_DB_PATH: /app/data/app.sqlite
+      SESSION_TTL_HOURS: 12
+    restart: unless-stopped
+    volumes:
+      - backend-data:/app/data
+      - backend-uploads:/app/uploads
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/frontend.Dockerfile
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+volumes:
+  backend-data:
+  backend-uploads:

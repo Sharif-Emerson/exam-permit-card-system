@@ -22,9 +22,11 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { apiBaseUrl } from '../config/provider'
-import { fetchStudentProfileById, recordPermitActivity, updateStudentAccount } from '../services/profileService'
-import type { StudentProfile } from '../types'
+import { useTheme } from '../context/ThemeContext'
+import { publicApiBaseUrl } from '../config/provider'
+import PermitCard from './PermitCard'
+import { createSupportRequest, fetchPermitActivityHistory, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, recordPermitActivity, updateStudentAccount } from '../services/profileService'
+import type { PermitActivityRecord, StudentProfile, SupportContact, SupportRequest } from '../types'
 import { FALLBACK_PROFILE_IMAGE } from './PermitCard'
 
 type PermitStatus = 'approved' | 'pending' | 'rejected'
@@ -53,6 +55,7 @@ type SettingsDraft = {
   name: string
   email: string
   profileImage: string
+  currentPassword: string
   password: string
   confirmPassword: string
 }
@@ -61,6 +64,12 @@ type ApplicationDraft = {
   semester: string
   courseUnits: string
   documents: string[]
+  checklist: string[]
+}
+
+type SupportDraft = {
+  subject: string
+  message: string
 }
 
 const portalSections: Array<{ key: PortalSection; label: string; icon: typeof LayoutDashboard }> = [
@@ -70,12 +79,14 @@ const portalSections: Array<{ key: PortalSection; label: string; icon: typeof La
   { key: 'support', label: 'Help & Support', icon: FileText },
 ]
 
+const requiredDocumentChecklist = [
+  { id: 'course-registration', label: 'Current course registration details' },
+  { id: 'student-id', label: 'Valid student identification' },
+  { id: 'payment-evidence', label: 'Payment evidence when requested' },
+] as const
+
 function getHistoryStorageKey(userId: string) {
   return `student-portal-history:${userId}`
-}
-
-function getDarkModeStorageKey(userId: string) {
-  return `student-portal-dark:${userId}`
 }
 
 function readApplicationHistory(userId: string): PermitApplicationRecord[] {
@@ -293,6 +304,7 @@ function getNotificationToneClasses(tone: NotificationItem['tone']) {
 
 export default function Dashboard() {
   const { user, signOut, refreshUser } = useAuth()
+  const { darkMode, toggleTheme } = useTheme()
   const [studentData, setStudentData] = useState<StudentProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -302,67 +314,167 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [applicationHistory, setApplicationHistory] = useState<PermitApplicationRecord[]>([])
-  const [darkMode, setDarkMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>('all')
   const [semesterFilter, setSemesterFilter] = useState('all')
   const [submittingApplication, setSubmittingApplication] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
+  const [loadingSupport, setLoadingSupport] = useState(false)
+  const [submittingSupport, setSubmittingSupport] = useState(false)
+  const [supportRequests, setSupportRequests] = useState<SupportRequest[]>([])
+  const [supportContacts, setSupportContacts] = useState<SupportContact[]>([])
+  const [permitHistory, setPermitHistory] = useState<PermitActivityRecord[]>([])
   const [applicationDraft, setApplicationDraft] = useState<ApplicationDraft>({
     semester: `${deriveAcademicSession()} ${deriveSemesterLabel()}`,
     courseUnits: '',
     documents: [],
+    checklist: [],
   })
   const [settingsDraft, setSettingsDraft] = useState<SettingsDraft>({
     name: '',
     email: '',
     profileImage: '',
+    currentPassword: '',
     password: '',
     confirmPassword: '',
   })
+  const [supportDraft, setSupportDraft] = useState<SupportDraft>({
+    subject: '',
+    message: '',
+  })
 
-  useEffect(() => {
-    async function loadStudentProfile() {
-      if (!user || user.role !== 'student') {
-        setLoading(false)
-        return
-      }
-
-      try {
-        setLoading(true)
-        setError('')
-        const profile = await fetchStudentProfileById(user.id)
-        setStudentData(profile)
-        setSettingsDraft({
-          name: profile.name,
-          email: profile.email,
-          profileImage: profile.profileImage,
-          password: '',
-          confirmPassword: '',
-        })
-        setApplicationHistory(readApplicationHistory(user.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
-
-        if (typeof window !== 'undefined') {
-          setDarkMode(window.localStorage.getItem(getDarkModeStorageKey(user.id)) === 'true')
-        }
-      } catch (loadError) {
-        const nextError = loadError instanceof Error ? loadError.message : 'Unable to load your dashboard'
-        setError(nextError)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    void loadStudentProfile()
-  }, [user])
-
-  useEffect(() => {
-    if (!user || typeof window === 'undefined') {
+  async function loadSupportRequests() {
+    if (!user || user.role !== 'student') {
       return
     }
 
-    window.localStorage.setItem(getDarkModeStorageKey(user.id), String(darkMode))
-  }, [darkMode, user])
+    try {
+      setLoadingSupport(true)
+      const requests = await fetchSupportRequests()
+      setSupportRequests(requests)
+    } catch (loadError) {
+      const nextError = loadError instanceof Error ? loadError.message : 'Unable to load support requests'
+      setError(nextError)
+    } finally {
+      setLoadingSupport(false)
+    }
+  }
+
+  async function loadSupportContactsAndHistory() {
+    if (!user || user.role !== 'student') {
+      return
+    }
+
+    try {
+      const [contacts, history] = await Promise.all([
+        fetchSupportContacts(),
+        fetchPermitActivityHistory(),
+      ])
+      setSupportContacts(contacts)
+      setPermitHistory(history)
+    } catch (loadError) {
+      const nextError = loadError instanceof Error ? loadError.message : 'Unable to load support contacts or permit history.'
+      setError(nextError)
+    }
+  }
+
+  async function syncStudentProfile(options?: { showLoading?: boolean; clearError?: boolean; syncDrafts?: boolean; initializeLocalState?: boolean }) {
+    if (!user || user.role !== 'student') {
+      setLoading(false)
+      return null
+    }
+
+    const {
+      showLoading = false,
+      clearError = false,
+      syncDrafts = false,
+      initializeLocalState = false,
+    } = options ?? {}
+
+    try {
+      if (showLoading) {
+        setLoading(true)
+      }
+
+      if (clearError) {
+        setError('')
+      }
+
+      const profile = await fetchStudentProfileById(user.id)
+      setStudentData(profile)
+
+      if (syncDrafts) {
+        setSettingsDraft((current) => ({
+          ...current,
+          name: profile.name,
+          email: profile.email,
+          profileImage: profile.profileImage,
+        }))
+      }
+
+      if (initializeLocalState) {
+        setApplicationHistory(readApplicationHistory(user.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+        await Promise.all([
+          loadSupportRequests(),
+          loadSupportContactsAndHistory(),
+        ])
+      }
+
+      return profile
+    } catch (loadError) {
+      const nextError = loadError instanceof Error ? loadError.message : 'Unable to load your dashboard'
+
+      if (clearError || !studentData) {
+        setError(nextError)
+      }
+
+      return null
+    } finally {
+      if (showLoading) {
+        setLoading(false)
+      }
+    }
+  }
+
+  useEffect(() => {
+    void syncStudentProfile({
+      showLoading: true,
+      clearError: true,
+      syncDrafts: true,
+      initializeLocalState: true,
+    })
+  }, [user])
+
+  useEffect(() => {
+    if (!user || user.role !== 'student' || typeof window === 'undefined') {
+      return
+    }
+
+    const syncSilently = () => {
+      void syncStudentProfile()
+    }
+
+    const intervalId = window.setInterval(syncSilently, 30000)
+
+    const handleFocus = () => {
+      syncSilently()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncSilently()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [user])
 
   useEffect(() => {
     if (!user) {
@@ -378,22 +490,15 @@ export default function Dashboard() {
     }
 
     try {
-      setLoading(true)
-      setError('')
       setSuccessMessage('')
-      const profile = await fetchStudentProfileById(user.id)
-      setStudentData(profile)
-      setSettingsDraft((current) => ({
-        ...current,
-        name: profile.name,
-        email: profile.email,
-        profileImage: profile.profileImage,
-      }))
+      await syncStudentProfile({ showLoading: true, clearError: true, syncDrafts: true })
+      await Promise.all([
+        loadSupportRequests(),
+        loadSupportContactsAndHistory(),
+      ])
     } catch (refreshError) {
       const nextError = refreshError instanceof Error ? refreshError.message : 'Unable to refresh dashboard details'
       setError(nextError)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -423,6 +528,42 @@ export default function Dashboard() {
     openPrintDialog()
   }
 
+  async function handleSubmitSupportRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!user || user.role !== 'student') {
+      return
+    }
+
+    const subject = supportDraft.subject.trim()
+    const message = supportDraft.message.trim()
+
+    if (subject.length < 4) {
+      setError('Support subject must be at least 4 characters long.')
+      return
+    }
+
+    if (message.length < 10) {
+      setError('Support message must be at least 10 characters long.')
+      return
+    }
+
+    try {
+      setSubmittingSupport(true)
+      setError('')
+      setSuccessMessage('')
+      const created = await createSupportRequest(user.id, { subject, message })
+      setSupportRequests((current) => [created, ...current])
+      setSupportDraft({ subject: '', message: '' })
+      setSuccessMessage('Support request sent to the admin desk.')
+    } catch (submitError) {
+      const nextError = submitError instanceof Error ? submitError.message : 'Unable to send support request'
+      setError(nextError)
+    } finally {
+      setSubmittingSupport(false)
+    }
+  }
+
   async function handleDownload() {
     if (!studentData || studentData.feesBalance > 0) {
       return
@@ -442,6 +583,15 @@ export default function Dashboard() {
     setApplicationDraft((current) => ({ ...current, documents }))
   }
 
+  function handleChecklistToggle(itemId: string) {
+    setApplicationDraft((current) => ({
+      ...current,
+      checklist: current.checklist.includes(itemId)
+        ? current.checklist.filter((entry) => entry !== itemId)
+        : [...current.checklist, itemId],
+    }))
+  }
+
   async function handleApplicationSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -456,6 +606,11 @@ export default function Dashboard() {
 
     if (courseUnits.length === 0) {
       setError('Add at least one course unit before submitting your permit request.')
+      return
+    }
+
+    if (applicationDraft.checklist.length !== requiredDocumentChecklist.length) {
+      setError('Complete the document checklist before submitting your permit request.')
       return
     }
 
@@ -475,7 +630,12 @@ export default function Dashboard() {
           ? 'Submitted. Outstanding fees must be cleared before approval.'
           : 'Submitted successfully and awaiting review.',
       courseUnits,
-      documents: applicationDraft.documents,
+      documents: [
+        ...requiredDocumentChecklist
+          .filter((item) => applicationDraft.checklist.includes(item.id))
+          .map((item) => item.label),
+        ...applicationDraft.documents,
+      ],
     }
 
     setApplicationHistory((current) => [nextRecord, ...current])
@@ -483,6 +643,7 @@ export default function Dashboard() {
       semester: applicationDraft.semester,
       courseUnits: '',
       documents: [],
+      checklist: [],
     })
     setSuccessMessage(nextStatus === 'approved' ? 'Permit request approved and added to your history.' : 'Permit request submitted successfully.')
     setActiveSection('applications')
@@ -501,20 +662,28 @@ export default function Dashboard() {
       return
     }
 
+    if (settingsDraft.password && !settingsDraft.currentPassword.trim()) {
+      setError('Enter your current password before choosing a new one.')
+      return
+    }
+
     try {
       setSavingSettings(true)
       setError('')
       setSuccessMessage('')
       const updatedProfile = await updateStudentAccount(studentData.id, {
-        name: settingsDraft.name,
-        email: settingsDraft.email,
         profileImage: settingsDraft.profileImage || null,
+        currentPassword: settingsDraft.currentPassword || undefined,
         password: settingsDraft.password || undefined,
       })
+      if (updatedProfile.role !== 'student') {
+        throw new Error('Unexpected profile response when updating student settings.')
+      }
       setStudentData(updatedProfile)
       await refreshUser()
       setSettingsDraft((current) => ({
         ...current,
+        currentPassword: '',
         password: '',
         confirmPassword: '',
       }))
@@ -528,8 +697,8 @@ export default function Dashboard() {
   }
 
   const qrValue = studentData
-    ? apiBaseUrl
-      ? `${apiBaseUrl}/permits/${encodeURIComponent(studentData.permitToken)}`
+    ? publicApiBaseUrl
+      ? `${publicApiBaseUrl}/permits/${encodeURIComponent(studentData.permitToken)}`
       : `permit:${studentData.permitToken}`
     : ''
 
@@ -594,6 +763,21 @@ export default function Dashboard() {
     return Array.from(new Set(applicationHistory.map((record) => record.semester)))
   }, [applicationHistory])
 
+  const permitHistoryBySemester = useMemo(() => {
+    const seenSemesters = new Set<string>()
+
+    return [...permitHistory]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .filter((record) => {
+        if (seenSemesters.has(record.semester)) {
+          return false
+        }
+
+        seenSemesters.add(record.semester)
+        return true
+      })
+  }, [permitHistory])
+
   const profileImage = studentData?.profileImage?.trim() ? studentData.profileImage : FALLBACK_PROFILE_IMAGE
   const unreadNotifications = notifications.length
   const currentSession = applicationHistory[0]?.semester || `${deriveAcademicSession(studentData?.examDate)} ${deriveSemesterLabel(studentData?.examDate)}`
@@ -639,8 +823,23 @@ export default function Dashboard() {
   }
 
   return (
-    <div className={`${darkMode ? 'dark' : ''}`}>
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(191,219,254,0.55),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(187,247,208,0.55),_transparent_28%),linear-gradient(180deg,_#eff6ff_0%,_#f8fafc_50%,_#eefbf3_100%)] text-slate-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(30,41,59,0.95),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(20,83,45,0.5),_transparent_26%),linear-gradient(180deg,_#020617_0%,_#0f172a_55%,_#052e16_100%)] dark:text-slate-100">
+    <div className={`${darkMode ? 'dark' : ''} student-dashboard-shell`}>
+      {studentData && (
+        <div hidden className="print-permit-sheet-wrapper">
+          <PermitCard
+            studentData={studentData}
+            qrCodeUrl={qrCodeUrl}
+            onRefresh={handleRefresh}
+            onSignOut={() => {
+              void signOut()
+            }}
+            onPrint={() => {}}
+            onDownload={() => {}}
+          />
+        </div>
+      )}
+
+      <div className="student-dashboard-app min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(191,219,254,0.55),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(187,247,208,0.55),_transparent_28%),linear-gradient(180deg,_#eff6ff_0%,_#f8fafc_50%,_#eefbf3_100%)] text-slate-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(30,41,59,0.95),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(20,83,45,0.5),_transparent_26%),linear-gradient(180deg,_#020617_0%,_#0f172a_55%,_#052e16_100%)] dark:text-slate-100">
         {sidebarOpen && (
           <button
             type="button"
@@ -749,7 +948,7 @@ export default function Dashboard() {
                   type="button"
                   title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
                   aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-                  onClick={() => setDarkMode((current) => !current)}
+                  onClick={toggleTheme}
                   className="rounded-full border border-slate-200 bg-white p-3 text-slate-700 shadow-sm transition hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                 >
                   {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -891,11 +1090,13 @@ export default function Dashboard() {
                     </div>
                     <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
                       <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Course / Program</p>
-                      <p className="mt-3 text-lg font-semibold">{studentData.course || 'Not assigned'}</p>
+                      <p className="mt-3 text-lg font-semibold">{studentData.program || studentData.course || 'Not assigned'}</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{studentData.department || 'Department not assigned'}</p>
                     </div>
                     <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
                       <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Year / Semester</p>
-                      <p className="mt-3 text-lg font-semibold">{currentSession}</p>
+                      <p className="mt-3 text-lg font-semibold">{studentData.semester || currentSession}</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{studentData.college || 'College not assigned'}</p>
                     </div>
                     <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
                       <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Permit Status</p>
@@ -1043,6 +1244,22 @@ export default function Dashboard() {
                           />
                         </div>
                         <div>
+                          <p className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Document checklist</p>
+                          <div className="space-y-2 rounded-[1.75rem] border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-900/70">
+                            {requiredDocumentChecklist.map((item) => (
+                              <label key={item.id} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
+                                <input
+                                  type="checkbox"
+                                  checked={applicationDraft.checklist.includes(item.id)}
+                                  onChange={() => handleChecklistToggle(item.id)}
+                                  className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                />
+                                <span>{item.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
                           <label htmlFor="documents" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Upload required documents</label>
                           <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:bg-slate-800">
                             <Upload className="h-4 w-4" />
@@ -1182,6 +1399,22 @@ export default function Dashboard() {
                           />
                         </div>
                         <div>
+                          <p className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Document checklist</p>
+                          <div className="space-y-2 rounded-[1.75rem] border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-900/70">
+                            {requiredDocumentChecklist.map((item) => (
+                              <label key={item.id} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
+                                <input
+                                  type="checkbox"
+                                  checked={applicationDraft.checklist.includes(item.id)}
+                                  onChange={() => handleChecklistToggle(item.id)}
+                                  className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                />
+                                <span>{item.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
                           <label htmlFor="application-documents" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Required documents</label>
                           <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                             <Upload className="h-4 w-4" />
@@ -1238,6 +1471,40 @@ export default function Dashboard() {
                       </div>
                     </section>
                   </div>
+
+                  <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Printed Permit History</p>
+                    <h2 className="mt-2 text-2xl font-semibold">One record per semester</h2>
+                    <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800">
+                      <table className="min-w-full text-left text-sm">
+                        <thead className="bg-slate-50 text-xs uppercase tracking-[0.25em] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                          <tr>
+                            <th className="px-5 py-4">Semester</th>
+                            <th className="px-5 py-4">Latest action</th>
+                            <th className="px-5 py-4">Source</th>
+                            <th className="px-5 py-4">Last activity</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                          {permitHistoryBySemester.map((record) => (
+                            <tr key={record.id} className="bg-white/80 dark:bg-slate-950/40">
+                              <td className="px-5 py-4 font-medium text-slate-900 dark:text-white">{record.semester}</td>
+                              <td className="px-5 py-4">{record.action === 'print_permit' ? 'Printed permit' : 'Downloaded permit'}</td>
+                              <td className="px-5 py-4 capitalize">{record.source.replace('-', ' ')}</td>
+                              <td className="px-5 py-4 text-slate-600 dark:text-slate-300">{formatDateTime(record.createdAt)}</td>
+                            </tr>
+                          ))}
+                          {permitHistoryBySemester.length === 0 && (
+                            <tr>
+                              <td colSpan={4} className="px-5 py-8 text-center text-slate-500 dark:text-slate-300">
+                                No printed or downloaded permit history is available yet.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
                 </div>
               )}
 
@@ -1247,6 +1514,9 @@ export default function Dashboard() {
                     <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Profile Settings</p>
                     <h2 className="mt-2 text-2xl font-semibold">Update your info</h2>
                     <form className="mt-6 space-y-4" onSubmit={(event) => void handleSettingsSave(event)}>
+                      <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                        Your registered full name and email are locked. Contact the admin desk if you need an identity correction.
+                      </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
                           <label htmlFor="settings-name" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Full name</label>
@@ -1254,8 +1524,8 @@ export default function Dashboard() {
                             id="settings-name"
                             type="text"
                             value={settingsDraft.name}
-                            onChange={(event) => setSettingsDraft((current) => ({ ...current, name: event.target.value }))}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            readOnly
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
                           />
                         </div>
                         <div>
@@ -1264,8 +1534,8 @@ export default function Dashboard() {
                             id="settings-email"
                             type="email"
                             value={settingsDraft.email}
-                            onChange={(event) => setSettingsDraft((current) => ({ ...current, email: event.target.value }))}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            readOnly
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
                           />
                         </div>
                       </div>
@@ -1280,7 +1550,18 @@ export default function Dashboard() {
                           className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
                         />
                       </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div>
+                          <label htmlFor="settings-current-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Current password</label>
+                          <input
+                            id="settings-current-password"
+                            type="password"
+                            value={settingsDraft.currentPassword}
+                            onChange={(event) => setSettingsDraft((current) => ({ ...current, currentPassword: event.target.value }))}
+                            placeholder="Required to change password"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                          />
+                        </div>
                         <div>
                           <label htmlFor="settings-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">New password</label>
                           <input
@@ -1336,8 +1617,10 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className="mt-6 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-                        <p>Program: {studentData.course}</p>
-                        <p>Exam session: {currentSession}</p>
+                        <p>Program: {studentData.program || studentData.course}</p>
+                        <p>Exam session: {studentData.semester || currentSession}</p>
+                        <p>Department: {studentData.department || 'Not assigned'}</p>
+                        <p>Course units: {studentData.courseUnits?.length ? studentData.courseUnits.join(', ') : 'Not assigned'}</p>
                         <p>Permit status: {statusView.label}</p>
                       </div>
                     </div>
@@ -1346,34 +1629,125 @@ export default function Dashboard() {
               )}
 
               {activeSection === 'support' && (
-                <div className="grid gap-6 lg:grid-cols-3">
-                  <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                    <FileText className="h-9 w-9 text-blue-600 dark:text-blue-300" />
-                    <h2 className="mt-4 text-xl font-semibold">Help & support</h2>
-                    <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                      If your application is pending or rejected, review your remarks, confirm course units, and make sure your fees are fully cleared.
-                    </p>
-                  </section>
+                <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+                  <div className="space-y-6">
+                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <FileText className="h-9 w-9 text-blue-600 dark:text-blue-300" />
+                      <h2 className="mt-4 text-xl font-semibold">Help & support</h2>
+                      <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                        If your application is pending or rejected, review your remarks, confirm your document checklist, and make sure your fees are fully cleared before contacting the admin desk.
+                      </p>
+                    </section>
 
-                  <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                    <FileText className="h-9 w-9 text-emerald-600 dark:text-emerald-300" />
-                    <h2 className="mt-4 text-xl font-semibold">Document checklist</h2>
-                    <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                      <li>Current course registration details</li>
-                      <li>Valid student identification</li>
-                      <li>Payment evidence when requested</li>
-                    </ul>
-                  </section>
+                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <FileText className="h-9 w-9 text-emerald-600 dark:text-emerald-300" />
+                      <h2 className="mt-4 text-xl font-semibold">Document checklist</h2>
+                      <div className="mt-4 space-y-3">
+                        {requiredDocumentChecklist.map((item) => {
+                          const checked = applicationDraft.checklist.includes(item.id)
 
-                  <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                    <UserCircle2 className="h-9 w-9 text-sky-600 dark:text-sky-300" />
-                    <h2 className="mt-4 text-xl font-semibold">Contact desk</h2>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                      <p>Email: support@exampro.edu</p>
-                      <p>Phone: +234 800 000 0000</p>
-                      <p>Office hours: Mon - Fri, 8:00 AM to 4:00 PM</p>
-                    </div>
-                  </section>
+                          return (
+                            <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/70">
+                              <span>{item.label}</span>
+                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${checked ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200'}`}>
+                                {checked ? 'Ready' : 'Pending'}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </section>
+
+                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <UserCircle2 className="h-9 w-9 text-sky-600 dark:text-sky-300" />
+                      <h2 className="mt-4 text-xl font-semibold">Contact desk</h2>
+                      <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                        {supportContacts.length > 0 ? supportContacts.map((contact) => (
+                          <div key={contact.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/70">
+                            <p className="font-semibold text-slate-900 dark:text-white">{contact.name}</p>
+                            <p>{contact.scope.replace('-', ' ')}</p>
+                            <p>Email: {contact.email}</p>
+                            <p>Phone: {contact.phoneNumber}</p>
+                          </div>
+                        )) : (
+                          <p>No admin contacts are available right now.</p>
+                        )}
+                        <p>Office hours: Mon - Fri, 8:00 AM to 4:00 PM</p>
+                      </div>
+                    </section>
+                  </div>
+
+                  <div className="space-y-6">
+                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Need help</p>
+                      <h2 className="mt-2 text-2xl font-semibold">Send a support request</h2>
+                      <form className="mt-6 space-y-4" onSubmit={(event) => void handleSubmitSupportRequest(event)}>
+                        <div>
+                          <label htmlFor="support-subject" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Subject</label>
+                          <input
+                            id="support-subject"
+                            type="text"
+                            value={supportDraft.subject}
+                            onChange={(event) => setSupportDraft((current) => ({ ...current, subject: event.target.value }))}
+                            placeholder="Permit approval, fees, profile correction"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="support-message" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Message</label>
+                          <textarea
+                            id="support-message"
+                            rows={6}
+                            value={supportDraft.message}
+                            onChange={(event) => setSupportDraft((current) => ({ ...current, message: event.target.value }))}
+                            placeholder="Explain the issue you want the admin desk to resolve."
+                            className="w-full rounded-[1.75rem] border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={submittingSupport}
+                          className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Bell className="h-4 w-4" />
+                          {submittingSupport ? 'Sending...' : 'Send support request'}
+                        </button>
+                      </form>
+                    </section>
+
+                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Support history</p>
+                          <h2 className="mt-2 text-2xl font-semibold">Your recent requests</h2>
+                        </div>
+                        {loadingSupport && <span className="text-sm text-slate-500 dark:text-slate-300">Loading...</span>}
+                      </div>
+                      <div className="mt-5 space-y-3">
+                        {supportRequests.length > 0 ? supportRequests.map((request) => (
+                          <div key={request.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-semibold">{request.subject}</p>
+                              <span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white dark:bg-emerald-500 dark:text-slate-950">
+                                {request.status.replace('_', ' ')}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{formatDateTime(request.createdAt)}</p>
+                            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{request.message}</p>
+                            {request.adminReply && (
+                              <p className="mt-3 rounded-2xl bg-white px-3 py-2 text-sm text-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                                Admin reply: {request.adminReply}
+                              </p>
+                            )}
+                          </div>
+                        )) : (
+                          <div className="rounded-3xl border border-dashed border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-300">
+                            No support requests submitted yet.
+                          </div>
+                        )}
+                      </div>
+                    </section>
+                  </div>
                 </div>
               )}
             </main>

@@ -1,16 +1,21 @@
-import { ChangeEvent, DragEvent, FormEvent, ReactNode, useEffect, useState } from 'react'
+import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useState } from 'react'
+import QRCode from 'qrcode'
 import {
   BarChart2, Bell, CheckCircle2, CreditCard, Download, FileCheck,
   FileSpreadsheet, FileUp, LayoutDashboard, LogOut, Menu,
-  Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Upload, Users, X,
+  Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Sun, Upload, Users, X,
 } from 'lucide-react'
 import BrandMark from './BrandMark'
+import PermitCard from './PermitCard'
+import { apiBaseUrl, publicApiBaseUrl } from '../config/provider'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
+import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, clearStudentBalance, fetchAdminActivityLogs, fetchAllStudentProfiles, importStudentFinancials, updateStudentFinancials } from '../services/profileService'
+import { adminUpdateStudentProfile, clearStudentBalance, createStudentProfile, deleteStudentProfile, fetchAdminActivityLogsPage, fetchStudentProfilesPage, fetchSystemFeeSettings, importStudentFinancials, updateStudentAccount, updateStudentFinancials, updateSystemFeeSettings } from '../services/profileService'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
-import type { AdminActivityLog, AdminProfileUpdateInput, FinancialImportRow, FinancialImportUpdate, StudentProfile } from '../types'
+import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, SystemFeeSettings } from '../types'
 
 type PaymentDrafts = Record<string, string>
 type ImportPreviewRow = {
@@ -18,11 +23,61 @@ type ImportPreviewRow = {
   matcher: string
   amountPaid?: number
   totalFees?: number
-  status: 'ready' | 'skipped'
+  status: 'ready' | 'create' | 'skipped'
   reason?: string
   studentName?: string
 }
 type NavSection = 'dashboard' | 'students' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'settings'
+
+const STUDENT_PAGE_SIZE = 24
+const ACTIVITY_PAGE_SIZE = 12
+const DEFAULT_SYSTEM_FEE_SETTINGS: SystemFeeSettings = {
+  localStudentFee: 3000,
+  internationalStudentFee: 6000,
+}
+
+type EditDraft = Omit<AdminProfileUpdateInput, 'totalFees' | 'courseUnits'> & {
+  totalFees: string
+  courseUnitsText: string
+}
+
+type CreateStudentDraft = Omit<CreateStudentInput, 'totalFees' | 'amountPaid' | 'courseUnits'> & {
+  totalFees: string
+  amountPaid: string
+  courseUnitsText: string
+}
+
+type CreatedStudentWelcome = {
+  name: string
+  email: string
+  studentId: string
+  password: string
+  generatedPassword: boolean
+}
+
+type FeeSettingsDraft = {
+  localStudentFee: string
+  internationalStudentFee: string
+}
+
+type AdminCapabilityProfile = {
+  scope: 'super-admin' | 'registrar' | 'finance' | 'operations'
+  label: string
+  sections: NavSection[]
+  canImportFinancials: boolean
+  canGenerateBulkPermits: boolean
+  canSendReminders: boolean
+  canExportReports: boolean
+}
+
+type DashboardAlert = {
+  id: string
+  title: string
+  message: string
+  tone: 'critical' | 'warning' | 'info'
+  actionLabel?: string
+  onAction?: () => void
+}
 
 function getActivityTimestamp(value: string | null | undefined) {
   if (!value) {
@@ -41,8 +96,256 @@ function getPaymentCompletionPercent(amountPaid: number, totalFees: number) {
   return Math.min(Math.max((amountPaid / totalFees) * 100, 0), 100)
 }
 
+function parseCurrencyDraft(value: string) {
+  const normalizedValue = value.trim().replace(/,/g, '')
+
+  if (!normalizedValue) {
+    return Number.NaN
+  }
+
+  return Number(normalizedValue)
+}
+
+function hasAnyPermission(permissions: Set<AdminPermission>, required: AdminPermission[]) {
+  return required.some((permission) => permissions.has(permission))
+}
+
+function getAdminCapabilityLabel(scope: AdminCapabilityProfile['scope']) {
+  switch (scope) {
+    case 'super-admin':
+      return 'Super Admin'
+    case 'registrar':
+      return 'Registrar Desk'
+    case 'finance':
+      return 'Finance Desk'
+    default:
+      return 'Operations Desk'
+  }
+}
+
+function getAdminSections(permissions: Set<AdminPermission>): NavSection[] {
+  const sections = new Set<NavSection>(['dashboard', 'settings'])
+
+  if (permissions.has('view_students')) {
+    sections.add('students')
+  }
+
+  if (permissions.has('view_audit_logs')) {
+    sections.add('permits')
+  }
+
+  if (permissions.has('manage_student_profiles')) {
+    sections.add('permit-cards')
+  }
+
+  if (permissions.has('manage_financials')) {
+    sections.add('import')
+  }
+
+  if (hasAnyPermission(permissions, ['export_reports', 'view_audit_logs'])) {
+    sections.add('reports')
+  }
+
+  return Array.from(sections)
+}
+
+function getAdminCapabilityProfile(user: AuthUser | null | undefined): AdminCapabilityProfile {
+  const permissions = new Set(user?.role === 'admin' ? user.permissions ?? [] : [])
+  const scope = user?.role === 'admin' ? user.scope ?? 'operations' : 'operations'
+  return {
+    scope,
+    label: getAdminCapabilityLabel(scope),
+    sections: getAdminSections(permissions),
+    canImportFinancials: permissions.has('manage_financials'),
+    canGenerateBulkPermits: permissions.has('manage_student_profiles'),
+    canSendReminders: hasAnyPermission(permissions, ['manage_student_profiles', 'manage_financials', 'manage_support_requests']),
+    canExportReports: permissions.has('export_reports'),
+  }
+}
+
+function getPermitStatusCounts(students: StudentProfile[]) {
+  const now = Date.now()
+  let issued = 0
+  let pending = 0
+  let expired = 0
+
+  for (const student of students) {
+    const examTimestamp = Number.isNaN(new Date(student.examDate).getTime()) ? null : new Date(student.examDate).getTime()
+
+    if (examTimestamp !== null && examTimestamp < now) {
+      expired += 1
+      continue
+    }
+
+    if (student.feesBalance === 0) {
+      issued += 1
+    } else {
+      pending += 1
+    }
+  }
+
+  return {
+    issued,
+    pending,
+    rejected: 0,
+    expired,
+  }
+}
+
+function formatAdminActionLabel(action: string) {
+  switch (action) {
+    case 'print_permit':
+      return 'Permit printed'
+    case 'download_permit':
+      return 'Permit downloaded'
+    case 'update_student_financials':
+      return 'Financials updated'
+    case 'bulk_import_student_financials':
+      return 'Bulk financial import'
+    case 'admin_update_student_profile':
+      return 'Student profile updated'
+    default:
+      return action.replace(/_/g, ' ')
+  }
+}
+
+type AdminSettingsDraft = {
+  name: string
+  email: string
+  phoneNumber: string
+  currentPassword: string
+  password: string
+  confirmPassword: string
+}
+
+function formatFeeDraftValue(value: number) {
+  return value.toFixed(2)
+}
+
+function getFeeForStudentCategory(feeSettings: SystemFeeSettings, studentCategory: StudentCategory) {
+  return studentCategory === 'international' ? feeSettings.internationalStudentFee : feeSettings.localStudentFee
+}
+
+function createFeeSettingsDraft(feeSettings: SystemFeeSettings): FeeSettingsDraft {
+  return {
+    localStudentFee: formatFeeDraftValue(feeSettings.localStudentFee),
+    internationalStudentFee: formatFeeDraftValue(feeSettings.internationalStudentFee),
+  }
+}
+
+function createEmptyStudentDraft(feeSettings: SystemFeeSettings = DEFAULT_SYSTEM_FEE_SETTINGS, studentCategory: StudentCategory = 'local'): CreateStudentDraft {
+  return {
+    name: '',
+    email: '',
+    password: '',
+    studentId: '',
+    studentCategory,
+    phoneNumber: '',
+    course: '',
+    program: '',
+    college: '',
+    department: '',
+    semester: '',
+    courseUnitsText: '',
+    profileImage: '',
+    totalFees: formatFeeDraftValue(getFeeForStudentCategory(feeSettings, studentCategory)),
+    amountPaid: '0',
+    instructions: '',
+    examDate: '',
+    examTime: '',
+    venue: '',
+    seatNumber: '',
+  }
+}
+
+function parseCourseUnitsText(value: string) {
+  return value
+    .split(/\r?\n|,/)
+    .map((unit) => unit.trim())
+    .filter(Boolean)
+}
+
+function generateTemporaryPassword() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+  const getRandomIndex = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      const values = new Uint32Array(1)
+      crypto.getRandomValues(values)
+      return values[0] % alphabet.length
+    }
+
+    return Math.floor(Math.random() * alphabet.length)
+  }
+
+  const token = Array.from({ length: 10 }, () => alphabet[getRandomIndex()]).join('')
+  return `Permit-${token}`
+}
+
+function getImportedStudentPassword(row: FinancialImportRow) {
+  if (typeof row.password === 'string' && row.password.trim()) {
+    return row.password.trim()
+  }
+
+  const seedSource = row.studentId ?? row.email?.split('@')[0] ?? `row${row.rowNumber}`
+  const normalizedSeed = seedSource.replace(/[^a-z0-9]/gi, '').slice(-24) || `row${row.rowNumber}`
+  return `Permit-${normalizedSeed}`
+}
+
+function buildImportedStudentInput(row: FinancialImportRow): { createStudent?: CreateStudentInput; reason?: string } {
+  if (!row.studentName) {
+    return { reason: 'Student name is required to create a new student account.' }
+  }
+
+  if (!row.studentId) {
+    return { reason: 'Registration number is required to create a new student account.' }
+  }
+
+  if (!row.email) {
+    return { reason: 'Email is required to create a new student account.' }
+  }
+
+  if (!row.course) {
+    return { reason: 'Course is required to create a new student account.' }
+  }
+
+  if (typeof row.totalFees !== 'number') {
+    return { reason: 'Expected fees are required to create a new student account.' }
+  }
+
+  return {
+    createStudent: {
+      name: row.studentName,
+      email: row.email,
+      password: getImportedStudentPassword(row),
+      studentId: row.studentId,
+      studentCategory: row.studentCategory ?? 'local',
+      phoneNumber: row.phoneNumber,
+      course: row.course,
+      program: row.program,
+      college: row.college,
+      department: row.department,
+      semester: row.semester,
+      courseUnits: row.courseUnits,
+      totalFees: row.totalFees,
+      amountPaid: row.amountPaid ?? 0,
+      instructions: row.instructions,
+      examDate: row.examDate,
+      examTime: row.examTime,
+      venue: row.venue,
+      seatNumber: row.seatNumber,
+    },
+  }
+}
+
 export default function AdminPanel() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, refreshUser } = useAuth()
+  const { darkMode, toggleTheme } = useTheme()
+  const adminCapability = getAdminCapabilityProfile(user)
+  const canViewStudents = adminCapability.sections.includes('students')
+  const canViewPermitActivity = adminCapability.sections.includes('permits')
+  const canManageStudentProfiles = adminCapability.sections.includes('permit-cards')
+  const canManageFinancials = adminCapability.canImportFinancials
+  const canAccessReports = adminCapability.sections.includes('reports')
   const [students, setStudents] = useState<StudentProfile[]>([])
   const [paymentDrafts, setPaymentDrafts] = useState<PaymentDrafts>({})
   const [loading, setLoading] = useState(true)
@@ -53,46 +356,220 @@ export default function AdminPanel() {
   const [importPreviewRows, setImportPreviewRows] = useState<ImportPreviewRow[]>([])
   const [pendingImportUpdates, setPendingImportUpdates] = useState<FinancialImportUpdate[]>([])
   const [activityLogs, setActivityLogs] = useState<AdminActivityLog[]>([])
+  const [activityPage, setActivityPage] = useState(1)
+  const [activityTotalItems, setActivityTotalItems] = useState(0)
+  const [activityTotalPages, setActivityTotalPages] = useState(1)
   const [showPrintedOnly, setShowPrintedOnly] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [activeSection, setActiveSection] = useState<NavSection>('students')
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'outstanding'>('all')
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(STUDENT_PAGE_SIZE)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalStudents, setTotalStudents] = useState(0)
+  const [clearedStudents, setClearedStudents] = useState(0)
+  const [outstandingStudents, setOutstandingStudents] = useState(0)
   const [editingStudent, setEditingStudent] = useState<StudentProfile | null>(null)
-  const [editDraft, setEditDraft] = useState<Omit<AdminProfileUpdateInput, 'totalFees'> & { totalFees: string }>({
-    name: '', email: '', studentId: '', course: '', totalFees: '',
+  const [showCreateStudent, setShowCreateStudent] = useState(false)
+  const [systemFeeSettings, setSystemFeeSettings] = useState<SystemFeeSettings>(DEFAULT_SYSTEM_FEE_SETTINGS)
+  const [feeSettingsDraft, setFeeSettingsDraft] = useState<FeeSettingsDraft>(() => createFeeSettingsDraft(DEFAULT_SYSTEM_FEE_SETTINGS))
+  const [editDraft, setEditDraft] = useState<EditDraft>({
+    name: '', email: '', studentId: '', studentCategory: 'local', phoneNumber: '', profileImage: '', course: '', program: '', college: '', department: '', semester: '', courseUnitsText: '', totalFees: '',
   })
+  const [createDraft, setCreateDraft] = useState<CreateStudentDraft>(() => createEmptyStudentDraft(DEFAULT_SYSTEM_FEE_SETTINGS))
+  const [createPasswordGenerated, setCreatePasswordGenerated] = useState(false)
+  const [createdStudentWelcome, setCreatedStudentWelcome] = useState<CreatedStudentWelcome | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
+  const [deletingStudentId, setDeletingStudentId] = useState('')
+  const [savingCreate, setSavingCreate] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [bulkPrintStudents, setBulkPrintStudents] = useState<StudentProfile[]>([])
+  const [bulkPrintQrCodes, setBulkPrintQrCodes] = useState<Record<string, string>>({})
+  const [bulkPrinting, setBulkPrinting] = useState(false)
+  const [selectedPermitStudentIds, setSelectedPermitStudentIds] = useState<string[]>([])
+  const [lastSyncAt, setLastSyncAt] = useState('')
+  const [lastReminderAt, setLastReminderAt] = useState('')
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [savingFeeSettings, setSavingFeeSettings] = useState(false)
+  const [settingsDraft, setSettingsDraft] = useState<AdminSettingsDraft>({
+    name: user?.name ?? '',
+    email: user?.email ?? '',
+    phoneNumber: '',
+    currentPassword: '',
+    password: '',
+    confirmPassword: '',
+  })
 
-  useEffect(() => {
-    void loadStudents()
-  }, [])
+  const loadStudents = useCallback(async (options?: {
+    silent?: boolean
+    page?: number
+    search?: string
+    status?: 'all' | 'paid' | 'outstanding'
+  }) => {
+    const silent = options?.silent ?? false
+    const nextPage = options?.page ?? page
+    const nextSearch = options?.search ?? searchQuery
+    const nextStatus = options?.status ?? filterStatus
 
-  async function loadStudents() {
     try {
-      setLoading(true)
+      if (!silent) {
+        setLoading(true)
+      }
       setError('')
-      const [nextStudents, nextActivityLogs] = await Promise.all([
-        fetchAllStudentProfiles(),
-        fetchAdminActivityLogs(),
-      ])
+      const nextStudentPage = await fetchStudentProfilesPage({
+        page: nextPage,
+        pageSize,
+        search: nextSearch,
+        status: nextStatus,
+      })
+      const nextStudents = nextStudentPage.items
+
       setStudents(nextStudents)
-      setActivityLogs(nextActivityLogs)
+      setTotalItems(nextStudentPage.totalItems)
+      setTotalPages(nextStudentPage.totalPages)
+      setTotalStudents(nextStudentPage.totalStudents)
+      setClearedStudents(nextStudentPage.clearedStudents)
+      setOutstandingStudents(nextStudentPage.outstandingStudents)
       setPaymentDrafts(
         nextStudents.reduce<PaymentDrafts>((drafts, student) => {
           drafts[student.id] = student.amountPaid.toFixed(2)
           return drafts
         }, {}),
       )
+      setLastSyncAt(new Date().toISOString())
     } catch (loadError) {
       const nextError = loadError instanceof Error ? loadError.message : 'Unable to load students'
       setError(nextError)
     } finally {
-      setLoading(false)
+      if (!silent) {
+        setLoading(false)
+      }
     }
-  }
+  }, [filterStatus, page, pageSize, searchQuery])
+
+  const loadActivityLogs = useCallback(async (options?: { silent?: boolean }) => {
+    try {
+      const nextActivityPage = await fetchAdminActivityLogsPage({
+        page: activityPage,
+        pageSize: ACTIVITY_PAGE_SIZE,
+      })
+      setActivityLogs(nextActivityPage.items)
+      setActivityTotalItems(nextActivityPage.totalItems)
+      setActivityTotalPages(nextActivityPage.totalPages)
+      if (!options?.silent) {
+        setLastSyncAt(new Date().toISOString())
+      }
+    } catch (loadError) {
+      const nextError = loadError instanceof Error ? loadError.message : 'Unable to load activity logs'
+      setError(nextError)
+    }
+  }, [activityPage])
+
+  const loadFeeSettings = useCallback(async () => {
+    if (!user || user.role !== 'admin') {
+      return
+    }
+
+    try {
+      const nextFeeSettings = await fetchSystemFeeSettings()
+      setSystemFeeSettings(nextFeeSettings)
+      setFeeSettingsDraft(createFeeSettingsDraft(nextFeeSettings))
+    } catch (loadError) {
+      const nextError = loadError instanceof Error ? loadError.message : 'Unable to load fee structure settings.'
+      setError(nextError)
+    }
+  }, [user])
+
+  useEffect(() => {
+    void loadStudents()
+  }, [loadStudents])
+
+  useEffect(() => {
+    if (!canViewPermitActivity) {
+      setActivityLogs([])
+      setActivityTotalItems(0)
+      setActivityTotalPages(1)
+      return
+    }
+
+    void loadActivityLogs()
+  }, [canViewPermitActivity, loadActivityLogs])
+
+  useEffect(() => {
+    void loadFeeSettings()
+  }, [loadFeeSettings])
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchQuery, filterStatus])
+
+  useEffect(() => {
+    setSelectedPermitStudentIds((current) => current.filter((studentId) => students.some((student) => student.id === studentId)))
+  }, [students])
+
+  useEffect(() => {
+    if (!adminCapability.sections.includes(activeSection)) {
+      setActiveSection(adminCapability.sections[0] ?? 'dashboard')
+    }
+  }, [activeSection, adminCapability.sections])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      void loadStudents({ silent: true })
+      if (canViewPermitActivity) {
+        void loadActivityLogs({ silent: true })
+      }
+    }, 30000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [canViewPermitActivity, loadActivityLogs, loadStudents])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user) {
+      return
+    }
+
+    let timeoutId = window.setTimeout(() => {
+      void signOut()
+    }, 15 * 60 * 1000)
+
+    const resetTimeout = () => {
+      window.clearTimeout(timeoutId)
+      timeoutId = window.setTimeout(() => {
+        void signOut()
+      }, 15 * 60 * 1000)
+    }
+
+    const events: Array<keyof WindowEventMap> = ['click', 'keydown', 'mousemove', 'scroll', 'touchstart']
+    for (const eventName of events) {
+      window.addEventListener(eventName, resetTimeout, { passive: true })
+    }
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      for (const eventName of events) {
+        window.removeEventListener(eventName, resetTimeout)
+      }
+    }
+  }, [signOut, user])
+
+  useEffect(() => {
+    setSettingsDraft((current) => ({
+      ...current,
+      name: user?.name ?? '',
+      email: user?.email ?? '',
+      phoneNumber: user?.phoneNumber === 'Not assigned' ? '' : user?.phoneNumber ?? '',
+    }))
+  }, [user?.email, user?.name, user?.phoneNumber])
 
   const permitActivityLogs = activityLogs
     .filter((log) => log.action === 'print_permit' || log.action === 'download_permit')
@@ -131,25 +608,13 @@ export default function AdminPanel() {
     : students
 
   const filteredStudents = visibleStudents
-    .filter((s) => {
-      if (filterStatus === 'paid') return s.feesBalance === 0
-      if (filterStatus === 'outstanding') return s.feesBalance > 0
-      return true
-    })
-    .filter((s) => {
-      if (!searchQuery.trim()) return true
-      const q = searchQuery.toLowerCase()
-      return (
-        s.name.toLowerCase().includes(q) ||
-        s.email.toLowerCase().includes(q) ||
-        s.studentId.toLowerCase().includes(q)
-      )
-    })
-
-  const totalStudents = students.length
-  const clearedStudents = students.filter((s) => s.feesBalance === 0).length
-  const outstandingStudents = students.filter((s) => s.feesBalance > 0).length
-  const permitEventCount = permitActivityLogs.length
+  const permitEventCount = activityTotalItems
+  const pageStart = totalItems === 0 ? 0 : ((page - 1) * pageSize) + 1
+  const pageEnd = totalItems === 0 ? 0 : Math.min(page * pageSize, totalItems)
+  const activityPageStart = activityTotalItems === 0 ? 0 : ((activityPage - 1) * ACTIVITY_PAGE_SIZE) + 1
+  const activityPageEnd = activityTotalItems === 0 ? 0 : Math.min(activityPage * ACTIVITY_PAGE_SIZE, activityTotalItems)
+  const selectedPermitStudents = students.filter((student) => selectedPermitStudentIds.includes(student.id))
+  const clearedSelectedPermitStudents = selectedPermitStudents.filter((student) => student.feesBalance === 0)
 
   const courseBreakdown = students.reduce<Record<string, { total: number; cleared: number }>>((acc, s) => {
     const course = s.course || 'Unknown'
@@ -160,8 +625,131 @@ export default function AdminPanel() {
   }, {})
   const courseNames = Object.keys(courseBreakdown)
   const maxCourseCount = Math.max(...courseNames.map((c) => courseBreakdown[c].total), 1)
+  const permitStatusCounts = getPermitStatusCounts(students)
+  const upcomingExamEntries = students
+    .flatMap((student) => student.exams.map((exam) => ({ student, exam, examTimestamp: new Date(exam.examDate).getTime() })))
+    .filter((item) => !Number.isNaN(item.examTimestamp))
+    .sort((left, right) => left.examTimestamp - right.examTimestamp)
+    .slice(0, 8)
+  const recentSystemActivity = activityLogs.slice(0, 6)
+  const departmentOutstandingBreakdown = students.reduce<Record<string, number>>((acc, student) => {
+    if (student.feesBalance <= 0) {
+      return acc
+    }
+
+    const key = student.department ?? student.course ?? 'Unassigned'
+    acc[key] = (acc[key] ?? 0) + 1
+    return acc
+  }, {})
+  const busiestOutstandingDepartment = Object.entries(departmentOutstandingBreakdown).sort((left, right) => right[1] - left[1])[0] ?? null
+  const dashboardAlerts: DashboardAlert[] = [
+    ...(outstandingStudents > 0 ? [{
+      id: 'outstanding',
+      title: 'Pending approvals require action',
+      message: `${outstandingStudents} student account(s) still have unpaid balances and cannot be issued permits.`,
+      tone: 'critical' as const,
+      actionLabel: 'Review Students',
+      onAction: () => navigate('students'),
+    }] : []),
+    ...(permitStatusCounts.expired > 0 ? [{
+      id: 'expired',
+      title: 'Expired permits detected',
+      message: `${permitStatusCounts.expired} exam schedule record(s) are now past the exam date and should be archived or reviewed.`,
+      tone: 'warning' as const,
+      actionLabel: 'Open Reports',
+      onAction: () => navigate('reports'),
+    }] : []),
+    ...(upcomingExamEntries.some((item) => item.student.feesBalance > 0 && item.examTimestamp - Date.now() <= 7 * 24 * 60 * 60 * 1000) ? [{
+      id: 'upcoming-unpaid',
+      title: 'Urgent fee reminders recommended',
+      message: 'Some upcoming exams are within 7 days while student balances are still outstanding.',
+      tone: 'warning' as const,
+      actionLabel: 'Send Reminders',
+      onAction: () => {
+        void handleSendReminders()
+      },
+    }] : []),
+  ]
+
+  async function handleGenerateBulkPermits() {
+    if (!adminCapability.canGenerateBulkPermits) {
+      setError('Your admin view does not allow bulk permit generation.')
+      return
+    }
+
+    await handleBulkPrintStudents(
+      students.filter((student) => student.feesBalance === 0),
+      'Bulk_Permits_All_Eligible',
+      'No cleared students are currently available for bulk permit generation.',
+    )
+  }
+
+  function handleVerifyStudent() {
+    if (!canViewStudents) {
+      setError('Your admin view does not allow student verification actions.')
+      return
+    }
+
+    navigate('students')
+    setSuccessMessage('Student verification view opened. Search by name, email, or registration number to review a record.')
+  }
+
+  function handleExportDashboardCsv() {
+    if (!adminCapability.canExportReports) {
+      setError('Your admin view does not allow report exports.')
+      return
+    }
+
+    downloadAdminDashboardCsv(students, activityLogs)
+    setSuccessMessage('Exported the dashboard report in CSV format.')
+  }
+
+  function handleExportDashboardExcel() {
+    if (!adminCapability.canExportReports) {
+      setError('Your admin view does not allow report exports.')
+      return
+    }
+
+    downloadAdminDashboardExcel(students, activityLogs)
+    setSuccessMessage('Exported the dashboard report in Excel format.')
+  }
+
+  function handlePrintDashboardReport() {
+    if (!adminCapability.canExportReports) {
+      setError('Your admin view does not allow report exports.')
+      return
+    }
+
+    try {
+      printAdminDashboardReport(students, activityLogs)
+      setSuccessMessage('Opened a print-friendly dashboard report. Use the browser print dialog to save as PDF if needed.')
+    } catch (printError) {
+      const nextError = printError instanceof Error ? printError.message : 'Unable to open the print-friendly report.'
+      setError(nextError)
+    }
+  }
+
+  async function handleSendReminders() {
+    if (!adminCapability.canSendReminders) {
+      setError('Your admin view does not allow reminder actions.')
+      return
+    }
+
+    if (outstandingStudents === 0) {
+      setError('There are no outstanding student balances to remind right now.')
+      return
+    }
+
+    setLastReminderAt(new Date().toISOString())
+    setSuccessMessage(`Queued in-app reminder notices for ${outstandingStudents} outstanding student account(s). Email and SMS gateways are not configured in this demo environment.`)
+  }
 
   function handleExportPermitActivity() {
+    if (!adminCapability.canExportReports) {
+      setError('Your admin view does not allow permit activity exports.')
+      return
+    }
+
     if (permitActivityLogs.length === 0) {
       setError('There is no permit activity to export yet.')
       return
@@ -173,6 +761,78 @@ export default function AdminPanel() {
     setSuccessMessage(`Exported ${permitActivityLogs.length} permit activity row(s).`)
   }
 
+  async function handleBulkPrintCleared() {
+    const printableStudents = filteredStudents.filter((student) => student.feesBalance === 0)
+
+    await handleBulkPrintStudents(printableStudents, `Cleared_Permits_Page_${page}`, 'There are no cleared students on this page to print.')
+  }
+
+  async function handlePrintSelectedPermits() {
+    await handleBulkPrintStudents(
+      clearedSelectedPermitStudents,
+      `Selected_Permits_Page_${page}`,
+      'Select at least one cleared student on this page before printing.',
+    )
+  }
+
+  async function handleBulkPrintStudents(printableStudents: StudentProfile[], title: string, emptyMessage: string) {
+
+    if (!canManageStudentProfiles) {
+      setError('Your admin view does not allow permit card operations.')
+      return
+    }
+
+    if (printableStudents.length === 0) {
+      setError(emptyMessage)
+      return
+    }
+
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      setBulkPrinting(true)
+      setError('')
+      setSuccessMessage('')
+
+      const qrEntries = await Promise.all(printableStudents.map(async (student) => {
+        const qrValue = publicApiBaseUrl
+          ? `${publicApiBaseUrl}/permits/${encodeURIComponent(student.permitToken)}`
+          : ''
+
+        const qrCodeUrl = qrValue
+          ? await QRCode.toDataURL(qrValue, { errorCorrectionLevel: 'M', margin: 1, width: 160 })
+          : ''
+
+        return [student.id, qrCodeUrl] as const
+      }))
+
+      setBulkPrintStudents(printableStudents)
+      setBulkPrintQrCodes(Object.fromEntries(qrEntries))
+      setSuccessMessage(`Preparing ${printableStudents.length} permit(s) for printing.`)
+
+      const previousTitle = document.title
+      const cleanup = () => {
+        setBulkPrintStudents([])
+        setBulkPrintQrCodes({})
+        document.title = previousTitle
+      }
+
+      window.addEventListener('afterprint', cleanup, { once: true })
+      document.title = title
+      window.setTimeout(() => {
+        window.print()
+        window.setTimeout(cleanup, 750)
+      }, 50)
+    } catch (bulkPrintError) {
+      const nextError = bulkPrintError instanceof Error ? bulkPrintError.message : 'Unable to prepare bulk permit printing'
+      setError(nextError)
+    } finally {
+      setBulkPrinting(false)
+    }
+  }
+
   async function handleSavePayment(event: FormEvent<HTMLFormElement>, student: StudentProfile) {
     event.preventDefault()
 
@@ -180,7 +840,12 @@ export default function AdminPanel() {
       return
     }
 
-    const draftValue = Number(paymentDrafts[student.id])
+    if (!canManageFinancials) {
+      setError('Your admin view does not allow financial updates.')
+      return
+    }
+
+    const draftValue = parseCurrencyDraft(paymentDrafts[student.id] ?? '')
 
     if (Number.isNaN(draftValue) || draftValue < 0) {
       setError('Amount paid must be a valid positive number.')
@@ -193,7 +858,7 @@ export default function AdminPanel() {
       setSuccessMessage('')
       await updateStudentFinancials(student.id, { amountPaid: draftValue }, user.id)
       await loadStudents()
-      setSuccessMessage(`Saved payment update for ${student.name}.`)
+      setSuccessMessage(`Saved received payment for ${student.name}.`)
     } catch (saveError) {
       const nextError = saveError instanceof Error ? saveError.message : 'Unable to save payment changes'
       setError(nextError)
@@ -204,6 +869,11 @@ export default function AdminPanel() {
 
   async function handleClear(student: StudentProfile) {
     if (!user) {
+      return
+    }
+
+    if (!canManageFinancials) {
+      setError('Your admin view does not allow financial updates.')
       return
     }
 
@@ -223,14 +893,44 @@ export default function AdminPanel() {
   }
 
   function handleEditStudent(student: StudentProfile) {
+    if (!canManageStudentProfiles) {
+      setError('Your admin view does not allow student profile edits.')
+      return
+    }
+
     setEditingStudent(student)
     setEditDraft({
       name: student.name,
       email: student.email,
       studentId: student.studentId ?? '',
+      studentCategory: student.studentCategory ?? 'local',
+      phoneNumber: student.phoneNumber === 'Not assigned' ? '' : student.phoneNumber ?? '',
+      profileImage: student.profileImage ?? '',
       course: student.course ?? '',
+      program: student.program ?? '',
+      college: student.college ?? '',
+      department: student.department ?? '',
+      semester: student.semester ?? '',
+      courseUnitsText: student.courseUnits?.join('\n') ?? '',
       totalFees: student.totalFees.toFixed(2),
     })
+  }
+
+  function handleOpenCreateStudent() {
+    if (!canManageStudentProfiles) {
+      setError('Your admin view does not allow student profile edits.')
+      return
+    }
+
+    setCreateDraft(createEmptyStudentDraft(systemFeeSettings))
+    setCreatePasswordGenerated(false)
+    setShowCreateStudent(true)
+  }
+
+  function handleGenerateTemporaryPassword() {
+    const nextPassword = generateTemporaryPassword()
+    setCreateDraft((current) => ({ ...current, password: nextPassword }))
+    setCreatePasswordGenerated(true)
   }
 
   async function handleSaveEdit(e: FormEvent<HTMLFormElement>) {
@@ -240,10 +940,16 @@ export default function AdminPanel() {
       return
     }
 
-    const totalFeesNum = Number(editDraft.totalFees)
+    if (!canManageStudentProfiles) {
+      setError('Your admin view does not allow student profile edits.')
+      return
+    }
+
+    const totalFeesNum = parseCurrencyDraft(editDraft.totalFees)
+    const courseUnits = parseCourseUnitsText(editDraft.courseUnitsText)
 
     if (Number.isNaN(totalFeesNum) || totalFeesNum < 0) {
-      setError('Total fees must be a valid positive number.')
+      setError('Expected total fees must be a valid positive number.')
       return
     }
 
@@ -257,7 +963,15 @@ export default function AdminPanel() {
           name: editDraft.name,
           email: editDraft.email,
           studentId: editDraft.studentId,
+          studentCategory: editDraft.studentCategory,
+          phoneNumber: editDraft.phoneNumber,
+          profileImage: editDraft.profileImage || null,
           course: editDraft.course,
+          program: editDraft.program,
+          college: editDraft.college,
+          department: editDraft.department,
+          semester: editDraft.semester,
+          courseUnits,
           totalFees: totalFeesNum,
         },
         user.id,
@@ -273,38 +987,192 @@ export default function AdminPanel() {
     }
   }
 
+  async function handleCreateStudent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!user) {
+      return
+    }
+
+    if (!canManageStudentProfiles) {
+      setError('Your admin view does not allow student profile edits.')
+      return
+    }
+
+    const totalFeesNum = parseCurrencyDraft(createDraft.totalFees)
+    const amountPaidNum = parseCurrencyDraft(createDraft.amountPaid)
+    const courseUnits = parseCourseUnitsText(createDraft.courseUnitsText)
+
+    if (Number.isNaN(totalFeesNum) || totalFeesNum < 0) {
+      setError('Expected total fees must be a valid positive number.')
+      return
+    }
+
+    if (Number.isNaN(amountPaidNum) || amountPaidNum < 0) {
+      setError('Amount paid must be a valid positive number.')
+      return
+    }
+
+    try {
+      setSavingCreate(true)
+      setError('')
+      setSuccessMessage('')
+      setCreatedStudentWelcome(null)
+      const assignedPassword = createDraft.password
+      const createdProfile = await createStudentProfile({
+        name: createDraft.name,
+        email: createDraft.email,
+        password: assignedPassword,
+        studentId: createDraft.studentId,
+        studentCategory: createDraft.studentCategory,
+        phoneNumber: createDraft.phoneNumber,
+        course: createDraft.course,
+        program: createDraft.program,
+        college: createDraft.college,
+        department: createDraft.department,
+        semester: createDraft.semester,
+        courseUnits,
+        profileImage: createDraft.profileImage || null,
+        totalFees: totalFeesNum,
+        amountPaid: amountPaidNum,
+        instructions: createDraft.instructions,
+        examDate: createDraft.examDate,
+        examTime: createDraft.examTime,
+        venue: createDraft.venue,
+        seatNumber: createDraft.seatNumber,
+      }, user.id)
+      const createdStudentMatcher = createdProfile.studentId || createdProfile.email || createdProfile.name
+      setActiveSection('students')
+      setFilterStatus('all')
+      setSearchQuery(createdStudentMatcher)
+      setPage(1)
+      await loadStudents({
+        page: 1,
+        search: createdStudentMatcher,
+        status: 'all',
+      })
+      setSuccessMessage(`Student profile created for ${createDraft.name}.`)
+      setCreatedStudentWelcome({
+        name: createDraft.name,
+        email: createDraft.email,
+        studentId: createDraft.studentId,
+        password: assignedPassword,
+        generatedPassword: createPasswordGenerated,
+      })
+      setShowCreateStudent(false)
+      setCreateDraft(createEmptyStudentDraft(systemFeeSettings))
+      setCreatePasswordGenerated(false)
+    } catch (createError) {
+      const nextError = createError instanceof Error ? createError.message : 'Unable to create student profile'
+      setError(nextError)
+    } finally {
+      setSavingCreate(false)
+    }
+  }
+
+  async function handleDeleteStudent() {
+    if (!user || !editingStudent) {
+      return
+    }
+
+    try {
+      setDeletingStudentId(editingStudent.id)
+      setError('')
+      setSuccessMessage('')
+      await deleteStudentProfile(editingStudent.id, user.id)
+      setEditingStudent(null)
+      await loadStudents({ page: 1, status: 'all' })
+      setSuccessMessage(`Student profile deleted for ${editingStudent.name}.`)
+    } catch (deleteError) {
+      const nextError = deleteError instanceof Error ? deleteError.message : 'Unable to delete student profile.'
+      setError(nextError)
+    } finally {
+      setDeletingStudentId('')
+    }
+  }
+  
   function resolveImportRows(rows: FinancialImportRow[]): { updates: FinancialImportUpdate[]; previewRows: ImportPreviewRow[] } {
     const updates: FinancialImportUpdate[] = []
     const previewRows: ImportPreviewRow[] = []
-
+    const seenRowKeys = new Set<string>()
+  
     for (const row of rows) {
       const matcher = row.studentId ?? row.email ?? row.userId ?? 'Unknown row'
+      const duplicateKey = row.userId
+        ? `id:${row.userId.toLowerCase()}`
+        : row.email
+          ? `email:${row.email.toLowerCase()}`
+          : row.studentId
+            ? `student:${row.studentId.toLowerCase()}`
+            : `row:${row.rowNumber}`
+  
+      if (seenRowKeys.has(duplicateKey)) {
+        previewRows.push({
+          rowNumber: row.rowNumber,
+          matcher,
+          studentName: row.studentName,
+          amountPaid: row.amountPaid,
+          totalFees: row.totalFees,
+          status: 'skipped',
+          reason: 'This spreadsheet contains another row with the same student key.',
+        })
+        continue
+      }
+  
+      seenRowKeys.add(duplicateKey)
+  
       const matchedStudent = students.find((student) => {
         const matchesById = row.userId && student.id.toLowerCase() === row.userId.toLowerCase()
         const matchesByEmail = row.email && student.email.toLowerCase() === row.email.toLowerCase()
         const matchesByStudentId = row.studentId && student.studentId.toLowerCase() === row.studentId.toLowerCase()
         return matchesById || matchesByEmail || matchesByStudentId
       })
-
+  
       if (!matchedStudent) {
+        const importedStudent = buildImportedStudentInput(row)
+  
+        if (!importedStudent.createStudent) {
+          previewRows.push({
+            rowNumber: row.rowNumber,
+            matcher,
+            studentName: row.studentName,
+            amountPaid: row.amountPaid,
+            totalFees: row.totalFees,
+            status: 'skipped',
+            reason: importedStudent.reason ?? 'No matching student was found.',
+          })
+          continue
+        }
+  
+        updates.push({
+          rowNumber: row.rowNumber,
+          action: 'create',
+          createStudent: importedStudent.createStudent,
+        })
+  
         previewRows.push({
           rowNumber: row.rowNumber,
           matcher,
-          amountPaid: row.amountPaid,
-          totalFees: row.totalFees,
-          status: 'skipped',
-          reason: 'No matching student was found.',
+          studentName: importedStudent.createStudent.name,
+          amountPaid: importedStudent.createStudent.amountPaid,
+          totalFees: importedStudent.createStudent.totalFees,
+          status: 'create',
+          reason: row.password?.trim()
+            ? 'New student account will be created with the provided password.'
+            : `New student account will be created with temporary password ${importedStudent.createStudent.password}.`,
         })
+  
         continue
       }
-
+  
       updates.push({
         rowNumber: row.rowNumber,
+        action: 'update',
         studentId: matchedStudent.id,
         amountPaid: row.amountPaid,
         totalFees: row.totalFees,
       })
-
+  
       previewRows.push({
         rowNumber: row.rowNumber,
         matcher,
@@ -314,25 +1182,30 @@ export default function AdminPanel() {
         studentName: matchedStudent.name,
       })
     }
-
+  
     return { updates, previewRows }
   }
-
+  
   async function prepareImport(file: File) {
     if (!user) {
       return
     }
-
+  
+    if (!canManageFinancials) {
+      setError('Your admin view does not allow financial imports.')
+      return
+    }
+  
     try {
       setImporting(true)
       setError('')
       setSuccessMessage('')
       const rows = await parseFinancialSpreadsheet(file)
-
+  
       if (rows.length === 0) {
         throw new Error('No valid financial rows were found in the uploaded spreadsheet.')
       }
-
+  
       const resolvedImport = resolveImportRows(rows)
       setImportFileName(file.name)
       setPendingImportUpdates(resolvedImport.updates)
@@ -345,28 +1218,33 @@ export default function AdminPanel() {
       setImporting(false)
     }
   }
-
+  
   async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
     if (!event.target.files?.[0]) {
       return
     }
-
+  
     const file = event.target.files[0]
     await prepareImport(file)
     event.target.value = ''
   }
-
+  
   async function handleApplyImport() {
     if (!user || pendingImportUpdates.length === 0) {
       return
     }
-
+  
+    if (!canManageFinancials) {
+      setError('Your admin view does not allow financial imports.')
+      return
+    }
+  
     try {
       setImporting(true)
       setError('')
       const importResult = await importStudentFinancials(pendingImportUpdates, user.id)
-      await loadStudents()
-
+      await loadStudents({ page: 1, status: 'all' })
+  
       const failedRows = new Map(importResult.skippedRows.map((item) => [item.rowNumber, item.reason]))
       setImportPreviewRows((current) =>
         current.map((row) =>
@@ -375,14 +1253,14 @@ export default function AdminPanel() {
             : row,
         ),
       )
-
+  
       setPendingImportUpdates([])
       setSuccessMessage(
-        `Imported ${importResult.updatedCount} student payment updates from ${importFileName}.${
+        `Imported ${importResult.updatedCount} student payment update(s) and created ${importResult.createdCount} new student account(s) from ${importFileName}.${
           importResult.skippedRows.length > 0 ? ` ${importResult.skippedRows.length} row(s) failed.` : ''
         }`,
       )
-
+  
       if (importResult.skippedRows.length > 0) {
         setError(
           importResult.skippedRows
@@ -398,12 +1276,118 @@ export default function AdminPanel() {
       setImporting(false)
     }
   }
-
+  
   function clearImportPreview() {
     setImportFileName('')
     setImportPreviewRows([])
     setPendingImportUpdates([])
   }
+
+  async function handleSaveAdminSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!user) {
+      return
+    }
+
+    if (settingsDraft.password && settingsDraft.password !== settingsDraft.confirmPassword) {
+      setError('Password confirmation does not match.')
+      return
+    }
+
+    if (settingsDraft.password && !settingsDraft.currentPassword.trim()) {
+      setError('Enter your current password before choosing a new one.')
+      return
+    }
+
+    try {
+      setSavingSettings(true)
+      setError('')
+      setSuccessMessage('')
+      await updateStudentAccount(user.id, {
+        name: settingsDraft.name,
+        email: settingsDraft.email,
+        phoneNumber: settingsDraft.phoneNumber || undefined,
+        currentPassword: settingsDraft.currentPassword || undefined,
+        password: settingsDraft.password || undefined,
+      })
+      await refreshUser()
+      setSettingsDraft((current) => ({
+        ...current,
+        currentPassword: '',
+        password: '',
+        confirmPassword: '',
+      }))
+      setSuccessMessage('Admin account settings updated successfully.')
+    } catch (saveError) {
+      const nextError = saveError instanceof Error ? saveError.message : 'Unable to update admin account settings.'
+      setError(nextError)
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
+  async function handleSaveFeeStructure(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!canManageFinancials) {
+      setError('Your admin view does not allow financial updates.')
+      return
+    }
+
+    const localStudentFee = parseCurrencyDraft(feeSettingsDraft.localStudentFee)
+    const internationalStudentFee = parseCurrencyDraft(feeSettingsDraft.internationalStudentFee)
+
+    if (Number.isNaN(localStudentFee) || localStudentFee < 0 || Number.isNaN(internationalStudentFee) || internationalStudentFee < 0) {
+      setError('Both local and international student fees must be valid positive numbers.')
+      return
+    }
+
+    try {
+      setSavingFeeSettings(true)
+      setError('')
+      setSuccessMessage('')
+      const nextFeeSettings = await updateSystemFeeSettings({
+        localStudentFee,
+        internationalStudentFee,
+      })
+      setSystemFeeSettings(nextFeeSettings)
+      setFeeSettingsDraft(createFeeSettingsDraft(nextFeeSettings))
+      setCreateDraft((current) => ({
+        ...current,
+        totalFees: formatFeeDraftValue(getFeeForStudentCategory(nextFeeSettings, current.studentCategory)),
+      }))
+      setSuccessMessage('Fee structure settings updated successfully.')
+    } catch (saveError) {
+      const nextError = saveError instanceof Error ? saveError.message : 'Unable to update fee structure settings.'
+      setError(nextError)
+    } finally {
+      setSavingFeeSettings(false)
+    }
+  }
+
+  function togglePermitSelection(studentId: string) {
+    setSelectedPermitStudentIds((current) => current.includes(studentId)
+      ? current.filter((id) => id !== studentId)
+      : [...current, studentId])
+  }
+
+  function handleSelectClearedStudentsOnPage() {
+    const clearedIds = students.filter((student) => student.feesBalance === 0).map((student) => student.id)
+
+    if (clearedIds.length === 0) {
+      setSelectedPermitStudentIds([])
+      return
+    }
+
+    const allSelected = clearedIds.every((studentId) => selectedPermitStudentIds.includes(studentId))
+    setSelectedPermitStudentIds(allSelected ? [] : clearedIds)
+  }
+
+  const allClearedStudentsOnPageSelected = students
+    .filter((student) => student.feesBalance === 0)
+    .every((student) => selectedPermitStudentIds.includes(student.id))
+    && students.some((student) => student.feesBalance === 0)
 
   const navItems: { key: NavSection; label: string; icon: ReactNode; badge?: number }[] = [
     { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -414,8 +1398,76 @@ export default function AdminPanel() {
     { key: 'reports', label: 'Reports', icon: <BarChart2 className="w-5 h-5" /> },
     { key: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
   ]
+  const visibleNavItems = navItems.filter((item) => adminCapability.sections.includes(item.key))
+  const quickActions = [
+    {
+      key: 'bulk-import',
+      label: 'Bulk Import',
+      description: 'Open the financial import workspace to upload spreadsheet updates in one pass.',
+      icon: <FileUp className="h-5 w-5" />,
+      disabled: !canManageFinancials,
+      action: () => navigate('import'),
+    },
+    {
+      key: 'generate-permits',
+      label: 'Generate Bulk Permits',
+      description: 'Prepare print-ready permit cards for all cleared students.',
+      icon: <CreditCard className="h-5 w-5" />,
+      disabled: !adminCapability.canGenerateBulkPermits,
+      action: () => {
+        void handleGenerateBulkPermits()
+      },
+    },
+    {
+      key: 'verify-student',
+      label: 'Verify Student',
+      description: 'Open the student verification workspace for identity and balance checks.',
+      icon: <Users className="h-5 w-5" />,
+      disabled: !canViewStudents,
+      action: handleVerifyStudent,
+    },
+    {
+      key: 'export-reports',
+      label: 'Export Reports',
+      description: 'Download the current dashboard summary in CSV format.',
+      icon: <Download className="h-5 w-5" />,
+      disabled: !adminCapability.canExportReports,
+      action: handleExportDashboardCsv,
+    },
+    {
+      key: 'analytics',
+      label: 'Analytics',
+      description: 'Open the analytics view for financial and permit issuance insights.',
+      icon: <BarChart2 className="h-5 w-5" />,
+      disabled: !canAccessReports,
+      action: () => navigate('reports'),
+    },
+    {
+      key: 'send-reminders',
+      label: 'Send Reminders',
+      description: 'Queue reminder notifications for students with pending balances.',
+      icon: <Bell className="h-5 w-5" />,
+      disabled: !adminCapability.canSendReminders,
+      action: () => {
+        void handleSendReminders()
+      },
+    },
+    {
+      key: 'settings',
+      label: 'Settings',
+      description: 'Review system integrations, session controls, and account scope.',
+      icon: <Settings className="h-5 w-5" />,
+      disabled: !adminCapability.sections.includes('settings'),
+      action: () => navigate('settings'),
+    },
+  ]
 
   function navigate(section: NavSection) {
+    if (!adminCapability.sections.includes(section)) {
+      setError(`The ${adminCapability.label} view does not include the ${section.replace(/-/g, ' ')} section.`)
+      return
+    }
+
     setActiveSection(section)
     setSidebarOpen(false)
   }
@@ -450,17 +1502,35 @@ export default function AdminPanel() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
+      <div className="flex h-screen items-center justify-center bg-gray-50 text-gray-900 dark:bg-slate-950 dark:text-slate-100">
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-b-2 border-emerald-600" />
-          <p className="text-gray-500">Loading student accounts...</p>
+          <p className="text-gray-500 dark:text-slate-300">Loading student accounts...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <>
+      {bulkPrintStudents.length > 0 && (
+        <div hidden className="admin-bulk-print-wrapper">
+          {bulkPrintStudents.map((student) => (
+            <div key={student.id} className="admin-bulk-print-item">
+              <PermitCard
+                studentData={student}
+                qrCodeUrl={bulkPrintQrCodes[student.id] ?? ''}
+                onRefresh={() => {}}
+                onSignOut={() => {}}
+                onPrint={() => {}}
+                onDownload={() => {}}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="admin-theme-shell flex h-screen overflow-hidden bg-gray-50 text-gray-900 dark:bg-slate-950 dark:text-slate-100">
 
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
@@ -472,19 +1542,19 @@ export default function AdminPanel() {
 
       {/* â”€â”€ Sidebar â”€â”€ */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-white shadow-lg transition-transform duration-300 lg:static lg:translate-x-0 lg:shadow-none lg:border-r lg:border-gray-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-white shadow-lg transition-transform duration-300 dark:border-r dark:border-slate-800 dark:bg-slate-950 lg:static lg:translate-x-0 lg:shadow-none lg:border-r lg:border-gray-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-5">
+        <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-5 dark:border-slate-800">
           <BrandMark
-            titleClassName="text-base font-bold text-gray-900 leading-tight"
-            subtitleClassName="text-xs text-emerald-600"
+            titleClassName="text-base font-bold leading-tight text-gray-900 dark:text-white"
+            subtitleClassName="text-xs text-emerald-600 dark:text-emerald-300"
           />
           <button
             type="button"
             title="Close sidebar"
             aria-label="Close sidebar"
-            className="ml-auto text-gray-400 hover:text-gray-600 lg:hidden"
+            className="ml-auto text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           >
             <X className="h-5 w-5" />
@@ -493,27 +1563,27 @@ export default function AdminPanel() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-gray-400">Menu</p>
+          <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-slate-500">Menu</p>
           <ul className="space-y-1">
-            {navItems.map((item) => (
+            {visibleNavItems.map((item) => (
               <li key={item.key}>
                 <button
                   type="button"
                   onClick={() => navigate(item.key)}
                   className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     activeSection === item.key
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  <span className={activeSection === item.key ? 'text-emerald-600' : 'text-gray-400'}>
+                  <span className={activeSection === item.key ? 'text-emerald-600 dark:text-emerald-300' : 'text-gray-400 dark:text-slate-500'}>
                     {item.icon}
                   </span>
                   <span className="flex-1 text-left">{item.label}</span>
                   {item.badge !== undefined && (
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        activeSection === item.key ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-600'
+                        activeSection === item.key ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-600 dark:bg-slate-800 dark:text-slate-300'
                       }`}
                     >
                       {item.badge}
@@ -526,20 +1596,20 @@ export default function AdminPanel() {
         </nav>
 
         {/* Admin profile + logout at bottom */}
-        <div className="border-t border-gray-200 p-4">
+        <div className="border-t border-gray-200 p-4 dark:border-slate-800">
           <div className="mb-3 flex items-center gap-3">
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
               {user?.name?.[0]?.toUpperCase() ?? 'A'}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-gray-900">{user?.name ?? 'Admin'}</p>
-              <p className="text-[11px] text-gray-400">{user?.role === 'admin' ? 'Administrator' : 'Staff'}</p>
+              <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{user?.name ?? 'Admin'}</p>
+              <p className="text-[11px] text-gray-400 dark:text-slate-500">{adminCapability.label}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => void signOut()}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-50 hover:text-red-600"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
           >
             <LogOut className="h-4 w-4" />
             Sign out
@@ -551,20 +1621,20 @@ export default function AdminPanel() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 
         {/* Top header */}
-        <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 sm:px-6">
+        <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-950 sm:px-6">
           <button
             type="button"
             title="Open sidebar"
             aria-label="Open sidebar"
-            className="text-gray-500 hover:text-gray-700 lg:hidden"
+            className="text-gray-500 hover:text-gray-700 dark:text-slate-300 dark:hover:text-white lg:hidden"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-5 w-5" />
           </button>
 
           {/* Search */}
-          <div className="flex max-w-sm flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-            <Search className="h-4 w-4 flex-shrink-0 text-gray-400" />
+          <div className="flex max-w-sm flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+            <Search className="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-slate-500" />
             <input
               type="text"
               aria-label="Search students"
@@ -574,7 +1644,7 @@ export default function AdminPanel() {
                 setSearchQuery(e.target.value)
                 if (activeSection !== 'students') setActiveSection('students')
               }}
-              className="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
+              className="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none dark:text-slate-100 dark:placeholder-slate-500"
             />
             {searchQuery && (
               <button
@@ -582,7 +1652,7 @@ export default function AdminPanel() {
                 title="Clear search"
                 aria-label="Clear search"
                 onClick={() => setSearchQuery('')}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -590,8 +1660,21 @@ export default function AdminPanel() {
           </div>
 
           <div className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              onClick={toggleTheme}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+            >
+              <span className="flex items-center gap-2">
+                {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                <span className="hidden sm:inline">Theme</span>
+              </span>
+            </button>
+
             {/* Notification bell */}
-            <button type="button" className="relative text-gray-500 hover:text-gray-700" title="Outstanding balances">
+            <button type="button" className="relative text-gray-500 hover:text-gray-700 dark:text-slate-300 dark:hover:text-white" title="Outstanding balances">
               <Bell className="h-5 w-5" />
               {outstandingStudents > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
@@ -604,7 +1687,7 @@ export default function AdminPanel() {
             <button
               type="button"
               onClick={() => void loadStudents()}
-              className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+              className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
             >
               <RefreshCcw className="h-4 w-4" />
               <span className="hidden sm:inline">Refresh</span>
@@ -615,13 +1698,16 @@ export default function AdminPanel() {
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
                 {user?.name?.[0]?.toUpperCase() ?? 'A'}
               </div>
-              <span className="text-sm font-medium text-gray-700">{user?.name ?? 'Admin'}</span>
+              <div>
+                <span className="text-sm font-medium text-gray-700 dark:text-slate-100">{user?.name ?? 'Admin'}</span>
+                <p className="text-[11px] text-gray-400 dark:text-slate-500">{adminCapability.label}</p>
+              </div>
             </div>
           </div>
         </header>
 
         {/* Alert banners */}
-        {(error || successMessage) && (
+        {(error || successMessage || createdStudentWelcome) && (
           <div className="flex-shrink-0 px-6 pt-4">
             {error && (
               <div className="mb-2 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -651,22 +1737,141 @@ export default function AdminPanel() {
                 </button>
               </div>
             )}
+            {createdStudentWelcome && (
+              <div className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-700">Welcome Message</p>
+                    <h2 className="mt-1 text-base font-semibold text-emerald-950">New student account ready</h2>
+                  </div>
+                  <button
+                    type="button"
+                    title="Dismiss welcome message"
+                    aria-label="Dismiss welcome message"
+                    onClick={() => setCreatedStudentWelcome(null)}
+                    className="text-emerald-500 hover:text-emerald-700"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="mb-3 text-sm text-emerald-800">
+                  Share these sign-in details with {createdStudentWelcome.name} and ask them to change the password after first login.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-md bg-white/70 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">Student Name</p>
+                    <p className="mt-1 font-medium text-emerald-950">{createdStudentWelcome.name}</p>
+                  </div>
+                  <div className="rounded-md bg-white/70 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">Registration Number</p>
+                    <p className="mt-1 font-medium text-emerald-950">{createdStudentWelcome.studentId}</p>
+                  </div>
+                  <div className="rounded-md bg-white/70 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">Email</p>
+                    <p className="mt-1 font-medium text-emerald-950">{createdStudentWelcome.email}</p>
+                  </div>
+                  <div className="rounded-md bg-white/70 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">
+                      {createdStudentWelcome.generatedPassword ? 'Temporary Password' : 'Assigned Password'}
+                    </p>
+                    <p className="mt-1 font-medium text-emerald-950">{createdStudentWelcome.password}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+          <input
+            id="admin-financial-import-input"
+            type="file"
+            accept=".xlsx,.csv"
+            className="hidden"
+            disabled={importing}
+            onChange={(e) => void handleImportFile(e)}
+          />
 
           {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ DASHBOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           {activeSection === 'dashboard' && (
             <div className="space-y-6">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-                <p className="text-sm text-gray-500">Overview of student clearance and permit status.</p>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+                  <p className="text-sm text-gray-500">Operational overview for {adminCapability.label.toLowerCase()}.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                  <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Real-time refresh every 30s</span>
+                  <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Session timeout after 15 min inactivity</span>
+                  <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Last sync: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : 'Waiting'}</span>
+                </div>
+              </div>
+
+              {dashboardAlerts.length > 0 && (
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {dashboardAlerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`rounded-2xl border p-4 shadow-sm ${
+                        alert.tone === 'critical'
+                          ? 'border-red-200 bg-red-50'
+                          : alert.tone === 'warning'
+                            ? 'border-amber-200 bg-amber-50'
+                            : 'border-blue-200 bg-blue-50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{alert.title}</p>
+                          <p className="mt-1 text-xs leading-5 text-gray-600">{alert.message}</p>
+                        </div>
+                        <Bell className="h-4 w-4 text-gray-400" />
+                      </div>
+                      {alert.actionLabel && alert.onAction && (
+                        <button
+                          type="button"
+                          onClick={alert.onAction}
+                          className="mt-3 rounded-lg border border-white/80 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          {alert.actionLabel}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Quick Actions</h2>
+                    <p className="text-sm text-gray-500">High-frequency actions for permit operations, reporting, and alerts.</p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">Access scope: {adminCapability.label}</span>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {quickActions.map((action) => (
+                    <button
+                      key={action.key}
+                      type="button"
+                      disabled={action.disabled}
+                      onClick={action.action}
+                      className="rounded-2xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-emerald-600">{action.icon}</span>
+                        {action.disabled && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Restricted</span>}
+                      </div>
+                      <p className="mt-3 text-sm font-semibold text-gray-900">{action.label}</p>
+                      <p className="mt-1 text-xs leading-5 text-gray-500">{action.description}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Analytics cards */}
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
                 <div className="rounded-xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Total Students</p>
@@ -699,16 +1904,146 @@ export default function AdminPanel() {
                   <p className="mt-2 text-3xl font-bold text-purple-700">{permitEventCount}</p>
                   <p className="mt-1 text-xs text-purple-400">prints &amp; downloads</p>
                 </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issued</p>
+                    <CreditCard className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <p className="mt-2 text-3xl font-bold text-slate-800">{permitStatusCounts.issued}</p>
+                  <p className="mt-1 text-xs text-slate-500">active permits</p>
+                </div>
+                <div className="rounded-xl border border-rose-100 bg-rose-50 p-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">Expired</p>
+                    <Shield className="h-5 w-5 text-rose-400" />
+                  </div>
+                  <p className="mt-2 text-3xl font-bold text-rose-700">{permitStatusCounts.expired}</p>
+                  <p className="mt-1 text-xs text-rose-400">past exam dates</p>
+                </div>
+              </div>
+
+              <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                    <div>
+                      <h2 className="font-semibold text-gray-800">Pending Approvals</h2>
+                      <p className="text-xs text-gray-400">Students who still need clearance before permit issuance</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate('students')}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                      Review list
+                    </button>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {students.filter((student) => student.feesBalance > 0).slice(0, 5).map((student) => (
+                      <div key={student.id} className="flex items-center justify-between gap-4 px-5 py-4">
+                        <div>
+                          <p className="font-medium text-gray-900">{student.name}</p>
+                          <p className="text-xs text-gray-400">{student.studentId} • {student.department ?? student.course}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-red-600">${student.feesBalance.toFixed(2)}</p>
+                          <p className="text-xs text-gray-400">Remaining balance</p>
+                        </div>
+                      </div>
+                    ))}
+                    {students.filter((student) => student.feesBalance > 0).length === 0 && (
+                      <div className="px-5 py-8 text-center text-sm text-gray-400">No pending approvals at the moment.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-gray-100 px-5 py-4">
+                    <h2 className="font-semibold text-gray-800">Upcoming Exam Schedule</h2>
+                    <p className="text-xs text-gray-400">Next scheduled exams pulled from current permit assignments</p>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {upcomingExamEntries.slice(0, 5).map((item) => (
+                      <div key={`${item.student.id}-${item.exam.id}`} className="px-5 py-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium text-gray-900">{item.exam.title}</p>
+                            <p className="text-xs text-gray-400">{item.student.name} • {item.student.studentId}</p>
+                          </div>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                            {new Date(item.exam.examDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs text-gray-500">{item.exam.examTime} • {item.exam.venue} • Seat {item.exam.seatNumber}</p>
+                      </div>
+                    ))}
+                    {upcomingExamEntries.length === 0 && (
+                      <div className="px-5 py-8 text-center text-sm text-gray-400">No scheduled exams are available yet.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-semibold text-gray-800">Permit Status Breakdown</h2>
+                    <FileCheck className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-emerald-50 p-4 text-center">
+                      <p className="text-2xl font-bold text-emerald-700">{permitStatusCounts.issued}</p>
+                      <p className="mt-1 text-xs text-emerald-500">Issued</p>
+                    </div>
+                    <div className="rounded-xl bg-amber-50 p-4 text-center">
+                      <p className="text-2xl font-bold text-amber-700">{permitStatusCounts.pending}</p>
+                      <p className="mt-1 text-xs text-amber-500">Pending</p>
+                    </div>
+                    <div className="rounded-xl bg-rose-50 p-4 text-center">
+                      <p className="text-2xl font-bold text-rose-700">{permitStatusCounts.rejected}</p>
+                      <p className="mt-1 text-xs text-rose-500">Rejected</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-100 p-4 text-center">
+                      <p className="text-2xl font-bold text-slate-700">{permitStatusCounts.expired}</p>
+                      <p className="mt-1 text-xs text-slate-500">Expired</p>
+                    </div>
+                  </div>
+                  <p className="mt-4 text-xs text-gray-400">Rejected permits are not currently tracked by the backend workflow, so this value remains informational until that state is added.</p>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-semibold text-gray-800">Analytics &amp; Insights</h2>
+                    <BarChart2 className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <div className="mt-4 space-y-4">
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-gray-400">Most At-Risk Department</p>
+                      <p className="mt-1 text-lg font-semibold text-gray-900">{busiestOutstandingDepartment?.[0] ?? 'No outstanding balances'}</p>
+                      <p className="text-xs text-gray-500">{busiestOutstandingDepartment ? `${busiestOutstandingDepartment[1]} student(s) still pending financial clearance.` : 'All currently loaded students are financially cleared.'}</p>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-gray-400">Reminder Queue</p>
+                      <p className="mt-1 text-lg font-semibold text-gray-900">{outstandingStudents}</p>
+                      <p className="text-xs text-gray-500">Students who would receive fee reminders from the current in-app notification workflow.</p>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-gray-400">Recent Reminder Activity</p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">{lastReminderAt ? new Date(lastReminderAt).toLocaleString() : 'No reminders queued in this session'}</p>
+                      <p className="text-xs text-gray-500">External email, SMS, and biometric integrations are not yet connected in this environment.</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Recent permit activity table */}
               <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
                   <h2 className="font-semibold text-gray-800">Recent Permit Activity</h2>
+                  <p className="text-xs text-gray-400">Showing {activityPageStart}-{activityPageEnd} of {activityTotalItems}</p>
                   <button
                     type="button"
                     onClick={handleExportPermitActivity}
-                    disabled={permitActivityLogs.length === 0}
+                    disabled={!adminCapability.canExportReports || permitActivityLogs.length === 0}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -747,11 +2082,58 @@ export default function AdminPanel() {
                     </tbody>
                   </table>
                 </div>
+                <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3 text-xs text-gray-500">
+                  <span>Page {activityPage} of {activityTotalPages}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={activityPage <= 1}
+                      onClick={() => setActivityPage((current) => Math.max(current - 1, 1))}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      disabled={activityPage >= activityTotalPages}
+                      onClick={() => setActivityPage((current) => Math.min(current + 1, activityTotalPages))}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {/* Quick navigation tiles */}
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                {navItems
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-gray-100 px-5 py-4">
+                    <h2 className="font-semibold text-gray-800">Audit Trail</h2>
+                    <p className="text-xs text-gray-400">Recent administrative actions captured by the backend</p>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {recentSystemActivity.map((log) => (
+                      <div key={log.id} className="flex items-start justify-between gap-3 px-5 py-4">
+                        <div>
+                          <p className="font-medium text-gray-900">{formatAdminActionLabel(log.action)}</p>
+                          <p className="text-xs text-gray-400">Actor: {log.adminId} • Target: {log.targetProfileId}</p>
+                        </div>
+                        <span className="text-xs text-gray-400">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</span>
+                      </div>
+                    ))}
+                    {recentSystemActivity.length === 0 && (
+                      <div className="px-5 py-8 text-center text-sm text-gray-400">No admin activity logs are available yet.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-gray-100 px-5 py-4">
+                    <h2 className="font-semibold text-gray-800">Section Shortcuts</h2>
+                    <p className="text-xs text-gray-400">Jump into the areas available for this admin scope</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-3">
+                    {visibleNavItems
                   .filter((n) => n.key !== 'dashboard')
                   .map((item) => (
                     <button
@@ -764,6 +2146,8 @@ export default function AdminPanel() {
                       <span className="text-xs font-medium text-gray-700">{item.label}</span>
                     </button>
                   ))}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -774,17 +2158,38 @@ export default function AdminPanel() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Students</h1>
-                  <p className="text-sm text-gray-500">{filteredStudents.length} student(s) shown</p>
+                  <p className="text-sm text-gray-500">Showing {pageStart}-{pageEnd} of {totalItems} student(s)</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleExportPermitActivity}
-                  disabled={permitActivityLogs.length === 0}
-                  className="inline-flex items-center gap-2 self-start rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  Export CSV
-                </button>
+                <div className="flex flex-wrap items-center gap-2 self-start">
+                  {canManageFinancials && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('import')}
+                      className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                    >
+                      <FileUp className="h-3.5 w-3.5" />
+                      Open Bulk Import
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleOpenCreateStudent}
+                    disabled={!canManageStudentProfiles}
+                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                    Add Student
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportPermitActivity}
+                    disabled={!adminCapability.canExportReports || permitActivityLogs.length === 0}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Export CSV
+                  </button>
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {(['all', 'paid', 'outstanding'] as const).map((status) => (
                     <button
@@ -823,9 +2228,9 @@ export default function AdminPanel() {
                       <tr>
                         <th className="px-5 py-3 text-left">Student</th>
                         <th className="px-5 py-3 text-left">Course</th>
-                        <th className="px-5 py-3 text-left">Total Fees</th>
-                        <th className="px-5 py-3 text-left">Amount Paid</th>
-                        <th className="px-5 py-3 text-left">Balance</th>
+                        <th className="px-5 py-3 text-left">Expected Fees</th>
+                        <th className="px-5 py-3 text-left">Amount Received</th>
+                        <th className="px-5 py-3 text-left">Remaining Balance</th>
                         <th className="px-5 py-3 text-left">Status</th>
                         <th className="px-5 py-3 text-left">Permit Activity</th>
                         <th className="px-5 py-3 text-left">Actions</th>
@@ -839,8 +2244,14 @@ export default function AdminPanel() {
                             <td className="px-5 py-3">
                               <div className="font-medium text-gray-900">{student.name}</div>
                               <div className="text-xs text-gray-400">{student.studentId} Â· {student.email}</div>
+                              <div className="mt-1 text-xs text-gray-400">
+                                {student.program ?? student.course} Â· {student.department ?? 'No department'}
+                              </div>
                             </td>
-                            <td className="px-5 py-3 text-gray-600">{student.course || '-'}</td>
+                            <td className="px-5 py-3 text-gray-600">
+                              <div>{student.course || '-'}</div>
+                              <div className="text-xs text-gray-400">{student.semester ?? 'No semester set'}</div>
+                            </td>
                             <td className="px-5 py-3 text-gray-700">${student.totalFees.toFixed(2)}</td>
                             <td className="px-5 py-3 font-medium text-green-700">${student.amountPaid.toFixed(2)}</td>
                             <td className="px-5 py-3">
@@ -877,24 +2288,24 @@ export default function AdminPanel() {
                                   onChange={(e) =>
                                     setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
                                   }
-                                  aria-label={`Payment amount for ${student.name}`}
-                                  title={`Payment amount for ${student.name}`}
-                                  placeholder="0.00"
+                                  aria-label={`Amount received for ${student.name}`}
+                                  title={`Amount received for ${student.name}`}
+                                  placeholder="Received"
                                   className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
                                 />
                                 <button
                                   type="submit"
-                                  disabled={savingId === student.id}
-                                  title="Save payment"
+                                  disabled={!canManageFinancials || savingId === student.id}
+                                  title="Save received amount"
                                   className="rounded bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
                                 >
                                   <Save className="h-3.5 w-3.5" />
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={savingId === student.id || student.feesBalance === 0}
+                                  disabled={!canManageFinancials || savingId === student.id || student.feesBalance === 0}
                                   onClick={() => void handleClear(student)}
-                                  title="Clear balance"
+                                  title="Mark fully paid"
                                   className="rounded bg-green-500 p-1.5 text-white hover:bg-green-600 disabled:opacity-50"
                                 >
                                   <CheckCircle2 className="h-3.5 w-3.5" />
@@ -902,9 +2313,10 @@ export default function AdminPanel() {
                               </form>
                                                           <button
                                                             type="button"
+                                                            disabled={!canManageStudentProfiles}
                                                             onClick={() => handleEditStudent(student)}
                                                             title="Edit student profile"
-                                                            className="rounded bg-blue-500 p-1.5 text-white hover:bg-blue-600"
+                                                            className="rounded bg-blue-500 p-1.5 text-white hover:bg-blue-600 disabled:opacity-50"
                                                           >
                                                             <Pencil className="h-3.5 w-3.5" />
                                                           </button>
@@ -926,6 +2338,27 @@ export default function AdminPanel() {
                     </tbody>
                   </table>
                 </div>
+                <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3 text-sm text-gray-600">
+                  <span>Page {page} of {totalPages}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={page <= 1 || loading}
+                      onClick={() => setPage((current) => Math.max(current - 1, 1))}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      disabled={page >= totalPages || loading}
+                      onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -936,7 +2369,7 @@ export default function AdminPanel() {
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Permit Activity</h1>
-                  <p className="text-sm text-gray-500">{permitActivityLogs.length} event(s) tracked</p>
+                  <p className="text-sm text-gray-500">Showing {activityPageStart}-{activityPageEnd} of {activityTotalItems} event(s)</p>
                 </div>
                 <button
                   type="button"
@@ -986,6 +2419,27 @@ export default function AdminPanel() {
                     </tbody>
                   </table>
                 </div>
+                <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3 text-sm text-gray-600">
+                  <span>Page {activityPage} of {activityTotalPages}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={activityPage <= 1}
+                      onClick={() => setActivityPage((current) => Math.max(current - 1, 1))}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      disabled={activityPage >= activityTotalPages}
+                      onClick={() => setActivityPage((current) => Math.min(current + 1, activityTotalPages))}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1002,6 +2456,7 @@ export default function AdminPanel() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <p className="max-w-sm text-sm text-gray-600">
                     Use columns such as{' '}
+                    <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_name</code>,{' '}
                     <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_id</code> or{' '}
                     <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">email</code>, plus{' '}
                     <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">amount_paid</code> and optional{' '}
@@ -1010,6 +2465,7 @@ export default function AdminPanel() {
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <button
                       type="button"
+                      disabled={!canManageFinancials}
                       onClick={downloadFinancialImportTemplate}
                       className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                     >
@@ -1017,7 +2473,8 @@ export default function AdminPanel() {
                       Download Template
                     </button>
                     <label
-                      className={`inline-flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white ${importing ? 'bg-emerald-400' : dragActive ? 'bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                      htmlFor="admin-financial-import-input"
+                      className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white ${!canManageFinancials ? 'cursor-not-allowed bg-emerald-300' : importing ? 'cursor-pointer bg-emerald-400' : dragActive ? 'cursor-pointer bg-emerald-700' : 'cursor-pointer bg-emerald-600 hover:bg-emerald-700'}`}
                       onDragEnter={handleDragEnter}
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
@@ -1025,13 +2482,6 @@ export default function AdminPanel() {
                     >
                       <Upload className="h-4 w-4" />
                       {importing ? 'Importing...' : dragActive ? 'Drop File Here' : 'Upload Spreadsheet'}
-                      <input
-                        type="file"
-                        accept=".xlsx,.csv"
-                        className="hidden"
-                        disabled={importing}
-                        onChange={(e) => void handleImportFile(e)}
-                      />
                     </label>
                   </div>
                 </div>
@@ -1055,7 +2505,7 @@ export default function AdminPanel() {
                         </button>
                         <button
                           type="button"
-                          disabled={importing || pendingImportUpdates.length === 0}
+                          disabled={!canManageFinancials || importing || pendingImportUpdates.length === 0}
                           onClick={() => void handleApplyImport()}
                           className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
                         >
@@ -1070,8 +2520,8 @@ export default function AdminPanel() {
                             <th className="px-3 py-2 text-left">Row</th>
                             <th className="px-3 py-2 text-left">Key</th>
                             <th className="px-3 py-2 text-left">Student</th>
-                            <th className="px-3 py-2 text-left">Amount Paid</th>
-                            <th className="px-3 py-2 text-left">Total Fees</th>
+                            <th className="px-3 py-2 text-left">Amount Received</th>
+                            <th className="px-3 py-2 text-left">Expected Fees</th>
                             <th className="px-3 py-2 text-left">Status</th>
                           </tr>
                         </thead>
@@ -1088,9 +2538,18 @@ export default function AdminPanel() {
                                 {typeof row.totalFees === 'number' ? `$${row.totalFees.toFixed(2)}` : '-'}
                               </td>
                               <td className="px-3 py-2">
-                                <span className={`rounded px-2 py-1 text-xs font-medium ${row.status === 'ready' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                  {row.status === 'ready' ? 'Ready' : (row.reason ?? 'Skipped')}
+                                <span className={`rounded px-2 py-1 text-xs font-medium ${
+                                  row.status === 'ready'
+                                    ? 'bg-green-100 text-green-700'
+                                    : row.status === 'create'
+                                      ? 'bg-blue-100 text-blue-700'
+                                      : 'bg-red-100 text-red-700'
+                               }`}>
+                                  {row.status === 'ready' ? 'Update' : row.status === 'create' ? 'Create' : (row.reason ?? 'Skipped')}
                                 </span>
+                                {row.status !== 'ready' && row.reason ? (
+                                  <p className="mt-1 max-w-xs text-[11px] text-gray-500">{row.reason}</p>
+                                ) : null}
                               </td>
                             </tr>
                           ))}
@@ -1109,9 +2568,40 @@ export default function AdminPanel() {
           {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ REPORTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           {activeSection === 'reports' && (
             <div className="space-y-6">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Reports &amp; Analytics</h1>
-                <p className="text-sm text-gray-500">Financial clearance breakdown and permit issuance trends.</p>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Reports &amp; Analytics</h1>
+                  <p className="text-sm text-gray-500">Financial clearance breakdown, permit trends, and exportable operational summaries.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!adminCapability.canExportReports}
+                    onClick={handleExportDashboardCsv}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export CSV
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!adminCapability.canExportReports}
+                    onClick={handleExportDashboardExcel}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Export Excel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!adminCapability.canExportReports}
+                    onClick={handlePrintDashboardReport}
+                    className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Print / Save PDF
+                  </button>
+                </div>
               </div>
 
               <div className="grid gap-6 lg:grid-cols-2">
@@ -1243,6 +2733,28 @@ export default function AdminPanel() {
                     </div>
                   </div>
                 </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
+                  <h2 className="mb-4 font-semibold text-gray-800">Integration Readiness</h2>
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-emerald-500">Student Database Sync</p>
+                      <p className="mt-1 text-sm font-semibold text-emerald-800">Available Through REST Profiles</p>
+                    </div>
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-emerald-500">Exam Scheduling</p>
+                      <p className="mt-1 text-sm font-semibold text-emerald-800">Available Through Assigned Exams</p>
+                    </div>
+                    <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-amber-500">Notification Gateway</p>
+                      <p className="mt-1 text-sm font-semibold text-amber-800">In-App Only In This Demo</p>
+                    </div>
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-blue-500">Payment Verification</p>
+                      <p className="mt-1 text-sm font-semibold text-blue-800">Supported Through Financial Updates</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1255,6 +2767,36 @@ export default function AdminPanel() {
                 <p className="text-sm text-gray-500">
                   {clearedStudents} cleared student(s) eligible to print. {outstandingStudents} still have outstanding balances.
                 </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  disabled={!canManageStudentProfiles || bulkPrinting || filteredStudents.every((student) => student.feesBalance > 0)}
+                  onClick={() => void handleBulkPrintCleared()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  {bulkPrinting ? 'Preparing print...' : 'Print Cleared Permits On This Page'}
+                </button>
+                <button
+                  type="button"
+                  disabled={!canManageStudentProfiles}
+                  onClick={handleSelectClearedStudentsOnPage}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {allClearedStudentsOnPageSelected ? 'Clear Page Selection' : 'Select Cleared Students On This Page'}
+                </button>
+                <button
+                  type="button"
+                  disabled={!canManageStudentProfiles || bulkPrinting || clearedSelectedPermitStudents.length === 0}
+                  onClick={() => void handlePrintSelectedPermits()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  Print Selected Permits ({clearedSelectedPermitStudents.length})
+                </button>
+                <span className="text-xs text-gray-500">Bulk printing uses the currently loaded page and current filters.</span>
               </div>
 
               {/* Summary strip */}
@@ -1289,9 +2831,20 @@ export default function AdminPanel() {
                       }`}
                     >
                       <div className="mb-3 flex items-start justify-between gap-2">
-                        <div className="min-w-0">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedPermitStudentIds.includes(student.id)}
+                            onChange={() => togglePermitSelection(student.id)}
+                            disabled={!canManageStudentProfiles}
+                            className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600"
+                            aria-label={`Select ${student.name} for bulk permit printing`}
+                          />
+                          <div className="min-w-0">
                           <p className="truncate font-semibold text-gray-900">{student.name}</p>
                           <p className="text-xs text-gray-400">{student.studentId} - {student.course || 'No course'}</p>
+                          <p className="text-xs text-gray-400">{student.program ?? 'No program'} - {student.semester ?? 'No semester'}</p>
+                          </div>
                         </div>
                         <span
                           className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -1315,7 +2868,7 @@ export default function AdminPanel() {
                         ) : (
                           <div className="flex flex-col items-center gap-1 text-amber-400">
                             <Shield className="h-10 w-10" />
-                            <span className="text-[10px] font-medium">Balance: ${student.feesBalance.toFixed(2)}</span>
+                            <span className="text-[10px] font-medium">Remaining: ${student.feesBalance.toFixed(2)}</span>
                           </div>
                         )}
                       </div>
@@ -1333,26 +2886,26 @@ export default function AdminPanel() {
                             onChange={(e) =>
                               setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
                             }
-                            aria-label={`Payment amount for ${student.name}`}
-                            title={`Payment amount for ${student.name}`}
-                            placeholder="0.00"
+                            aria-label={`Amount received for ${student.name}`}
+                            title={`Amount received for ${student.name}`}
+                            placeholder="Received"
                             className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
                           />
                           <button
                             type="submit"
-                            disabled={savingId === student.id}
-                            title="Save payment"
-                            aria-label={`Save payment for ${student.name}`}
+                            disabled={!canManageFinancials || savingId === student.id}
+                            title="Save received amount"
+                            aria-label={`Save received amount for ${student.name}`}
                             className="rounded bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
                           >
                             <Save className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"
-                            disabled={savingId === student.id || student.feesBalance === 0}
+                            disabled={!canManageFinancials || savingId === student.id || student.feesBalance === 0}
                             onClick={() => void handleClear(student)}
-                            title="Clear balance"
-                            aria-label={`Clear balance for ${student.name}`}
+                            title="Mark fully paid"
+                            aria-label={`Mark ${student.name} as fully paid`}
                             className="rounded bg-green-500 p-1.5 text-white hover:bg-green-600 disabled:opacity-50"
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
@@ -1360,10 +2913,11 @@ export default function AdminPanel() {
                         </form>
                         <button
                           type="button"
+                          disabled={!canManageStudentProfiles}
                           onClick={() => handleEditStudent(student)}
                           title="Edit student profile"
                           aria-label={`Edit profile for ${student.name}`}
-                          className="rounded bg-blue-500 p-1.5 text-white hover:bg-blue-600"
+                          className="rounded bg-blue-500 p-1.5 text-white hover:bg-blue-600 disabled:opacity-50"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
@@ -1371,8 +2925,8 @@ export default function AdminPanel() {
 
                       <div className="mb-3">
                         <div className="mb-1 flex justify-between text-xs text-gray-500">
-                          <span>Paid: ${student.amountPaid.toFixed(2)}</span>
-                          <span>Total: ${student.totalFees.toFixed(2)}</span>
+                          <span>Received: ${student.amountPaid.toFixed(2)}</span>
+                          <span>Expected: ${student.totalFees.toFixed(2)}</span>
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
                           <progress
@@ -1386,6 +2940,11 @@ export default function AdminPanel() {
                       </div>
 
                       <div className="flex flex-wrap gap-1.5">
+                        {student.courseUnits && student.courseUnits.length > 0 && (
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
+                            {student.courseUnits.length} course units
+                          </span>
+                        )}
                         {summary.printCount > 0 && (
                           <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
                             Printed {summary.printCount}x
@@ -1416,6 +2975,27 @@ export default function AdminPanel() {
                   </div>
                 )}
               </div>
+              <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm text-gray-600 shadow-sm">
+                <span>Page {page} of {totalPages}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={page <= 1 || loading}
+                    onClick={() => setPage((current) => Math.max(current - 1, 1))}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={page >= totalPages || loading}
+                    onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1425,6 +3005,138 @@ export default function AdminPanel() {
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Settings</h1>
                 <p className="text-sm text-gray-500">System configuration and account information.</p>
+              </div>
+
+              {canManageFinancials && (
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-gray-100 px-6 py-4">
+                    <h2 className="font-semibold text-gray-800">Fee Structure</h2>
+                    <p className="mt-1 text-xs text-gray-400">Set the default exam clearance fees used for new local and international student accounts.</p>
+                  </div>
+                  <form className="space-y-4 px-6 py-5" onSubmit={(event) => void handleSaveFeeStructure(event)}>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="fee-settings-local" className="mb-2 block text-sm font-medium text-gray-700">Local student fee</label>
+                        <input
+                          id="fee-settings-local"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={feeSettingsDraft.localStudentFee}
+                          onChange={(event) => setFeeSettingsDraft((current) => ({ ...current, localStudentFee: event.target.value }))}
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="fee-settings-international" className="mb-2 block text-sm font-medium text-gray-700">International student fee</label>
+                        <input
+                          id="fee-settings-international"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={feeSettingsDraft.internationalStudentFee}
+                          onChange={(event) => setFeeSettingsDraft((current) => ({ ...current, internationalStudentFee: event.target.value }))}
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={savingFeeSettings}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      <Save className="h-4 w-4" />
+                      {savingFeeSettings ? 'Saving...' : 'Save fee structure'}
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-100 px-6 py-4">
+                  <h2 className="font-semibold text-gray-800">Account Settings</h2>
+                  <p className="mt-1 text-xs text-gray-400">Update your admin name, email, phone number, or password.</p>
+                </div>
+                <form className="space-y-4 px-6 py-5" onSubmit={(event) => void handleSaveAdminSettings(event)}>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="admin-settings-name" className="mb-2 block text-sm font-medium text-gray-700">Full name</label>
+                      <input
+                        id="admin-settings-name"
+                        type="text"
+                        required
+                        minLength={2}
+                        maxLength={120}
+                        value={settingsDraft.name}
+                        onChange={(event) => setSettingsDraft((current) => ({ ...current, name: event.target.value }))}
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="admin-settings-email" className="mb-2 block text-sm font-medium text-gray-700">Email address</label>
+                      <input
+                        id="admin-settings-email"
+                        type="email"
+                        required
+                        value={settingsDraft.email}
+                        onChange={(event) => setSettingsDraft((current) => ({ ...current, email: event.target.value }))}
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="admin-settings-phone" className="mb-2 block text-sm font-medium text-gray-700">Phone number</label>
+                      <input
+                        id="admin-settings-phone"
+                        type="tel"
+                        value={settingsDraft.phoneNumber}
+                        onChange={(event) => setSettingsDraft((current) => ({ ...current, phoneNumber: event.target.value }))}
+                        placeholder="e.g. +256700123456"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="admin-settings-password" className="mb-2 block text-sm font-medium text-gray-700">New password</label>
+                      <input
+                        id="admin-settings-password"
+                        type="password"
+                        value={settingsDraft.password}
+                        onChange={(event) => setSettingsDraft((current) => ({ ...current, password: event.target.value }))}
+                        placeholder="Leave blank to keep current password"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="admin-settings-current-password" className="mb-2 block text-sm font-medium text-gray-700">Current password</label>
+                      <input
+                        id="admin-settings-current-password"
+                        type="password"
+                        value={settingsDraft.currentPassword}
+                        onChange={(event) => setSettingsDraft((current) => ({ ...current, currentPassword: event.target.value }))}
+                        placeholder="Required to change password"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-w-md">
+                    <label htmlFor="admin-settings-confirm-password" className="mb-2 block text-sm font-medium text-gray-700">Confirm password</label>
+                    <input
+                      id="admin-settings-confirm-password"
+                      type="password"
+                      value={settingsDraft.confirmPassword}
+                      onChange={(event) => setSettingsDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
+                      placeholder="Repeat new password"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={savingSettings}
+                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    <Save className="h-4 w-4" />
+                    {savingSettings ? 'Saving...' : 'Save account settings'}
+                  </button>
+                </form>
               </div>
 
               {/* Account info */}
@@ -1446,6 +3158,13 @@ export default function AdminPanel() {
                       <p className="text-xs text-gray-400">Registered account email</p>
                     </div>
                     <p className="text-sm text-gray-900">{user?.email ?? '—'}</p>
+                  </div>
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Access Scope</p>
+                      <p className="text-xs text-gray-400">Frontend workspace restrictions for this admin account</p>
+                    </div>
+                    <p className="text-sm text-gray-900">{adminCapability.label}</p>
                   </div>
                   <div className="flex items-center justify-between px-6 py-4">
                     <div>
@@ -1477,7 +3196,7 @@ export default function AdminPanel() {
                       <p className="text-xs text-gray-400">REST API base URL</p>
                     </div>
                     <code className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">
-                      {window.location.hostname === 'localhost' ? 'http://localhost:4000' : '/api'}
+                      {publicApiBaseUrl || apiBaseUrl || 'Not configured'}
                     </code>
                   </div>
                   <div className="flex items-center justify-between px-6 py-4">
@@ -1493,6 +3212,20 @@ export default function AdminPanel() {
                       <p className="text-xs text-gray-400">Print and download actions tracked</p>
                     </div>
                     <p className="text-sm font-semibold text-gray-900">{permitEventCount}</p>
+                  </div>
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Security Controls Active</p>
+                      <p className="text-xs text-gray-400">Implemented directly in this app version</p>
+                    </div>
+                    <p className="text-right text-sm text-gray-900">Inactivity timeout, audit trail, role-scoped views</p>
+                  </div>
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Pending Security Integrations</p>
+                      <p className="text-xs text-gray-400">Require backend or infrastructure support</p>
+                    </div>
+                    <p className="text-right text-sm text-gray-900">2FA, IP allow-listing, field encryption, biometric verification</p>
                   </div>
                 </div>
               </div>
@@ -1579,6 +3312,36 @@ export default function AdminPanel() {
                   />
                 </div>
                 <div>
+                  <label htmlFor="edit-student-phone" className="mb-1 block text-xs font-medium text-gray-700">Phone Number</label>
+                  <input
+                    id="edit-student-phone"
+                    type="tel"
+                    value={editDraft.phoneNumber ?? ''}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, phoneNumber: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="e.g. +256700123456"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-student-category" className="mb-1 block text-xs font-medium text-gray-700">Student Category</label>
+                  <select
+                    id="edit-student-category"
+                    value={editDraft.studentCategory ?? 'local'}
+                    onChange={(event) => {
+                      const nextCategory = event.target.value === 'international' ? 'international' : 'local'
+                      setEditDraft((draft) => ({
+                        ...draft,
+                        studentCategory: nextCategory,
+                        totalFees: formatFeeDraftValue(getFeeForStudentCategory(systemFeeSettings, nextCategory)),
+                      }))
+                    }}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="local">Local Student</option>
+                    <option value="international">International Student</option>
+                  </select>
+                </div>
+                <div>
                   <label htmlFor="edit-student-course" className="mb-1 block text-xs font-medium text-gray-700">Course</label>
                   <input
                     id="edit-student-course"
@@ -1590,7 +3353,18 @@ export default function AdminPanel() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="edit-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">Total Fees ($)</label>
+                  <label htmlFor="edit-student-profile-image" className="mb-1 block text-xs font-medium text-gray-700">Profile Photo URL</label>
+                  <input
+                    id="edit-student-profile-image"
+                    type="url"
+                    value={editDraft.profileImage ?? ''}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, profileImage: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="https://example.com/student-photo.jpg"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">Expected Total Fees ($)</label>
                   <input
                     id="edit-student-total-fees"
                     type="number"
@@ -1602,28 +3376,378 @@ export default function AdminPanel() {
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   />
                 </div>
+                <div>
+                  <label htmlFor="edit-student-program" className="mb-1 block text-xs font-medium text-gray-700">Program</label>
+                  <input
+                    id="edit-student-program"
+                    type="text"
+                    value={editDraft.program ?? ''}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, program: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="e.g. BSc Computer Science"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-student-college" className="mb-1 block text-xs font-medium text-gray-700">College</label>
+                  <input
+                    id="edit-student-college"
+                    type="text"
+                    value={editDraft.college ?? ''}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, college: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-student-department" className="mb-1 block text-xs font-medium text-gray-700">Department</label>
+                  <input
+                    id="edit-student-department"
+                    type="text"
+                    value={editDraft.department ?? ''}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, department: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-student-semester" className="mb-1 block text-xs font-medium text-gray-700">Semester</label>
+                  <input
+                    id="edit-student-semester"
+                    type="text"
+                    value={editDraft.semester ?? ''}
+                    onChange={(e) => setEditDraft((d) => ({ ...d, semester: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="e.g. Semester 1 2026/2027"
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="edit-student-course-units" className="mb-1 block text-xs font-medium text-gray-700">Course Units</label>
+                <textarea
+                  id="edit-student-course-units"
+                  value={editDraft.courseUnitsText}
+                  onChange={(e) => setEditDraft((d) => ({ ...d, courseUnitsText: e.target.value }))}
+                  className="min-h-28 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  placeholder="Enter one course unit per line"
+                />
+                <p className="mt-1 text-xs text-gray-400">One course unit per line. Comma-separated values also work.</p>
+              </div>
+              <div className="flex items-center justify-between gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteStudent()}
+                  disabled={deletingStudentId === editingStudent.id || savingEdit}
+                  className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                >
+                  {deletingStudentId === editingStudent.id ? 'Deleting\u2026' : 'Delete Student'}
+                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingStudent(null)}
+                    className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingEdit}
+                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {savingEdit ? 'Saving\u2026' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {showCreateStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-base font-semibold text-gray-900">Add New Student</h2>
+              <button
+                type="button"
+                title="Close add student dialog"
+                aria-label="Close add student dialog"
+                onClick={() => setShowCreateStudent(false)}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form onSubmit={(event) => void handleCreateStudent(event)} className="space-y-4 px-6 py-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="create-student-name" className="mb-1 block text-xs font-medium text-gray-700">Full Name</label>
+                  <input
+                    id="create-student-name"
+                    type="text"
+                    required
+                    minLength={2}
+                    maxLength={120}
+                    value={createDraft.name}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, name: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-email" className="mb-1 block text-xs font-medium text-gray-700">Email</label>
+                  <input
+                    id="create-student-email"
+                    type="email"
+                    required
+                    value={createDraft.email}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, email: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-password" className="mb-1 block text-xs font-medium text-gray-700">Initial Password</label>
+                  <div className="flex gap-2">
+                    <input
+                      id="create-student-password"
+                      type="text"
+                      required
+                      minLength={8}
+                      maxLength={128}
+                      value={createDraft.password}
+                      onChange={(event) => {
+                        setCreateDraft((current) => ({ ...current, password: event.target.value }))
+                        setCreatePasswordGenerated(false)
+                      }}
+                      className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleGenerateTemporaryPassword}
+                      className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+                    >
+                      <RefreshCcw className="h-4 w-4" />
+                      Generate
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">Generate a temporary password automatically or enter one manually.</p>
+                </div>
+                <div>
+                  <label htmlFor="create-student-id" className="mb-1 block text-xs font-medium text-gray-700">Registration No.</label>
+                  <input
+                    id="create-student-id"
+                    type="text"
+                    required
+                    maxLength={80}
+                    value={createDraft.studentId}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, studentId: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="e.g. STU-001"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-phone" className="mb-1 block text-xs font-medium text-gray-700">Phone Number</label>
+                  <input
+                    id="create-student-phone"
+                    type="tel"
+                    value={createDraft.phoneNumber ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, phoneNumber: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="e.g. +256700123456"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-category" className="mb-1 block text-xs font-medium text-gray-700">Student Category</label>
+                  <select
+                    id="create-student-category"
+                    value={createDraft.studentCategory}
+                    onChange={(event) => {
+                      const nextCategory = event.target.value === 'international' ? 'international' : 'local'
+                      setCreateDraft((current) => ({
+                        ...current,
+                        studentCategory: nextCategory,
+                        totalFees: formatFeeDraftValue(getFeeForStudentCategory(systemFeeSettings, nextCategory)),
+                      }))
+                    }}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="local">Local Student</option>
+                    <option value="international">International Student</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="create-student-course" className="mb-1 block text-xs font-medium text-gray-700">Course</label>
+                  <input
+                    id="create-student-course"
+                    type="text"
+                    required
+                    maxLength={120}
+                    value={createDraft.course}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, course: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="e.g. BSc Computer Science"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-program" className="mb-1 block text-xs font-medium text-gray-700">Program</label>
+                  <input
+                    id="create-student-program"
+                    type="text"
+                    value={createDraft.program ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, program: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-college" className="mb-1 block text-xs font-medium text-gray-700">College</label>
+                  <input
+                    id="create-student-college"
+                    type="text"
+                    value={createDraft.college ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, college: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-department" className="mb-1 block text-xs font-medium text-gray-700">Department</label>
+                  <input
+                    id="create-student-department"
+                    type="text"
+                    value={createDraft.department ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, department: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-semester" className="mb-1 block text-xs font-medium text-gray-700">Semester</label>
+                  <input
+                    id="create-student-semester"
+                    type="text"
+                    value={createDraft.semester ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, semester: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="e.g. Semester 1 2026/2027"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">Expected Total Fees ($)</label>
+                  <input
+                    id="create-student-total-fees"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value={createDraft.totalFees}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, totalFees: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">Defaults come from the fee structure set for {createDraft.studentCategory === 'international' ? 'international' : 'local'} students.</p>
+                </div>
+                <div>
+                  <label htmlFor="create-student-amount-paid" className="mb-1 block text-xs font-medium text-gray-700">Amount Paid ($)</label>
+                  <input
+                    id="create-student-amount-paid"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={createDraft.amountPaid}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, amountPaid: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-profile-image" className="mb-1 block text-xs font-medium text-gray-700">Profile Photo URL</label>
+                  <input
+                    id="create-student-profile-image"
+                    type="url"
+                    value={createDraft.profileImage ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, profileImage: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="https://example.com/student-photo.jpg"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-exam-date" className="mb-1 block text-xs font-medium text-gray-700">Exam Date</label>
+                  <input
+                    id="create-student-exam-date"
+                    type="text"
+                    value={createDraft.examDate ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, examDate: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="e.g. 2026-11-04"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-exam-time" className="mb-1 block text-xs font-medium text-gray-700">Exam Time</label>
+                  <input
+                    id="create-student-exam-time"
+                    type="text"
+                    value={createDraft.examTime ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, examTime: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="e.g. 9:00 AM"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-venue" className="mb-1 block text-xs font-medium text-gray-700">Venue</label>
+                  <input
+                    id="create-student-venue"
+                    type="text"
+                    value={createDraft.venue ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, venue: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-seat" className="mb-1 block text-xs font-medium text-gray-700">Seat Number</label>
+                  <input
+                    id="create-student-seat"
+                    type="text"
+                    value={createDraft.seatNumber ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, seatNumber: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="create-student-course-units" className="mb-1 block text-xs font-medium text-gray-700">Course Units</label>
+                <textarea
+                  id="create-student-course-units"
+                  value={createDraft.courseUnitsText}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, courseUnitsText: event.target.value }))}
+                  className="min-h-24 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  placeholder="Enter one course unit per line"
+                />
+                <p className="mt-1 text-xs text-gray-400">One course unit per line. Comma-separated values also work.</p>
+              </div>
+              <div>
+                <label htmlFor="create-student-instructions" className="mb-1 block text-xs font-medium text-gray-700">Permit Instructions</label>
+                <textarea
+                  id="create-student-instructions"
+                  value={createDraft.instructions ?? ''}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, instructions: event.target.value }))}
+                  className="min-h-24 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  placeholder="Optional instructions shown on the permit"
+                />
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setEditingStudent(null)}
+                  onClick={() => setShowCreateStudent(false)}
                   className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={savingEdit}
+                  disabled={savingCreate}
                   className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
-                  {savingEdit ? 'Saving\u2026' : 'Save Changes'}
+                  {savingCreate ? 'Creating...' : 'Create Student'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   )
 }
 

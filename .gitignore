@@ -38,6 +38,11 @@ logs/
 *.tmp
 *.temp
 
+# Playwright
+playwright-report/
+test-results/
+playwright/.cache/
+
 # Example backend runtime artifacts
 examples/rest-backend/data/*.sqlite
 examples/rest-backend/data/*.sqlite-shm

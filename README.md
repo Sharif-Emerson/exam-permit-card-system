@@ -9,6 +9,7 @@ Exam Permit System is a React application backed by a REST API for managing stud
 - Student permit dashboard with QR code, print, and PDF download flow
 - Student dashboard sections for overview, applications, profile settings, and support
 - Student self-service profile updates for name, email, avatar URL, and password
+- Student self-service profile updates for name, email, phone number, avatar URL, and password
 - Student-side permit application history and local request tracking
 - Fee breakdown showing total fees, amount paid, remaining balance, and payment progress
 - Print/download restriction until a student is fully cleared
@@ -30,6 +31,7 @@ Exam Permit System is a React application backed by a REST API for managing stud
 - Tailwind CSS
 - React Router
 - Vitest and Testing Library
+- Playwright
 - Lucide React
 - qrcode
 - papaparse
@@ -50,7 +52,7 @@ Exam Permit System is a React application backed by a REST API for managing stud
    ```bash
    copy .env.example .env
    ```
-3. The default frontend configuration is:
+3. For an explicit backend URL, use:
    - `VITE_BACKEND_PROVIDER=rest`
    - `VITE_API_BASE_URL=http://localhost:4000`
 4. Start the full local stack:
@@ -60,10 +62,18 @@ Exam Permit System is a React application backed by a REST API for managing stud
 
 This launcher streams both backend and frontend output and is configured to work on Windows shells as well.
 
+During local Vite development, frontend requests first go through `/api` using the built-in dev proxy, then fall back to `http://<current-host>:4000` when needed. This keeps fetches working on localhost, machine hostnames, and LAN IPs without extra CORS setup.
+
+If the backend is offline or fails to start, the app now returns a direct REST API availability message instead of a bare `502` error.
+
+If `VITE_API_BASE_URL` is set to `http://localhost:4000` during development, the app now still prefers the proxy path for browser requests so other devices on your network do not break.
+
 This starts:
 
 - the frontend in REST mode
 - the example backend at `http://localhost:4000`
+
+The example backend reset flow clears student data and generated permit artifacts, but now preserves the customized identity of the three bootstrap admin accounts by ID. That means updated admin email, phone, password, and scope survive `npm run reset-data`.
 
 You can also run the pieces separately:
 
@@ -79,10 +89,14 @@ You can also run the pieces separately:
 - `npm run dev:rest:backend` starts only the example backend
 - `npm run build` creates the production build
 - `npm run build:rest` creates the same REST production build explicitly
+- `npm run check:rest` validates the example REST backend syntax before you start relying on it
 - `npm run preview` previews the production build locally
 - `npm run typecheck` runs TypeScript checks
 - `npm run lint` runs ESLint
-- `npm run test` runs the Vitest suite
+- `npm run test` runs the backend syntax check first, then the Vitest suite
+- `npm run test:integration` runs the backend API integration script plus the main frontend flow tests
+- `npm run test:e2e` runs real browser end-to-end tests with Playwright
+- `npm run test:all` runs unit, integration, and browser E2E suites together
 
 ## Backend Contract
 
@@ -162,9 +176,12 @@ The admin panel includes:
 
 Accepted spreadsheet columns:
 
+- `student_name`
 - `student_id` or `email` or `id`
 - `amount_paid`
 - optional `total_fees`
+
+The bundled backend now starts without seeded student records. Use the admin panel to add/import real students after first login with an admin account.
 
 ## Project Structure
 
@@ -207,6 +224,18 @@ Run the test suite with:
 npm run test
 ```
 
+Run browser end-to-end coverage with:
+
+```bash
+npm run test:e2e
+```
+
+Run the full testing pyramid with:
+
+```bash
+npm run test:all
+```
+
 ## Deployment
 
 This project is configured as a single-page application for both:
@@ -214,20 +243,57 @@ This project is configured as a single-page application for both:
 - [vercel.json](c:/Users/kabuy/OneDrive/Desktop/project/vercel.json)
 - [netlify.toml](c:/Users/kabuy/OneDrive/Desktop/project/netlify.toml)
 
-Both configs rewrite all routes to `index.html` so client-side routing works in production.
+Both configs rewrite frontend routes to `index.html` so client-side routing works in production.
+
+For the app to work on any device anywhere, the backend must also be reachable from the public internet. There are two supported deployment models:
+
+1. Set `VITE_API_BASE_URL` to a public backend URL such as `https://api.yourdomain.com`
+2. Host the frontend behind a same-origin reverse proxy so browser requests to `/api/*` are forwarded to your backend
 
 To deploy:
 
 1. Deploy the frontend to Vercel or Netlify.
-2. Set frontend environment variables:
+2. Choose one API strategy:
+  - Set frontend environment variables:
    - `VITE_BACKEND_PROVIDER=rest`
    - `VITE_API_BASE_URL=https://your-backend.example.com`
+  - or expose your backend behind the same origin at `/api`
 3. Deploy [examples/rest-backend](c:/Users/kabuy/OneDrive/Desktop/project/examples/rest-backend) as a separate Node service using its Dockerfile.
 4. Set backend environment variables:
    - `PORT`
    - `APP_DB_PATH`
    - `SESSION_TTL_HOURS`
    - `CORS_ALLOWED_ORIGINS`
+
+If the frontend is public but the backend is still only running on your laptop, users in other locations will never be able to fetch data from it.
+
+### Public Docker Deployment
+
+This repository now includes a same-origin deployment option for a VPS or container host:
+
+- [docker-compose.deploy.yml](c:/Users/kabuy/OneDrive/Desktop/project/docker-compose.deploy.yml)
+- [deploy/frontend.Dockerfile](c:/Users/kabuy/OneDrive/Desktop/project/deploy/frontend.Dockerfile)
+- [deploy/nginx.conf](c:/Users/kabuy/OneDrive/Desktop/project/deploy/nginx.conf)
+
+This setup:
+
+- builds the React frontend into an Nginx container
+- proxies browser requests from `/api/*` to the backend container
+- keeps the backend database and uploads in Docker volumes
+- avoids browser CORS issues by serving frontend and API from the same public origin
+
+To run it on a public server:
+
+1. Install Docker and Docker Compose on the host.
+2. Copy the repository to the host.
+3. Start the stack:
+  ```bash
+  docker compose -f docker-compose.deploy.yml up -d --build
+  ```
+4. Point your domain at that server.
+5. Put TLS in front of it with your platform load balancer, Caddy, Nginx Proxy Manager, or another reverse proxy.
+
+With this setup, the frontend can use the default `/api` production path and does not need `VITE_API_BASE_URL` at build time.
 
 ## Notes
 

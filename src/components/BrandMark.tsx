@@ -1,4 +1,5 @@
 import { ShieldCheck } from 'lucide-react'
+import { institutionName } from '../config/branding'
 
 type BrandMarkProps = {
   align?: 'left' | 'center'
@@ -19,8 +20,8 @@ export default function BrandMark({
         <ShieldCheck className={iconClassName} />
       </div>
       <div>
-        <div className={titleClassName}>Exam Pro Permit</div>
-        <div className={subtitleClassName}>Secure examination clearance</div>
+        <div className={titleClassName}>{institutionName}</div>
+        <div className={subtitleClassName}>Secure examination permit portal</div>
       </div>
     </div>
   )

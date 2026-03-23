@@ -5,7 +5,7 @@ app.use(express.json())
 
 const users = [
   { id: 'admin-1', email: 'admin@example.com', password: 'Permit@2026', role: 'admin', name: 'Administrator' },
-  { id: 'student-1', email: 'student1@example.com', password: 'Permit@2026', role: 'student', name: 'John Doe' },
+  { id: 'admin-2', email: 'registrar@example.com', password: 'Permit@2026', role: 'admin', name: 'Registrar Office' },
 ]
 
 const profiles = [
@@ -26,20 +26,20 @@ const profiles = [
     amount_paid: 0,
   },
   {
-    id: 'student-1',
-    email: 'student1@example.com',
-    role: 'student',
-    name: 'John Doe',
-    student_id: 'STU001',
-    course: 'Computer Science',
-    exam_date: '2026-04-15',
-    exam_time: '10:00 AM',
-    venue: 'Hall A',
-    seat_number: 'A-001',
-    instructions: 'Bring valid ID and arrive 30 minutes early.',
+    id: 'admin-2',
+    email: 'registrar@example.com',
+    role: 'admin',
+    name: 'Registrar Office',
+    student_id: null,
+    course: null,
+    exam_date: null,
+    exam_time: null,
+    venue: null,
+    seat_number: null,
+    instructions: null,
     profile_image: null,
-    total_fees: 3000,
-    amount_paid: 1500,
+    total_fees: 0,
+    amount_paid: 0,
   },
 ]
 

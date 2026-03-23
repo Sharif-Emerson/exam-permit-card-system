@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
+import { generalExamRules } from '../config/examRules'
+import { institutionName } from '../config/branding'
 import PermitCard from './PermitCard'
 
 describe('PermitCard', () => {
@@ -44,6 +46,11 @@ describe('PermitCard', () => {
 
     expect(screen.getByText('John Doe')).toBeTruthy()
     expect(screen.getByText('Computer Science Theory')).toBeTruthy()
+    expect(screen.getByText('General Examination Rules')).toBeTruthy()
+    for (const rule of generalExamRules) {
+      expect(screen.getByText(rule)).toBeTruthy()
+    }
+    expect(screen.getAllByText(institutionName).length).toBeGreaterThan(0)
     expect(screen.getByAltText('Verification QR code')).toBeTruthy()
   })
 })

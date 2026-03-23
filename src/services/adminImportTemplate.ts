@@ -1,7 +1,5 @@
 const templateContent = [
-  ['student_id', 'email', 'amount_paid', 'total_fees'],
-  ['STU001', 'student1@example.com', '1500.00', '3000.00'],
-  ['STU002', 'student2@example.com', '3000.00', '3000.00'],
+  ['student_name', 'student_id', 'email', 'phone_number', 'course', 'program', 'college', 'department', 'semester', 'password', 'course_units', 'amount_paid', 'total_fees'],
 ].map((row) => row.join(',')).join('\n')
 
 export function downloadFinancialImportTemplate() {

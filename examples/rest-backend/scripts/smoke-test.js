@@ -30,13 +30,56 @@ async function requestRaw(pathname, options = {}) {
 }
 
 await fs.mkdir(uploadsDir, { recursive: true })
-await fs.writeFile(smokeCsvPath, 'student_id,amount_paid,total_fees\nSTU001,2800,3000\n')
 
 const login = await request('/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ identifier: 'admin@example.com', password: 'Permit@2026' }),
 })
+
+const createdStudent = await request('/profiles', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${login.token}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    name: 'Smoke Student One',
+    email: 'smoke-student-1@example.com',
+    password: 'Permit@2026',
+    student_id: 'SMOKE001',
+    course: 'Computer Science',
+    total_fees: 3000,
+    amount_paid: 1500,
+    exam_date: '2026-04-15',
+    exam_time: '10:00 AM',
+    venue: 'Hall A',
+    seat_number: 'A-001',
+  }),
+})
+
+const secondStudent = await request('/profiles', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${login.token}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    name: 'Smoke Student Two',
+    email: 'smoke-student-2@example.com',
+    password: 'Permit@2026',
+    student_id: 'SMOKE002',
+    course: 'Mathematics',
+    total_fees: 3000,
+    amount_paid: 3000,
+    exam_date: '2026-04-16',
+    exam_time: '2:00 PM',
+    venue: 'Hall B',
+    seat_number: 'B-002',
+  }),
+})
+
+await fs.writeFile(smokeCsvPath, 'student_name,student_id,amount_paid,total_fees\nSmoke Student One,SMOKE001,2800,3000\n')
 
 const formData = new FormData()
 formData.set('file', new Blob([await fs.readFile(smokeCsvPath)], { type: 'text/csv' }), 'smoke.csv')
@@ -47,13 +90,17 @@ const preview = await request('/imports/financials/preview', {
   body: formData,
 })
 
+if (preview?.data?.[0]?.studentName !== 'John Doe') {
+  throw new Error(`Expected preview row to include studentName John Doe, received ${JSON.stringify(preview?.data?.[0] ?? null)}`)
+}
+
 const apply = await request('/imports/financials/apply', {
   method: 'POST',
   headers: { Authorization: `Bearer ${login.token}` },
   body: formData,
 })
 
-const profile = await request('/profiles/student-1', {
+const profile = await request(`/profiles/${createdStudent.id}`, {
   headers: { Authorization: `Bearer ${login.token}` },
 })
 
@@ -62,71 +109,71 @@ const publicPermit = await request(`/permits/${profile.permit_token}`)
 const studentLogin = await request('/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ identifier: 'student1@example.com', password: 'Permit@2026' }),
+  body: JSON.stringify({ identifier: 'smoke-student-1@example.com', password: 'Permit@2026' }),
 })
 
 const otherStudentLogin = await request('/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ identifier: 'student2@example.com', password: 'Permit@2026' }),
+  body: JSON.stringify({ identifier: 'smoke-student-2@example.com', password: 'Permit@2026' }),
 })
 
-const forbiddenProfileAccess = await requestRaw('/profiles/student-1', {
+const forbiddenProfileAccess = await requestRaw(`/profiles/${createdStudent.id}`, {
   headers: { Authorization: `Bearer ${otherStudentLogin.token}` },
 })
 
-const accountUpdated = await request('/profiles/student-1/account', {
+const accountUpdated = await request(`/profiles/${createdStudent.id}/account`, {
   method: 'PATCH',
   headers: {
     Authorization: `Bearer ${studentLogin.token}`,
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({
-    name: 'John Doe Updated',
-    email: 'student1@example.com',
+    name: 'Smoke Student One Updated',
+    email: 'smoke-student-1@example.com',
     profileImage: 'https://example.com/avatar.png',
   }),
 })
 
-const adminUpdatedProfile = await request('/profiles/student-1/admin', {
+const adminUpdatedProfile = await request(`/profiles/${createdStudent.id}/admin`, {
   method: 'PATCH',
   headers: {
     Authorization: `Bearer ${login.token}`,
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({
-    name: 'John Doe Admin Updated',
-    email: 'student1@example.com',
-    student_id: 'STU001-UPDATED',
+    name: 'Smoke Student One Admin Updated',
+    email: 'smoke-student-1@example.com',
+    student_id: 'SMOKE001-UPDATED',
     course: 'Computer Science',
     total_fees: 3200,
   }),
 })
 
-const adminRestoredProfile = await request('/profiles/student-1/admin', {
+const adminRestoredProfile = await request(`/profiles/${createdStudent.id}/admin`, {
   method: 'PATCH',
   headers: {
     Authorization: `Bearer ${login.token}`,
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({
-    name: 'John Doe',
-    email: 'student1@example.com',
-    student_id: 'STU001',
+    name: 'Smoke Student One',
+    email: 'smoke-student-1@example.com',
+    student_id: 'SMOKE001',
     course: 'Computer Science',
     total_fees: 3000,
   }),
 })
 
-const accountRestored = await request('/profiles/student-1/account', {
+const accountRestored = await request(`/profiles/${createdStudent.id}/account`, {
   method: 'PATCH',
   headers: {
     Authorization: `Bearer ${studentLogin.token}`,
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({
-    name: 'John Doe',
-    email: 'student1@example.com',
+    name: 'Smoke Student One',
+    email: 'smoke-student-1@example.com',
     profileImage: null,
   }),
 })

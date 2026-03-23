@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
 import { activeAuthAdapter } from '../adapters/auth'
+import type { AuthSession } from '../adapters/auth/types'
 import { fetchProfileById } from '../services/profileService'
 import type { AuthUser } from '../types'
 
@@ -14,13 +15,21 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-function mapAuthUser(profile: Awaited<ReturnType<typeof fetchProfileById>>): AuthUser {
-  return {
+function mapAuthUser(profile: Awaited<ReturnType<typeof fetchProfileById>>, sessionUser?: AuthUser): AuthUser {
+  const nextUser: AuthUser = {
     id: profile.id,
     email: profile.email,
     role: profile.role,
     name: profile.name,
+    phoneNumber: profile.phoneNumber,
   }
+
+  if (nextUser.role === 'admin' && sessionUser?.role === 'admin') {
+    nextUser.scope = sessionUser.scope
+    nextUser.permissions = sessionUser.permissions ?? []
+  }
+
+  return nextUser
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -28,9 +37,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [configError, setConfigError] = useState<string | null>(null)
 
-  async function loadUserProfile(userId: string) {
+  async function loadUserProfile(userId: string, sessionUser?: AuthUser) {
     const profile = await fetchProfileById(userId)
-    const nextUser = mapAuthUser(profile)
+    const nextUser = mapAuthUser(profile, sessionUser)
     setUser(nextUser)
     setConfigError(null)
     return nextUser
@@ -47,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let isMounted = true
 
-    async function applySession(session: { userId: string } | null) {
+    async function applySession(session: AuthSession | null) {
       if (!isMounted) {
         return
       }
@@ -59,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const nextUser = await loadUserProfile(session.userId)
+        const nextUser = await loadUserProfile(session.userId, session.user)
 
         if (!isMounted) {
           return
@@ -112,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
 
     const session = await activeAuthAdapter.signIn(email, password)
-    const nextUser = await loadUserProfile(session.userId)
+    const nextUser = await loadUserProfile(session.userId, session.user)
     setLoading(false)
     return nextUser
   }
@@ -135,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
 
     try {
-      await loadUserProfile(user.id)
+      await loadUserProfile(user.id, user)
     } finally {
       setLoading(false)
     }

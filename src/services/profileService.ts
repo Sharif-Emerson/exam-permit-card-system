@@ -1,6 +1,25 @@
 import { activeDataAdapter } from '../adapters/data'
 import type { FinancialUpdateValues } from '../adapters/data/types'
-import type { AdminActivityLog, AdminProfileUpdateInput, AppProfile, FinancialImportResult, FinancialImportUpdate, PermitActivityAction, StudentAccountUpdateInput, StudentProfile } from '../types'
+import type {
+  AdminActivityLog,
+  AdminActivityLogPage,
+  AdminProfileUpdateInput,
+  AppProfile,
+  CreateStudentInput,
+  CreateSupportRequestInput,
+  FinancialImportResult,
+  FinancialImportUpdate,
+  SupportContact,
+  PermitActivityRecord,
+  PermitActivityAction,
+  StudentAccountUpdateInput,
+  StudentListPage,
+  StudentListQuery,
+  StudentProfile,
+  SystemFeeSettings,
+  SupportRequest,
+  SupportRequestUpdateInput,
+} from '../types'
 
 export function getDataConfigError() {
   return activeDataAdapter.getConfigError()
@@ -14,15 +33,31 @@ export async function fetchStudentProfileById(userId: string): Promise<StudentPr
   return activeDataAdapter.fetchStudentProfileById(userId)
 }
 
-export async function fetchAllStudentProfiles(): Promise<StudentProfile[]> {
-  return activeDataAdapter.fetchAllStudentProfiles()
+export async function fetchStudentProfilesPage(query?: StudentListQuery): Promise<StudentListPage> {
+  return activeDataAdapter.fetchStudentProfilesPage(query)
 }
 
 export async function fetchAdminActivityLogs(): Promise<AdminActivityLog[]> {
   return activeDataAdapter.fetchAdminActivityLogs()
 }
 
-export async function updateStudentAccount(studentId: string, values: StudentAccountUpdateInput): Promise<StudentProfile> {
+export async function fetchAdminActivityLogsPage(query?: { page?: number; pageSize?: number }): Promise<AdminActivityLogPage> {
+  return activeDataAdapter.fetchAdminActivityLogsPage(query)
+}
+
+export async function fetchSystemFeeSettings(): Promise<SystemFeeSettings> {
+  return activeDataAdapter.fetchSystemFeeSettings()
+}
+
+export async function updateSystemFeeSettings(values: SystemFeeSettings): Promise<SystemFeeSettings> {
+  return activeDataAdapter.updateSystemFeeSettings(values)
+}
+
+export async function createStudentProfile(values: CreateStudentInput, adminId: string): Promise<StudentProfile> {
+  return activeDataAdapter.createStudentProfile(values, adminId)
+}
+
+export async function updateStudentAccount(studentId: string, values: StudentAccountUpdateInput): Promise<AppProfile> {
   return activeDataAdapter.updateStudentAccount(studentId, values)
 }
 
@@ -38,25 +73,64 @@ export async function clearStudentBalance(studentId: string, adminId: string) {
   return activeDataAdapter.clearStudentBalance(studentId, adminId)
 }
 
+export async function deleteStudentProfile(studentId: string, adminId: string) {
+  return activeDataAdapter.deleteStudentProfile(studentId, adminId)
+}
+
 export async function recordPermitActivity(studentId: string, action: PermitActivityAction) {
   return activeDataAdapter.recordPermitActivity(studentId, action)
 }
 
+export async function fetchPermitActivityHistory(): Promise<PermitActivityRecord[]> {
+  return activeDataAdapter.fetchPermitActivityHistory()
+}
+
+export async function fetchSupportContacts(): Promise<SupportContact[]> {
+  return activeDataAdapter.fetchSupportContacts()
+}
+
+export async function fetchSupportRequests(): Promise<SupportRequest[]> {
+  return activeDataAdapter.fetchSupportRequests()
+}
+
+export async function createSupportRequest(studentId: string, values: CreateSupportRequestInput): Promise<SupportRequest> {
+  return activeDataAdapter.createSupportRequest(studentId, values)
+}
+
+export async function updateSupportRequest(requestId: string, values: SupportRequestUpdateInput): Promise<SupportRequest> {
+  return activeDataAdapter.updateSupportRequest(requestId, values)
+}
+
 export async function importStudentFinancials(updates: FinancialImportUpdate[], adminId: string): Promise<FinancialImportResult> {
   let updatedCount = 0
+  let createdCount = 0
+  const createdStudents: FinancialImportResult['createdStudents'] = []
   const skippedRows: FinancialImportResult['skippedRows'] = []
 
   for (const update of updates) {
     try {
-      await activeDataAdapter.updateStudentFinancials(
-        update.studentId,
-        {
-          amountPaid: update.amountPaid,
-          totalFees: update.totalFees,
-        },
-        adminId,
-      )
-      updatedCount += 1
+      if (update.action === 'update') {
+        await activeDataAdapter.updateStudentFinancials(
+          update.studentId,
+          {
+            amountPaid: update.amountPaid,
+            totalFees: update.totalFees,
+          },
+          adminId,
+        )
+        updatedCount += 1
+        continue
+      }
+
+      await activeDataAdapter.createStudentProfile(update.createStudent, adminId)
+      createdCount += 1
+      createdStudents.push({
+        rowNumber: update.rowNumber,
+        name: update.createStudent.name,
+        email: update.createStudent.email,
+        studentId: update.createStudent.studentId,
+        password: update.createStudent.password,
+      })
     } catch (error) {
       skippedRows.push({
         rowNumber: update.rowNumber,
@@ -65,5 +139,5 @@ export async function importStudentFinancials(updates: FinancialImportUpdate[], 
     }
   }
 
-  return { updatedCount, skippedRows }
+  return { updatedCount, createdCount, createdStudents, skippedRows }
 }

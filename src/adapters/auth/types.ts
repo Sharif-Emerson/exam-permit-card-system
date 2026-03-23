@@ -1,5 +1,8 @@
+import type { AuthUser } from '../../types'
+
 export interface AuthSession {
   userId: string
+  user?: AuthUser
 }
 
 export interface AuthAdapter {

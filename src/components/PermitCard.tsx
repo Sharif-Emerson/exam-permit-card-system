@@ -1,4 +1,6 @@
 import { Calendar, Clock, Download, LogOut, MapPin, Printer, RefreshCcw, Ticket, User } from 'lucide-react'
+import { generalExamRules } from '../config/examRules'
+import { institutionName } from '../config/branding'
 import type { StudentProfile } from '../types'
 import BrandMark from './BrandMark'
 
@@ -55,6 +57,14 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
               titleClassName="text-2xl sm:text-3xl font-bold text-gray-900"
               subtitleClassName="text-sm sm:text-base text-gray-600"
             />
+            <p className="mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
+              {institutionName}
+            </p>
+          </div>
+
+          <div className="mb-5 hidden rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center print:block print:mb-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-800">Institution</p>
+            <p className="mt-1 text-sm font-semibold text-emerald-900">{institutionName}</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 sm:gap-8 mb-6 sm:mb-8 print:grid-cols-1 print:gap-3 print:mb-4">
@@ -82,7 +92,19 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                 <span className="text-sm sm:text-base">{studentData.course}</span>
               </div>
               <div className="flex items-center space-x-2">
-                <span className="font-medium text-sm sm:text-base">Fees Balance:</span>
+                <span className="font-medium text-sm sm:text-base">Program:</span>
+                <span className="text-sm sm:text-base">{studentData.program ?? studentData.course}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="font-medium text-sm sm:text-base">Department:</span>
+                <span className="text-sm sm:text-base">{studentData.department ?? 'Not assigned'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="font-medium text-sm sm:text-base">Semester:</span>
+                <span className="text-sm sm:text-base">{studentData.semester ?? 'Not assigned'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="font-medium text-sm sm:text-base">Remaining Balance:</span>
                 <span className={`font-semibold text-sm sm:text-base ${studentData.feesBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
                   ${studentData.feesBalance.toFixed(2)}
                 </span>
@@ -101,6 +123,18 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">Assigned Exams</h3>
               <span className="text-xs sm:text-sm text-slate-500">{studentData.exams.length} scheduled</span>
             </div>
+            {studentData.courseUnits && studentData.courseUnits.length > 0 && (
+              <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:mb-2 print:rounded-lg print:p-3 print:shadow-none">
+                <h4 className="mb-2 text-sm font-semibold text-slate-900 print:text-sm">Registered Course Units</h4>
+                <div className="flex flex-wrap gap-2 print:gap-1.5">
+                  {studentData.courseUnits.map((unit) => (
+                    <span key={unit} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700 print:bg-slate-50 print:text-[10px]">
+                      {unit}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             {studentData.exams.length > 0 ? (
               <div className="grid grid-cols-1 gap-4 print:gap-2">
                 {studentData.exams.map((exam) => (
@@ -136,9 +170,21 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
             )}
           </div>
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8 print:hidden">
-            <h4 className="font-semibold text-yellow-800 mb-2">Important Instructions</h4>
-            <p className="text-yellow-700">{studentData.instructions}</p>
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:p-5 print:mb-4 print:rounded-lg print:border-slate-200 print:bg-white print:p-3">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-900 print:text-xs print:tracking-[0.16em]">General Examination Rules</h4>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700 print:border print:border-slate-200 print:bg-slate-50 print:text-slate-600">
+                Read Before Entry
+              </span>
+            </div>
+            <ul className="space-y-2 text-sm leading-6 text-amber-900 print:space-y-1.5 print:text-[11px] print:leading-5 print:text-slate-800">
+              {generalExamRules.map((rule) => (
+                <li key={rule} className="flex gap-2">
+                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-500" aria-hidden="true" />
+                  <span>{rule}</span>
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div className={`rounded-lg p-3 sm:p-4 mb-6 sm:mb-8 border-2 print:hidden ${studentData.feesBalance > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
@@ -148,15 +194,16 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm">
                 <div className="text-center">
-                  <p className="text-gray-600">Total Fees</p>
+                  <p className="text-gray-600">Expected Fees</p>
                   <p className="font-bold text-gray-900 text-sm sm:text-base">${studentData.totalFees.toFixed(2)}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-gray-600">Amount Paid</p>
+                  <p className="text-gray-600">Amount Received</p>
                   <p className="font-bold text-green-600 text-sm sm:text-base">${studentData.amountPaid.toFixed(2)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-gray-600">Remaining</p>
+                  <p className="text-gray-600">Remaining Balance</p>
                   <p className={`font-bold text-sm sm:text-base ${studentData.feesBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
                     ${studentData.feesBalance.toFixed(2)}
                   </p>

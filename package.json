@@ -6,13 +6,18 @@
   "scripts": {
     "dev": "node scripts/run-vite-rest.mjs dev",
     "dev:rest": "node scripts/dev-rest-stack.mjs",
+    "dev:rest:e2e": "node scripts/dev-rest-e2e.mjs",
     "dev:rest:backend": "npm --prefix examples/rest-backend run dev",
     "dev:rest:frontend": "node scripts/run-vite-rest.mjs dev",
-    "build": "node scripts/run-vite-rest.mjs build",
-    "build:rest": "node scripts/run-vite-rest.mjs build",
+    "check:rest": "npm --prefix examples/rest-backend run check",
+    "build": "npm run check:rest && node scripts/run-vite-rest.mjs build",
+    "build:rest": "npm run check:rest && node scripts/run-vite-rest.mjs build",
+    "test:integration": "npm run check:rest && npm --prefix examples/rest-backend run integration-test && vitest run --run src/App.test.tsx src/components/Login.test.tsx src/components/Dashboard.test.tsx src/components/AdminPanel.test.tsx",
+    "test:e2e": "playwright test",
+    "test:all": "npm run test && npm run test:integration && npm run test:e2e",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --max-warnings 0",
-    "test": "vitest run",
+    "test": "npm run check:rest && vitest run",
     "preview": "node scripts/run-vite-rest.mjs preview"
   },
   "dependencies": {
@@ -26,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",

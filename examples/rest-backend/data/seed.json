@@ -9,36 +9,33 @@
         {
             "id": "admin-1",
             "email": "admin@example.com",
+            "phone_number": "+256700100001",
             "password": "Permit@2026",
             "role": "admin",
+            "admin_scope": "super-admin",
             "name": "Administrator",
             "campus_id": "main-campus",
             "campus_name": "Main Campus"
         },
         {
-            "id": "student-1",
-            "email": "student1@example.com",
+            "id": "admin-2",
+            "email": "registrar@example.com",
+            "phone_number": "+256700100002",
             "password": "Permit@2026",
-            "role": "student",
-            "name": "John Doe",
+            "role": "admin",
+            "admin_scope": "registrar",
+            "name": "Registrar Office",
             "campus_id": "main-campus",
             "campus_name": "Main Campus"
         },
         {
-            "id": "student-2",
-            "email": "student2@example.com",
+            "id": "admin-3",
+            "email": "finance@example.com",
+            "phone_number": "+256700100003",
             "password": "Permit@2026",
-            "role": "student",
-            "name": "Jane Smith",
-            "campus_id": "main-campus",
-            "campus_name": "Main Campus"
-        },
-        {
-            "id": "student-3",
-            "email": "student3@example.com",
-            "password": "Permit@2026",
-            "role": "student",
-            "name": "Grace Walker",
+            "role": "admin",
+            "admin_scope": "finance",
+            "name": "Finance Office",
             "campus_id": "main-campus",
             "campus_name": "Main Campus"
         }
@@ -47,6 +44,7 @@
         {
             "id": "admin-1",
             "email": "admin@example.com",
+            "phone_number": "+256700100001",
             "role": "admin",
             "name": "Administrator",
             "campus_id": "main-campus",
@@ -63,105 +61,47 @@
             "amount_paid": 0
         },
         {
-            "id": "student-1",
-            "email": "student1@example.com",
-            "role": "student",
-            "name": "John Doe",
+            "id": "admin-2",
+            "email": "registrar@example.com",
+            "phone_number": "+256700100002",
+            "role": "admin",
+            "name": "Registrar Office",
             "campus_id": "main-campus",
             "campus_name": "Main Campus",
-            "student_id": "STU001",
-            "course": "Computer Science",
-            "exam_date": "2026-04-15",
-            "exam_time": "10:00 AM",
-            "venue": "Hall A",
-            "seat_number": "A-001",
-            "instructions": "Bring valid ID and arrive 30 minutes early.",
+            "student_id": null,
+            "course": null,
+            "exam_date": null,
+            "exam_time": null,
+            "venue": null,
+            "seat_number": null,
+            "instructions": null,
             "profile_image": null,
-            "exams": [
-                {
-                    "id": "student-1-exam-1",
-                    "title": "Computer Science Theory",
-                    "examDate": "2026-04-15",
-                    "examTime": "10:00 AM",
-                    "venue": "Hall A",
-                    "seatNumber": "A-001"
-                },
-                {
-                    "id": "student-1-exam-2",
-                    "title": "Computer Science Practical",
-                    "examDate": "2026-04-17",
-                    "examTime": "1:00 PM",
-                    "venue": "Lab 2",
-                    "seatNumber": "L2-014"
-                }
-            ],
-            "total_fees": 3000,
-            "amount_paid": 1500
+            "total_fees": 0,
+            "amount_paid": 0
         },
         {
-            "id": "student-2",
-            "email": "student2@example.com",
-            "role": "student",
-            "name": "Jane Smith",
+            "id": "admin-3",
+            "email": "finance@example.com",
+            "phone_number": "+256700100003",
+            "role": "admin",
+            "name": "Finance Office",
             "campus_id": "main-campus",
             "campus_name": "Main Campus",
-            "student_id": "STU002",
-            "course": "Mathematics",
-            "exam_date": "2026-04-16",
-            "exam_time": "2:00 PM",
-            "venue": "Hall B",
-            "seat_number": "B-002",
-            "instructions": "No calculators allowed. Bring pencils only.",
+            "student_id": null,
+            "course": null,
+            "exam_date": null,
+            "exam_time": null,
+            "venue": null,
+            "seat_number": null,
+            "instructions": null,
             "profile_image": null,
-            "exams": [
-                {
-                    "id": "student-2-exam-1",
-                    "title": "Mathematics Paper I",
-                    "examDate": "2026-04-16",
-                    "examTime": "2:00 PM",
-                    "venue": "Hall B",
-                    "seatNumber": "B-002"
-                }
-            ],
-            "total_fees": 3000,
-            "amount_paid": 3000
-        },
-        {
-            "id": "student-3",
-            "email": "student3@example.com",
-            "role": "student",
-            "name": "Grace Walker",
-            "campus_id": "main-campus",
-            "campus_name": "Main Campus",
-            "student_id": "STU003",
-            "course": "Information Systems",
-            "exam_date": "2026-04-18",
-            "exam_time": "8:30 AM",
-            "venue": "Hall C",
-            "seat_number": "C-014",
-            "instructions": "Bring your permit and student card.",
-            "profile_image": null,
-            "exams": [
-                {
-                    "id": "student-3-exam-1",
-                    "title": "Information Systems Analysis",
-                    "examDate": "2026-04-18",
-                    "examTime": "8:30 AM",
-                    "venue": "Hall C",
-                    "seatNumber": "C-014"
-                },
-                {
-                    "id": "student-3-exam-2",
-                    "title": "Database Systems",
-                    "examDate": "2026-04-20",
-                    "examTime": "11:30 AM",
-                    "venue": "Hall D",
-                    "seatNumber": "D-007"
-                }
-            ],
-            "total_fees": 3000,
-            "amount_paid": 3000
+            "total_fees": 0,
+            "amount_paid": 0
         }
     ],
+    "systemSettings": {
+        "local_student_fee": 3000,
+        "international_student_fee": 6000
+    },
     "activityLogs": []
 }
