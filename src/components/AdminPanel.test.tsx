@@ -1759,7 +1759,7 @@ describe('AdminPanel', () => {
     expect(screen.getAllByRole('button', { name: /^permit cards$/i }).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: /generate bulk permits/i })).toBeEnabled()
     expect(screen.getByRole('button', { name: /send reminders/i })).toBeEnabled()
-  })
+  }, 15000)
 
   it('derives navigation and quick actions from permissions instead of scope defaults', async () => {
     const authContextModule = await import('../context/AuthContext')

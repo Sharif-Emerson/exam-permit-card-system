@@ -96,9 +96,19 @@ You can also run the pieces separately:
 - `npm run typecheck` runs TypeScript checks
 - `npm run lint` runs ESLint
 - `npm run test` runs the backend syntax check first, then the Vitest suite
+- `npm run test:unit` runs focused unit tests for shared request/auth logic
+- `npm run test:component` runs component-focused React tests
 - `npm run test:integration` runs the backend API integration script plus the main frontend flow tests
+- `npm run test:api` runs dedicated backend API contract checks
+- `npm run test:security` runs backend authorization and CORS security checks
+- `npm run test:performance` runs lightweight backend response-time smoke checks
+- `npm run test:accessibility` runs automated accessibility checks against key screens
+- `npm run test:snapshot` validates the current permit-card snapshot baseline
+- `npm run test:snapshot:update` refreshes the permit-card snapshot baseline when the UI intentionally changes
+- `npm run test:regression` runs high-risk regression coverage for request, dashboard, and admin flows
 - `npm run test:e2e` runs real browser end-to-end tests with Playwright
-- `npm run test:all` runs unit, integration, and browser E2E suites together
+- `npm run test:system` runs the full-stack API, integration, and browser system flow checks
+- `npm run test:all` runs the full testing matrix across unit, component, accessibility, snapshot, regression, security, performance, and system suites
 
 ## Backend Contract
 

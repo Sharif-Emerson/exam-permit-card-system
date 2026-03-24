@@ -1,0 +1,893 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
+<div
+  class="min-h-screen bg-slate-100 py-4 sm:py-8 print:bg-white"
+>
+  <div
+    class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8"
+  >
+    <div
+      class="flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center mb-4 no-print"
+    >
+      <div>
+        <h1
+          class="text-2xl font-bold text-slate-900"
+        >
+          Welcome back, 
+          Snapshot Student
+        </h1>
+      </div>
+      <div
+        class="flex flex-col sm:flex-row gap-3"
+      >
+        <button
+          class="inline-flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors"
+          type="button"
+        >
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
+            />
+            <path
+              d="M3 3v5h5"
+            />
+            <path
+              d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"
+            />
+            <path
+              d="M16 16h5v5"
+            />
+          </svg>
+          Refresh
+        </button>
+        <button
+          class="inline-flex items-center justify-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors"
+          type="button"
+        >
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"
+            />
+            <polyline
+              points="16 17 21 12 16 7"
+            />
+            <line
+              x1="21"
+              x2="9"
+              y1="12"
+              y2="12"
+            />
+          </svg>
+          Logout
+        </button>
+      </div>
+    </div>
+    <div
+      class="permit-sheet bg-amber-50 rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border border-amber-200"
+    >
+      <div
+        class="text-center mb-6 sm:mb-8 border-b border-slate-200 pb-5 print:hidden"
+      >
+        <p
+          class="text-xs uppercase tracking-[0.3em] text-slate-500 mb-2"
+        >
+          Official Examination Access Card
+        </p>
+        <div
+          class="flex items-center gap-3 justify-center text-center"
+        >
+          <div
+            class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 via-green-600 to-lime-500 shadow-md shadow-emerald-200"
+          >
+            <svg
+              class="h-6 w-6 text-white"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+              />
+              <path
+                d="m9 12 2 2 4-4"
+              />
+            </svg>
+          </div>
+          <div>
+            <div
+              class="text-2xl sm:text-3xl font-bold text-gray-900"
+            >
+              MNS INSTUTITE
+            </div>
+            <div
+              class="text-sm sm:text-base text-gray-600"
+            >
+              Secure examination permit portal
+            </div>
+          </div>
+        </div>
+        <p
+          class="mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700"
+        >
+          MNS INSTUTITE
+        </p>
+      </div>
+      <div
+        class="mb-5 hidden rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center print:block print:mb-4"
+      >
+        <p
+          class="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-800"
+        >
+          Institution
+        </p>
+        <p
+          class="mt-1 text-sm font-semibold text-emerald-900"
+        >
+          MNS INSTUTITE
+        </p>
+      </div>
+      <div
+        class="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 sm:gap-8 mb-6 sm:mb-8 print:grid-cols-1 print:gap-3 print:mb-4"
+      >
+        <div
+          class="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4 print:flex-row print:items-center print:justify-center print:space-y-0 print:space-x-3"
+        >
+          <img
+            alt="Profile"
+            class="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover print:w-14 print:h-14"
+            src="https://via.placeholder.com/150"
+          />
+          <div
+            class="text-center sm:text-left print:text-left"
+          >
+            <h2
+              class="text-lg sm:text-xl font-semibold text-gray-900 print:text-base"
+            >
+              Snapshot Student
+            </h2>
+            <p
+              class="text-sm sm:text-base text-gray-600 print:hidden"
+            >
+              SNAP001
+            </p>
+            <p
+              class="text-sm sm:text-base text-gray-600 print:hidden"
+            >
+              student@example.com
+            </p>
+          </div>
+        </div>
+        <div
+          class="space-y-2 print:hidden"
+        >
+          <div
+            class="flex items-center space-x-2"
+          >
+            <svg
+              class="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 flex-shrink-0"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"
+              />
+              <circle
+                cx="12"
+                cy="7"
+                r="4"
+              />
+            </svg>
+            <span
+              class="font-medium text-sm sm:text-base"
+            >
+              Course:
+            </span>
+            <span
+              class="text-sm sm:text-base"
+            >
+              Computer Science
+            </span>
+          </div>
+          <div
+            class="flex items-center space-x-2"
+          >
+            <span
+              class="font-medium text-sm sm:text-base"
+            >
+              Program:
+            </span>
+            <span
+              class="text-sm sm:text-base"
+            >
+              BSc Computer Science
+            </span>
+          </div>
+          <div
+            class="flex items-center space-x-2"
+          >
+            <span
+              class="font-medium text-sm sm:text-base"
+            >
+              College:
+            </span>
+            <span
+              class="text-sm sm:text-base"
+            >
+              College of Computing
+            </span>
+          </div>
+          <div
+            class="flex items-center space-x-2"
+          >
+            <span
+              class="font-medium text-sm sm:text-base"
+            >
+              Department:
+            </span>
+            <span
+              class="text-sm sm:text-base"
+            >
+              Computer Science Department
+            </span>
+          </div>
+          <div
+            class="flex items-center space-x-2"
+          >
+            <span
+              class="font-medium text-sm sm:text-base"
+            >
+              Semester:
+            </span>
+            <span
+              class="text-sm sm:text-base"
+            >
+              Semester 1 2026/2027
+            </span>
+          </div>
+          <div
+            class="flex items-center space-x-2"
+          >
+            <span
+              class="font-medium text-sm sm:text-base"
+            >
+              Student Category:
+            </span>
+            <span
+              class="text-sm sm:text-base"
+            >
+              International
+            </span>
+          </div>
+          <div
+            class="flex items-center space-x-2"
+          >
+            <span
+              class="font-medium text-sm sm:text-base"
+            >
+              Phone:
+            </span>
+            <span
+              class="text-sm sm:text-base"
+            >
+              +256700123456
+            </span>
+          </div>
+          <div
+            class="flex items-center space-x-2"
+          >
+            <span
+              class="font-medium text-sm sm:text-base"
+            >
+              Remaining Balance:
+            </span>
+            <span
+              class="font-semibold text-sm sm:text-base text-green-600"
+            >
+              $
+              0.00
+            </span>
+          </div>
+        </div>
+      </div>
+      <div
+        class="mb-5 hidden rounded-xl border border-slate-200 bg-white px-4 py-3 print:block print:mb-4"
+      >
+        <div
+          class="grid grid-cols-2 gap-2 text-[11px] text-slate-700"
+        >
+          <p>
+            <span
+              class="font-semibold"
+            >
+              Program:
+            </span>
+             
+            BSc Computer Science
+          </p>
+          <p>
+            <span
+              class="font-semibold"
+            >
+              College:
+            </span>
+             
+            College of Computing
+          </p>
+          <p>
+            <span
+              class="font-semibold"
+            >
+              Department:
+            </span>
+             
+            Computer Science Department
+          </p>
+          <p>
+            <span
+              class="font-semibold"
+            >
+              Semester:
+            </span>
+             
+            Semester 1 2026/2027
+          </p>
+          <p>
+            <span
+              class="font-semibold"
+            >
+              Category:
+            </span>
+             
+            International
+          </p>
+          <p>
+            <span
+              class="font-semibold"
+            >
+              Phone:
+            </span>
+             
+            +256700123456
+          </p>
+        </div>
+      </div>
+      <div
+        class="hidden print:flex print:items-center print:justify-center print:mb-4"
+      >
+        <div
+          class="rounded-full border px-4 py-2 text-sm font-semibold border-green-300 bg-green-50 text-green-700"
+        >
+          Cleared Status: 
+          Cleared
+        </div>
+      </div>
+      <div
+        class="bg-gray-50 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8 print:bg-transparent print:p-0"
+      >
+        <div
+          class="flex items-center justify-between gap-4 mb-4 print:hidden"
+        >
+          <h3
+            class="text-base sm:text-lg font-semibold text-gray-900"
+          >
+            Assigned Exams
+          </h3>
+          <span
+            class="text-xs sm:text-sm text-slate-500"
+          >
+            1
+             scheduled
+          </span>
+        </div>
+        <div
+          class="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:mb-2 print:rounded-lg print:p-3 print:shadow-none"
+        >
+          <h4
+            class="mb-2 text-sm font-semibold text-slate-900 print:text-sm"
+          >
+            Registered Course Units
+          </h4>
+          <div
+            class="flex flex-wrap gap-2 print:gap-1.5"
+          >
+            <span
+              class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700 print:bg-slate-50 print:text-[10px]"
+            >
+              CSC 401 - Compiler Construction
+            </span>
+            <span
+              class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700 print:bg-slate-50 print:text-[10px]"
+            >
+              CSC 402 - Distributed Systems
+            </span>
+          </div>
+        </div>
+        <div
+          class="grid grid-cols-1 gap-4 print:gap-2"
+        >
+          <div
+            class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:rounded-lg print:p-3 print:shadow-none"
+          >
+            <h4
+              class="text-sm sm:text-base font-semibold text-slate-900 mb-3 print:text-sm print:mb-2"
+            >
+              Computer Science Theory
+            </h4>
+            <div
+              class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 print:gap-2"
+            >
+              <div
+                class="flex items-center space-x-2"
+              >
+                <svg
+                  class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="18"
+                    rx="2"
+                    ry="2"
+                    width="18"
+                    x="3"
+                    y="4"
+                  />
+                  <line
+                    x1="16"
+                    x2="16"
+                    y1="2"
+                    y2="6"
+                  />
+                  <line
+                    x1="8"
+                    x2="8"
+                    y1="2"
+                    y2="6"
+                  />
+                  <line
+                    x1="3"
+                    x2="21"
+                    y1="10"
+                    y2="10"
+                  />
+                </svg>
+                <span
+                  class="font-medium text-sm sm:text-base print:text-xs"
+                >
+                  Date:
+                </span>
+                <span
+                  class="text-sm sm:text-base print:text-xs"
+                >
+                  2026-04-15
+                </span>
+              </div>
+              <div
+                class="flex items-center space-x-2"
+              >
+                <svg
+                  class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                  />
+                  <polyline
+                    points="12 6 12 12 16 14"
+                  />
+                </svg>
+                <span
+                  class="font-medium text-sm sm:text-base print:text-xs"
+                >
+                  Time:
+                </span>
+                <span
+                  class="text-sm sm:text-base print:text-xs"
+                >
+                  10:00 AM
+                </span>
+              </div>
+              <div
+                class="flex items-center space-x-2"
+              >
+                <svg
+                  class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"
+                  />
+                  <circle
+                    cx="12"
+                    cy="10"
+                    r="3"
+                  />
+                </svg>
+                <span
+                  class="font-medium text-sm sm:text-base print:text-xs"
+                >
+                  Venue:
+                </span>
+                <span
+                  class="text-sm sm:text-base print:text-xs"
+                >
+                  Hall A
+                </span>
+              </div>
+              <div
+                class="flex items-center space-x-2"
+              >
+                <svg
+                  class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
+                  />
+                  <path
+                    d="M13 5v2"
+                  />
+                  <path
+                    d="M13 17v2"
+                  />
+                  <path
+                    d="M13 11v2"
+                  />
+                </svg>
+                <span
+                  class="font-medium text-sm sm:text-base print:text-xs"
+                >
+                  Seat:
+                </span>
+                <span
+                  class="text-sm sm:text-base print:text-xs"
+                >
+                  A-001
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:p-5 print:mb-4 print:rounded-lg print:border-slate-200 print:bg-white print:p-3"
+      >
+        <div
+          class="mb-3 flex items-center justify-between gap-3"
+        >
+          <h4
+            class="text-sm font-semibold uppercase tracking-[0.18em] text-amber-900 print:text-xs print:tracking-[0.16em]"
+          >
+            General Examination Rules
+          </h4>
+          <span
+            class="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700 print:border print:border-slate-200 print:bg-slate-50 print:text-slate-600"
+          >
+            Read Before Entry
+          </span>
+        </div>
+        <ul
+          class="space-y-2 text-sm leading-6 text-amber-900 print:space-y-1.5 print:text-[11px] print:leading-5 print:text-slate-800"
+        >
+          <li
+            class="flex gap-2"
+          >
+            <span
+              aria-hidden="true"
+              class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-500"
+            />
+            <span>
+              Arrive at the examination venue at least 30 minutes before the scheduled start time.
+            </span>
+          </li>
+          <li
+            class="flex gap-2"
+          >
+            <span
+              aria-hidden="true"
+              class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-500"
+            />
+            <span>
+              Bring a valid student ID card and this permit for verification before entry.
+            </span>
+          </li>
+          <li
+            class="flex gap-2"
+          >
+            <span
+              aria-hidden="true"
+              class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-500"
+            />
+            <span>
+              Sit only in the seat assigned on the permit or as directed by invigilators.
+            </span>
+          </li>
+          <li
+            class="flex gap-2"
+          >
+            <span
+              aria-hidden="true"
+              class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-500"
+            />
+            <span>
+              Keep phones, smart devices, notes, and other unauthorized materials out of reach during the exam.
+            </span>
+          </li>
+          <li
+            class="flex gap-2"
+          >
+            <span
+              aria-hidden="true"
+              class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-500"
+            />
+            <span>
+              Follow all invigilator instructions and maintain silence throughout the examination period.
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div
+        class="rounded-lg p-3 sm:p-4 mb-6 sm:mb-8 border-2 print:hidden bg-green-50 border-green-200"
+      >
+        <h4
+          class="font-semibold mb-3 sm:mb-4 text-sm sm:text-base text-green-800"
+        >
+          Fees Status
+        </h4>
+        <div
+          class="space-y-3"
+        >
+          <div
+            class="grid grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm"
+          >
+            <div
+              class="text-center"
+            >
+              <p
+                class="text-gray-600"
+              >
+                Expected Fees
+              </p>
+              <p
+                class="font-bold text-gray-900 text-sm sm:text-base"
+              >
+                $
+                3000.00
+              </p>
+            </div>
+            <div
+              class="text-center"
+            >
+              <p
+                class="text-gray-600"
+              >
+                Amount Received
+              </p>
+              <p
+                class="font-bold text-green-600 text-sm sm:text-base"
+              >
+                $
+                3000.00
+              </p>
+            </div>
+            <div
+              class="text-center"
+            >
+              <p
+                class="text-gray-600"
+              >
+                Remaining
+              </p>
+              <p
+                class="text-gray-600"
+              >
+                Remaining Balance
+              </p>
+              <p
+                class="font-bold text-sm sm:text-base text-green-600"
+              >
+                $
+                0.00
+              </p>
+            </div>
+          </div>
+          <div
+            class="w-full bg-gray-200 rounded-full h-2"
+          >
+            <progress
+              class="payment-progress payment-progress-clear"
+              max="100"
+              value="100"
+            />
+          </div>
+          <div
+            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+          >
+            <span
+              class="text-xs sm:text-sm font-medium text-green-600"
+            >
+              All Clear
+            </span>
+            <span
+              class="text-xs sm:text-sm text-gray-600"
+            >
+              100.0
+              % Paid
+            </span>
+          </div>
+        </div>
+        <p
+          class="text-green-700 mt-3 text-xs sm:text-sm"
+        >
+          All fees have been paid. You are eligible to take the examination.
+        </p>
+        <p
+          class="mt-3 text-xs sm:text-sm text-slate-600"
+        >
+          Prints this month: 
+          0
+          /
+          2
+        </p>
+      </div>
+      <div
+        class="text-center mb-8 print:mb-0 print:mt-4"
+      >
+        <h4
+          class="font-semibold text-gray-900 mb-4 print:hidden"
+        >
+          Verification QR Code
+        </h4>
+        <div
+          class="inline-flex p-3 rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-lg print:p-2 print:shadow-none"
+        >
+          <img
+            alt="Verification QR code"
+            class="h-32 w-32 print:h-24 print:w-24"
+            src="data:image/png;base64,permit-qr"
+          />
+        </div>
+      </div>
+      <div
+        class="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 no-print"
+      >
+        <button
+          class="flex items-center justify-center space-x-2 px-4 sm:px-6 py-2 sm:py-2 rounded-lg transition-colors text-sm sm:text-base bg-blue-600 text-white hover:bg-blue-700"
+          title=""
+        >
+          <svg
+            class="w-4 h-4 sm:w-5 sm:h-5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <polyline
+              points="6 9 6 2 18 2 18 9"
+            />
+            <path
+              d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+            />
+            <rect
+              height="8"
+              width="12"
+              x="6"
+              y="14"
+            />
+          </svg>
+          <span>
+            Print Permit
+          </span>
+        </button>
+        <button
+          class="flex items-center justify-center space-x-2 px-4 sm:px-6 py-2 sm:py-2 rounded-lg transition-colors text-sm sm:text-base bg-green-600 text-white hover:bg-green-700"
+          title=""
+        >
+          <svg
+            class="w-4 h-4 sm:w-5 sm:h-5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+            />
+            <polyline
+              points="7 10 12 15 17 10"
+            />
+            <line
+              x1="12"
+              x2="12"
+              y1="15"
+              y2="3"
+            />
+          </svg>
+          <span>
+            Download PDF
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+`;

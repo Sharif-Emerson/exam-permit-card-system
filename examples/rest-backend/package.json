@@ -7,8 +7,11 @@
         "dev": "node --watch server.js",
         "start": "node server.js",
         "check": "node --check server.js",
+        "api-test": "node scripts/api-test.js",
         "integration-test": "node scripts/integration-test.js",
+        "performance-test": "node scripts/performance-test.js",
         "reset-data": "node scripts/reset-data.js",
+        "security-test": "node scripts/security-test.js",
         "smoke-test": "node scripts/smoke-test.js"
     },
     "dependencies": {
