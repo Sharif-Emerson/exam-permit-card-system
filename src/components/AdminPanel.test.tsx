@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, vi } from 'vitest'
 import type { AuthUser } from '../types'
@@ -628,6 +629,75 @@ describe('AdminPanel', () => {
     expect(await screen.findByText('John Doe')).toBeTruthy()
     expect(await screen.findByText('Grace Walker')).toBeTruthy()
     expect(screen.queryByText(/student filters are active/i)).toBeNull()
+  })
+
+  it('opens the notification center from the admin header and routes alerts to the student queue', async () => {
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: createAdminUser(),
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signOut,
+      refreshUser,
+    })
+
+    const profileServiceModule = await import('../services/profileService')
+    vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+
+    fetchStudentProfilesPage.mockResolvedValue(createStudentPage([
+      {
+        id: 'student-1',
+        email: 'student1@example.com',
+        role: 'student',
+        name: 'Outstanding Student',
+        studentId: 'STU001',
+        course: 'Computer Science',
+        examDate: '2026-04-15',
+        examTime: '10:00 AM',
+        venue: 'Hall A',
+        seatNumber: 'A-001',
+        instructions: 'Bring valid ID.',
+        profileImage: 'https://via.placeholder.com/150',
+        exams: [],
+        totalFees: 3000,
+        amountPaid: 1000,
+        feesBalance: 2000,
+        canPrintPermit: false,
+        printAccessMessage: 'Outstanding balance remains.',
+        permitPrintsUsedThisMonth: 0,
+        permitPrintsRemainingThisMonth: 2,
+        permitPrintGrantMonth: null,
+        permitPrintGrantsRemaining: 0,
+      },
+    ]))
+    fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([]))
+
+    const { default: AdminPanel } = await import('./AdminPanel')
+    const user = userEvent.setup()
+
+    render(<AdminPanel />)
+
+    await waitFor(() => {
+      expect(fetchStudentProfilesPage).toHaveBeenCalled()
+    })
+
+    await user.click(screen.getByRole('button', { name: /^dashboard$/i }))
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: /open notification center/i }))
+    const notificationCenter = await screen.findByRole('dialog', { name: /admin notifications/i })
+    expect(notificationCenter).toBeTruthy()
+    expect(within(notificationCenter).getByText(/pending approvals require action/i)).toBeTruthy()
+
+    await user.click(within(notificationCenter).getByRole('button', { name: /review students/i }))
+
+    expect(await screen.findByRole('heading', { name: 'Students' })).toBeTruthy()
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /admin notifications/i })).toBeNull()
+    })
   })
 
   it('edits a student profile from the permit card view', async () => {

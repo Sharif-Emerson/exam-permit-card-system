@@ -420,6 +420,7 @@ export default function AdminPanel() {
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null)
   const [savingCreate, setSavingCreate] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false)
   const [bulkPrintStudents, setBulkPrintStudents] = useState<StudentProfile[]>([])
   const [bulkPrintQrCodes, setBulkPrintQrCodes] = useState<Record<string, string>>({})
   const [bulkPrinting, setBulkPrinting] = useState(false)
@@ -793,6 +794,31 @@ export default function AdminPanel() {
       },
     }] : []),
   ]
+  const notificationCenterAlerts: DashboardAlert[] = [
+    ...dashboardAlerts,
+    ...(canManageSupportRequests && openSupportRequestCount > 0 ? [{
+      id: 'support-queue',
+      title: 'Support queue needs review',
+      message: `${openSupportRequestCount} support request(s) are still open or in progress.`,
+      tone: 'info' as const,
+      actionLabel: 'Open Support',
+      onAction: () => navigate('support'),
+    }] : []),
+    ...(canViewPermitActivity && permitEventCount > 0 ? [{
+      id: 'permit-events',
+      title: 'Permit activity ready for review',
+      message: `${permitEventCount} permit print/download event(s) are available in the activity log.`,
+      tone: 'info' as const,
+      actionLabel: 'Open Permit Activity',
+      onAction: () => navigate('permits'),
+    }] : []),
+  ]
+  const notificationBadgeCount = notificationCenterAlerts.length
+
+  function handleNotificationAlertAction(action?: () => void) {
+    setShowNotificationCenter(false)
+    action?.()
+  }
 
   async function handleGenerateBulkPermits() {
     if (!adminCapability.canGenerateBulkPermits) {
@@ -1693,6 +1719,7 @@ export default function AdminPanel() {
     }
 
     setActiveSection(section)
+    setShowNotificationCenter(false)
     setSidebarOpen(false)
   }
 
@@ -1930,15 +1957,82 @@ export default function AdminPanel() {
               </span>
             </button>
 
-            {/* Notification bell */}
-            <button type="button" className="relative text-gray-500 hover:text-gray-700 dark:text-slate-300 dark:hover:text-white" title="Outstanding balances">
-              <Bell className="h-5 w-5" />
-              {outstandingStudents > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
-                  {outstandingStudents > 9 ? '9+' : String(outstandingStudents)}
-                </span>
+            <div className="relative">
+              <button
+                type="button"
+                title="Open notification center"
+                aria-label="Open notification center"
+                aria-haspopup="dialog"
+                aria-controls="admin-notification-center"
+                onClick={() => setShowNotificationCenter((current) => !current)}
+                className="relative text-gray-500 hover:text-gray-700 dark:text-slate-300 dark:hover:text-white"
+              >
+                <Bell className="h-5 w-5" />
+                {notificationBadgeCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                    {notificationBadgeCount > 9 ? '9+' : String(notificationBadgeCount)}
+                  </span>
+                )}
+              </button>
+
+              {showNotificationCenter && (
+                <div
+                  id="admin-notification-center"
+                  role="dialog"
+                  aria-label="Admin notifications"
+                  className="absolute right-0 top-11 z-20 w-80 rounded-2xl border border-gray-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-950"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Notifications</h2>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">Operational alerts, support queue updates, and permit activity notices.</p>
+                    </div>
+                    <button
+                      type="button"
+                      title="Close notification center"
+                      aria-label="Close notification center"
+                      onClick={() => setShowNotificationCenter(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {notificationCenterAlerts.length === 0 ? (
+                    <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                      No new notifications right now.
+                    </div>
+                  ) : (
+                    <div className="mt-4 space-y-3">
+                      {notificationCenterAlerts.map((alert) => (
+                        <div
+                          key={alert.id}
+                          className={`rounded-xl border p-3 ${
+                            alert.tone === 'critical'
+                              ? 'border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/30'
+                              : alert.tone === 'warning'
+                                ? 'border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30'
+                                : 'border-blue-200 bg-blue-50 dark:border-blue-900/60 dark:bg-blue-950/30'
+                          }`}
+                        >
+                          <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">{alert.title}</p>
+                          <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-slate-300">{alert.message}</p>
+                          {alert.actionLabel && alert.onAction && (
+                            <button
+                              type="button"
+                              onClick={() => handleNotificationAlertAction(alert.onAction)}
+                              className="mt-3 rounded-lg border border-white/80 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                              {alert.actionLabel}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
-            </button>
+            </div>
 
             {/* Refresh */}
             <button
