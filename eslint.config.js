@@ -11,7 +11,7 @@ export default [
   },
   js.configs.recommended,
   {
-    files: ['scripts/**/*.js', 'scripts/**/*.mjs', 'examples/**/*.js', 'examples/**/*.mjs'],
+    files: ['scripts/**/*.js', 'scripts/**/*.mjs', 'examples/**/*.js', 'examples/**/*.mjs', 'api/**/*.js'],
     languageOptions: {
       globals: {
         ...globals.node,

@@ -261,6 +261,8 @@ This project is configured as a single-page application for both:
 
 Both configs rewrite frontend routes to `index.html` so client-side routing works in production.
 
+On Vercel, the SPA rewrite must not be treated as an API proxy. If `/api/*` is not backed by a real service, browser `POST` requests such as `/api/auth/login` will fail in preview or production.
+
 For the app to work on any device anywhere, the backend must also be reachable from the public internet. There are two supported deployment models:
 
 1. Set `VITE_API_BASE_URL` to a public backend URL such as `https://api.yourdomain.com`
@@ -280,6 +282,8 @@ To deploy:
    - `APP_DB_PATH`
    - `SESSION_TTL_HOURS`
    - `CORS_ALLOWED_ORIGINS`
+
+For Vercel Preview deployments, this repository now includes a same-origin `/api` proxy function. Set `API_BASE_URL=https://your-backend.example.com` in the Vercel project settings for `Preview` and `Production` so the proxy knows where to forward requests. If `API_BASE_URL` is missing, `/api/*` returns a deployment error instead of silently falling through to the SPA.
 
 If the frontend is public but the backend is still only running on your laptop, users in other locations will never be able to fetch data from it.
 

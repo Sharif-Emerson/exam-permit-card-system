@@ -1,5 +1,29 @@
 import { apiBaseUrlCandidates } from '../../config/provider'
 
+function isVercelPreviewHost() {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  return window.location.hostname.endsWith('.vercel.app')
+}
+
+function getDeploymentHint(path: string, status: number) {
+  if (!path.startsWith('/auth/') && !path.startsWith('/profiles') && !path.startsWith('/permits/') && !path.startsWith('/admin-activity-logs') && !path.startsWith('/imports/')) {
+    return null
+  }
+
+  if (!isVercelPreviewHost()) {
+    return null
+  }
+
+  if (status !== 404 && status !== 405) {
+    return null
+  }
+
+  return 'This Vercel preview is serving the frontend without a reachable REST API. Configure the built-in /api proxy with API_BASE_URL pointing at your deployed backend, or proxy /api to the backend from the same origin.'
+}
+
 async function parseJsonResponse(response: Response) {
   const contentType = response.headers.get('content-type') ?? ''
 
@@ -18,7 +42,13 @@ function getUnavailableApiMessage(status: number) {
   return null
 }
 
-function getErrorMessage(payload: unknown, status: number) {
+function getErrorMessage(path: string, payload: unknown, status: number) {
+  const deploymentHint = getDeploymentHint(path, status)
+
+  if (deploymentHint) {
+    return deploymentHint
+  }
+
   const unavailableApiMessage = getUnavailableApiMessage(status)
 
   if (unavailableApiMessage) {
@@ -49,7 +79,7 @@ export async function requestWithApiFallback(path: string, init?: RequestInit) {
       const payload = await parseJsonResponse(response)
 
       if (!response.ok) {
-        throw new Error(getErrorMessage(payload, response.status))
+        throw new Error(getErrorMessage(path, payload, response.status))
       }
 
       return payload
