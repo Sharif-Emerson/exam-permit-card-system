@@ -7,6 +7,18 @@
 			"command": "npm.cmd run build",
 			"isBackground": false,
 			"group": "build"
+		},
+		{
+			"label": "dev:rest full stack",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": [
+				"run",
+				"dev:rest"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
 		}
 	]
 }
