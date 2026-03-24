@@ -14,7 +14,14 @@ describe('PermitCard', () => {
           role: 'student',
           name: 'John Doe',
           studentId: 'STU001',
+          studentCategory: 'international',
+          phoneNumber: '+256700123456',
           course: 'Computer Science',
+          program: 'BSc Computer Science',
+          college: 'College of Computing',
+          department: 'Computer Science Department',
+          semester: 'Semester 1 2026/2027',
+          courseUnits: ['CSC 401 - Compiler Construction'],
           examDate: '2026-04-15',
           examTime: '10:00 AM',
           venue: 'Hall A',
@@ -46,6 +53,9 @@ describe('PermitCard', () => {
 
     expect(screen.getByText('John Doe')).toBeTruthy()
     expect(screen.getByText('Computer Science Theory')).toBeTruthy()
+    expect(screen.getAllByText(/college of computing/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/international/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/\+256700123456/i).length).toBeGreaterThan(0)
     expect(screen.getByText('General Examination Rules')).toBeTruthy()
     for (const rule of generalExamRules) {
       expect(screen.getByText(rule)).toBeTruthy()

@@ -13,6 +13,7 @@ import type {
   StudentListPage,
   StudentListQuery,
   StudentProfile,
+  TrashedStudentProfile,
   SupportContact,
   SystemFeeSettings,
   SupportRequest,
@@ -92,6 +93,11 @@ function toDatabaseProfileRow(payload: unknown): DatabaseProfileRow {
         ? JSON.stringify(exams)
         : null,
     exams,
+    monthly_print_count: record.monthly_print_count == null ? (record.monthlyPrintCount == null ? null : Number(record.monthlyPrintCount)) : Number(record.monthly_print_count),
+    monthly_print_limit: record.monthly_print_limit == null ? (record.monthlyPrintLimit == null ? null : Number(record.monthlyPrintLimit)) : Number(record.monthly_print_limit),
+    granted_prints_remaining: record.granted_prints_remaining == null ? (record.grantedPrintsRemaining == null ? null : Number(record.grantedPrintsRemaining)) : Number(record.granted_prints_remaining),
+    can_print_permit: typeof record.can_print_permit === 'boolean' ? record.can_print_permit : typeof record.canPrintPermit === 'boolean' ? record.canPrintPermit : null,
+    print_access_message: record.print_access_message == null ? (record.printAccessMessage == null ? null : String(record.printAccessMessage)) : String(record.print_access_message),
     total_fees: Number(record.total_fees ?? record.totalFees ?? 0),
     amount_paid: Number(record.amount_paid ?? record.amountPaid ?? 0),
   }
@@ -149,6 +155,28 @@ function toStudentListPage(payload: unknown): StudentListPage {
     totalStudents: Number(summary.totalStudents ?? items.length) || items.length,
     clearedStudents: Number(summary.clearedStudents ?? items.filter((student) => student.feesBalance === 0).length) || 0,
     outstandingStudents: Number(summary.outstandingStudents ?? items.filter((student) => student.feesBalance > 0).length) || 0,
+  }
+}
+
+function toTrashedStudentProfile(payload: unknown): TrashedStudentProfile {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('The API returned an invalid trashed student payload.')
+  }
+
+  const record = payload as Record<string, unknown>
+
+  return {
+    id: String(record.id ?? ''),
+    profileId: String(record.profile_id ?? record.profileId ?? ''),
+    role: 'student',
+    name: String(record.name ?? ''),
+    email: String(record.email ?? ''),
+    studentId: record.student_id == null ? (record.studentId == null ? undefined : String(record.studentId)) : String(record.student_id),
+    deletedAt: String(record.deleted_at ?? record.deletedAt ?? ''),
+    purgeAfterAt: String(record.purge_after_at ?? record.purgeAfterAt ?? ''),
+    deletedByAdminId: record.deleted_by_admin_id == null ? (record.deletedByAdminId == null ? null : String(record.deletedByAdminId)) : String(record.deleted_by_admin_id),
+    restoredAt: record.restored_at == null ? (record.restoredAt == null ? null : String(record.restoredAt)) : String(record.restored_at),
+    restoredByAdminId: record.restored_by_admin_id == null ? (record.restoredByAdminId == null ? null : String(record.restoredByAdminId)) : String(record.restored_by_admin_id),
   }
 }
 
@@ -283,6 +311,10 @@ export const restDataAdapter: DataAdapter = {
 
     const payload = await request(`/profiles?${params.toString()}`, { method: 'GET' })
     return toStudentListPage(payload)
+  },
+  async fetchTrashedStudentProfiles(): Promise<TrashedStudentProfile[]> {
+    const payload = await request('/profiles-trash', { method: 'GET' })
+    return extractCollection(payload).map(toTrashedStudentProfile)
   },
   async fetchAdminActivityLogs(): Promise<AdminActivityLog[]> {
     const payload = await request('/admin-activity-logs', { method: 'GET' })
@@ -424,6 +456,21 @@ export const restDataAdapter: DataAdapter = {
     await request(`/profiles/${studentId}`, {
       method: 'DELETE',
     })
+  },
+  async restoreStudentProfile(trashId: string, _adminId: string): Promise<StudentProfile> {
+    const result = await request(`/profiles-trash/${trashId}/restore`, {
+      method: 'POST',
+    })
+
+    return ensureStudentProfile(mapProfile(toDatabaseProfileRow(result)))
+  },
+  async grantStudentPermitPrintAccess(studentId: string, additionalPrints: number, _adminId: string): Promise<StudentProfile> {
+    const result = await request(`/profiles/${studentId}/permit-print-grants`, {
+      method: 'POST',
+      body: JSON.stringify({ additionalPrints }),
+    })
+
+    return ensureStudentProfile(mapProfile(toDatabaseProfileRow(result)))
   },
   async recordPermitActivity(studentId: string, action: PermitActivityAction) {
     await request('/permit-activity', {

@@ -1,5 +1,4 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react'
-import QRCode from 'qrcode'
 import {
   Bell,
   Download,
@@ -54,6 +53,7 @@ type NotificationItem = {
 type SettingsDraft = {
   name: string
   email: string
+  phoneNumber: string
   profileImage: string
   currentPassword: string
   password: string
@@ -333,6 +333,7 @@ export default function Dashboard() {
   const [settingsDraft, setSettingsDraft] = useState<SettingsDraft>({
     name: '',
     email: '',
+    phoneNumber: '',
     profileImage: '',
     currentPassword: '',
     password: '',
@@ -408,6 +409,7 @@ export default function Dashboard() {
           ...current,
           name: profile.name,
           email: profile.email,
+          phoneNumber: profile.phoneNumber ?? '',
           profileImage: profile.profileImage,
         }))
       }
@@ -515,17 +517,28 @@ export default function Dashboard() {
   }
 
   async function handlePrint() {
-    if (!studentData || studentData.feesBalance > 0) {
+    if (!studentData) {
+      return
+    }
+
+    if (studentData.feesBalance > 0) {
+      setError('Please clear all outstanding fees before printing your permit.')
+      return
+    }
+
+    if (studentData.canPrintPermit === false) {
+      setError(studentData.printAccessMessage || 'You have reached the monthly permit print limit. Contact administration for access.')
       return
     }
 
     try {
       await recordPermitActivity(studentData.id, 'print_permit')
-    } catch {
-      // Keep printing available even if telemetry fails.
+      await syncStudentProfile({ syncDrafts: false })
+      openPrintDialog()
+    } catch (printError) {
+      const nextError = printError instanceof Error ? printError.message : 'Unable to print your permit right now.'
+      setError(nextError)
     }
-
-    openPrintDialog()
   }
 
   async function handleSubmitSupportRequest(event: FormEvent<HTMLFormElement>) {
@@ -565,17 +578,28 @@ export default function Dashboard() {
   }
 
   async function handleDownload() {
-    if (!studentData || studentData.feesBalance > 0) {
+    if (!studentData) {
+      return
+    }
+
+    if (studentData.feesBalance > 0) {
+      setError('Please clear all outstanding fees before downloading your permit.')
+      return
+    }
+
+    if (studentData.canPrintPermit === false) {
+      setError(studentData.printAccessMessage || 'You have reached the monthly permit print limit. Contact administration for access.')
       return
     }
 
     try {
       await recordPermitActivity(studentData.id, 'download_permit')
-    } catch {
-      // Keep downloads available even if telemetry fails.
+      await syncStudentProfile({ syncDrafts: false })
+      openPrintDialog()
+    } catch (downloadError) {
+      const nextError = downloadError instanceof Error ? downloadError.message : 'Unable to download your permit right now.'
+      setError(nextError)
     }
-
-    openPrintDialog()
   }
 
   function handleDocumentSelection(event: ChangeEvent<HTMLInputElement>) {
@@ -672,6 +696,9 @@ export default function Dashboard() {
       setError('')
       setSuccessMessage('')
       const updatedProfile = await updateStudentAccount(studentData.id, {
+        name: settingsDraft.name,
+        email: settingsDraft.email,
+        phoneNumber: settingsDraft.phoneNumber || undefined,
         profileImage: settingsDraft.profileImage || null,
         currentPassword: settingsDraft.currentPassword || undefined,
         password: settingsDraft.password || undefined,
@@ -681,12 +708,15 @@ export default function Dashboard() {
       }
       setStudentData(updatedProfile)
       await refreshUser()
-      setSettingsDraft((current) => ({
-        ...current,
+      setSettingsDraft({
+        name: updatedProfile.name,
+        email: updatedProfile.email,
+        phoneNumber: updatedProfile.phoneNumber ?? '',
+        profileImage: updatedProfile.profileImage,
         currentPassword: '',
         password: '',
         confirmPassword: '',
-      }))
+      })
       setSuccessMessage('Profile settings updated successfully.')
     } catch (saveError) {
       const nextError = saveError instanceof Error ? saveError.message : 'Unable to update your profile settings'
@@ -712,6 +742,7 @@ export default function Dashboard() {
       }
 
       try {
+        const { default: QRCode } = await import('qrcode')
         const nextUrl = await QRCode.toDataURL(qrValue, {
           errorCorrectionLevel: 'M',
           margin: 1,
@@ -779,6 +810,12 @@ export default function Dashboard() {
   }, [permitHistory])
 
   const profileImage = studentData?.profileImage?.trim() ? studentData.profileImage : FALLBACK_PROFILE_IMAGE
+  const permitOutputLocked = Boolean(studentData && (studentData.feesBalance > 0 || studentData.canPrintPermit === false))
+  const permitOutputMessage = !studentData
+    ? ''
+    : studentData.feesBalance > 0
+      ? 'Please clear all outstanding fees before printing or downloading your permit.'
+      : studentData.printAccessMessage || 'You have reached the monthly permit print limit. Contact administration for access.'
   const unreadNotifications = notifications.length
   const currentSession = applicationHistory[0]?.semester || `${deriveAcademicSession(studentData?.examDate)} ${deriveSemesterLabel(studentData?.examDate)}`
 
@@ -1184,8 +1221,12 @@ export default function Dashboard() {
                               <p>Total Fees: ${studentData.totalFees.toFixed(2)}</p>
                               <p>Amount Paid: ${studentData.amountPaid.toFixed(2)}</p>
                               <p>Balance: ${studentData.feesBalance.toFixed(2)}</p>
-                              <p className={studentData.feesBalance === 0 ? 'text-green-700 dark:text-green-300' : 'text-red-600 dark:text-red-300'}>
-                                {studentData.feesBalance === 0 ? 'Eligible for printing' : 'Clear outstanding fees to print'}
+                              <p className={permitOutputLocked ? 'text-red-600 dark:text-red-300' : 'text-green-700 dark:text-green-300'}>
+                                {permitOutputLocked ? permitOutputMessage : 'Eligible for printing'}
+                              </p>
+                              <p className="text-slate-500 dark:text-slate-400">
+                                Prints this month: {studentData.monthlyPrintCount ?? 0}/{studentData.monthlyPrintLimit ?? 2}
+                                {(studentData.grantedPrintsRemaining ?? 0) > 0 ? ` • Extra admin prints left: ${studentData.grantedPrintsRemaining}` : ''}
                               </p>
                             </div>
                           </div>
@@ -1195,9 +1236,9 @@ export default function Dashboard() {
                           <button
                             type="button"
                             onClick={handleDownload}
-                            disabled={studentData.feesBalance > 0}
-                            className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${studentData.feesBalance > 0 ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-emerald-500 text-white hover:bg-emerald-400'}`}
-                            title={studentData.feesBalance > 0 ? 'Please clear all outstanding fees before downloading' : 'Download permit'}
+                            disabled={permitOutputLocked}
+                            className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${permitOutputLocked ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-emerald-500 text-white hover:bg-emerald-400'}`}
+                            title={permitOutputLocked ? permitOutputMessage : 'Download permit'}
                           >
                             <Download className="h-4 w-4" />
                             Download PDF
@@ -1205,9 +1246,9 @@ export default function Dashboard() {
                           <button
                             type="button"
                             onClick={handlePrint}
-                            disabled={studentData.feesBalance > 0}
-                            className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${studentData.feesBalance > 0 ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
-                            title={studentData.feesBalance > 0 ? 'Please clear all outstanding fees before printing' : 'Print permit'}
+                            disabled={permitOutputLocked}
+                            className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${permitOutputLocked ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                            title={permitOutputLocked ? permitOutputMessage : 'Print permit'}
                           >
                             <Printer className="h-4 w-4" />
                             Print Permit
@@ -1515,7 +1556,7 @@ export default function Dashboard() {
                     <h2 className="mt-2 text-2xl font-semibold">Update your info</h2>
                     <form className="mt-6 space-y-4" onSubmit={(event) => void handleSettingsSave(event)}>
                       <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-                        Your registered full name and email are locked. Contact the admin desk if you need an identity correction.
+                        Identity and contact changes update both your student profile and your login details. Use a valid email address and reachable phone number.
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
@@ -1524,8 +1565,8 @@ export default function Dashboard() {
                             id="settings-name"
                             type="text"
                             value={settingsDraft.name}
-                            readOnly
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+                            onChange={(event) => setSettingsDraft((current) => ({ ...current, name: event.target.value }))}
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
                           />
                         </div>
                         <div>
@@ -1534,8 +1575,19 @@ export default function Dashboard() {
                             id="settings-email"
                             type="email"
                             value={settingsDraft.email}
-                            readOnly
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+                            onChange={(event) => setSettingsDraft((current) => ({ ...current, email: event.target.value }))}
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label htmlFor="settings-phone" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Phone number</label>
+                          <input
+                            id="settings-phone"
+                            type="tel"
+                            value={settingsDraft.phoneNumber}
+                            onChange={(event) => setSettingsDraft((current) => ({ ...current, phoneNumber: event.target.value }))}
+                            placeholder="e.g. +256700123456"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
                           />
                         </div>
                       </div>
@@ -1617,7 +1669,10 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className="mt-6 space-y-3 text-sm text-slate-600 dark:text-slate-300">
+                        <p>Phone: {studentData.phoneNumber || 'Not assigned'}</p>
+                        <p>Student category: {studentData.studentCategory === 'international' ? 'International' : 'Local'}</p>
                         <p>Program: {studentData.program || studentData.course}</p>
+                        <p>College: {studentData.college || 'Not assigned'}</p>
                         <p>Exam session: {studentData.semester || currentSession}</p>
                         <p>Department: {studentData.department || 'Not assigned'}</p>
                         <p>Course units: {studentData.courseUnits?.length ? studentData.courseUnits.join(', ') : 'Not assigned'}</p>

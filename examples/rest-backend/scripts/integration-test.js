@@ -60,6 +60,7 @@ async function runReset() {
       cwd: backendRoot,
       env: {
         ...process.env,
+        DISABLE_ENV_FILE_LOADING: '1',
         APP_DB_PATH: relativeDbPath,
       },
       stdio: 'inherit',
@@ -94,6 +95,7 @@ async function main() {
     cwd: backendRoot,
     env: {
       ...process.env,
+      DISABLE_ENV_FILE_LOADING: '1',
       PORT: String(port),
       APP_DB_PATH: relativeDbPath,
     },
@@ -122,7 +124,8 @@ async function main() {
     assert.equal(registrarLogin.user.role, 'admin')
     assert.equal(registrarLogin.user.scope, 'registrar')
     assert.ok(registrarLogin.user.permissions.includes('manage_student_profiles'))
-    assert.ok(!registrarLogin.user.permissions.includes('manage_financials'))
+    assert.ok(registrarLogin.user.permissions.includes('manage_financials'))
+    assert.ok(registrarLogin.user.permissions.includes('manage_support_requests'))
 
     const financeLogin = await request(baseUrl, '/auth/login', {
       method: 'POST',
@@ -133,7 +136,20 @@ async function main() {
     assert.equal(financeLogin.user.role, 'admin')
     assert.equal(financeLogin.user.scope, 'finance')
     assert.ok(financeLogin.user.permissions.includes('manage_financials'))
-    assert.ok(!financeLogin.user.permissions.includes('manage_student_profiles'))
+    assert.ok(financeLogin.user.permissions.includes('manage_student_profiles'))
+    assert.ok(financeLogin.user.permissions.includes('manage_support_requests'))
+
+    const operationsLogin = await request(baseUrl, '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'operations@example.com', password: 'Permit@2026' }),
+    })
+
+    assert.equal(operationsLogin.user.role, 'admin')
+    assert.equal(operationsLogin.user.scope, 'operations')
+    assert.ok(operationsLogin.user.permissions.includes('manage_financials'))
+    assert.ok(operationsLogin.user.permissions.includes('manage_student_profiles'))
+    assert.ok(operationsLogin.user.permissions.includes('manage_support_requests'))
 
     const initialFeeSettings = await request(baseUrl, '/system-settings', {
       headers: {
@@ -355,6 +371,56 @@ async function main() {
     assert.equal(localStudent.student_category, 'local')
     assert.equal(localStudent.total_fees, 4500)
 
+    const bulkImportPreviewForm = new FormData()
+    bulkImportPreviewForm.append(
+      'file',
+      new Blob([
+        'student_name,student_id,email,course,total_fees,amount_paid\nBulk Import Student,BULK900,bulk-import@example.com,Information Systems,510000,260000',
+      ], { type: 'text/csv' }),
+      'bulk-create.csv',
+    )
+
+    const bulkImportPreview = await request(baseUrl, '/imports/financials/preview', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${financeLogin.token}`,
+      },
+      body: bulkImportPreviewForm,
+    })
+
+    assert.equal(bulkImportPreview.data.length, 1)
+    assert.equal(bulkImportPreview.data[0].status, 'create')
+
+    const bulkImportApplyForm = new FormData()
+    bulkImportApplyForm.append(
+      'file',
+      new Blob([
+        'student_name,student_id,email,course,total_fees,amount_paid\nBulk Import Student,BULK900,bulk-import@example.com,Information Systems,510000,260000',
+      ], { type: 'text/csv' }),
+      'bulk-create.csv',
+    )
+
+    const bulkImportApply = await request(baseUrl, '/imports/financials/apply', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${financeLogin.token}`,
+      },
+      body: bulkImportApplyForm,
+    })
+
+    assert.equal(bulkImportApply.updatedCount, 0)
+    assert.equal(bulkImportApply.createdCount, 1)
+    assert.equal(bulkImportApply.createdStudents[0].studentId, 'BULK900')
+    assert.equal(bulkImportApply.createdStudents[0].password, 'Permit-BULK900')
+
+    const bulkImportedStudentLogin = await request(baseUrl, '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'BULK900', password: 'Permit-BULK900' }),
+    })
+
+    assert.equal(bulkImportedStudentLogin.user.email, 'bulk-import@example.com')
+
     await request(baseUrl, `/profiles/${primaryStudent.id}/admin`, {
       method: 'PATCH',
       headers: {
@@ -375,7 +441,7 @@ async function main() {
 
     assert.equal(phoneLogin.user.id, primaryStudent.id)
 
-    const registrarFinanceAttempt = await requestRaw(baseUrl, `/profiles/${primaryStudent.id}/financials`, {
+    const registrarFinanceUpdate = await request(baseUrl, `/profiles/${primaryStudent.id}/financials`, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${registrarLogin.token}`,
@@ -384,10 +450,9 @@ async function main() {
       body: JSON.stringify({ amountPaid: 50000 }),
     })
 
-    assert.equal(registrarFinanceAttempt.status, 403)
-    assert.match(registrarFinanceAttempt.body.message, /permission to manage student financials/i)
+    assert.equal(registrarFinanceUpdate.amount_paid, 50000)
 
-    const financeProfileAttempt = await requestRaw(baseUrl, `/profiles/${primaryStudent.id}/admin`, {
+    const financeProfileUpdate = await request(baseUrl, `/profiles/${primaryStudent.id}/admin`, {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${financeLogin.token}`,
@@ -398,17 +463,15 @@ async function main() {
       }),
     })
 
-    assert.equal(financeProfileAttempt.status, 403)
-    assert.match(financeProfileAttempt.body.message, /permission to manage student profiles/i)
+    assert.equal(financeProfileUpdate.phone_number, '+256700999999')
 
-    const financeSupportAttempt = await requestRaw(baseUrl, '/support-requests', {
+    const financeSupportQueue = await request(baseUrl, '/support-requests', {
       headers: {
         Authorization: `Bearer ${financeLogin.token}`,
       },
     })
 
-    assert.equal(financeSupportAttempt.status, 403)
-    assert.match(financeSupportAttempt.body.message, /permission to view support requests/i)
+    assert.ok(Array.isArray(financeSupportQueue.data))
 
     const financeUpdate = await request(baseUrl, `/profiles/${primaryStudent.id}/financials`, {
       method: 'PATCH',
@@ -458,6 +521,23 @@ async function main() {
 
     assert.equal(resolvedRequest.status, 'resolved')
     assert.equal(resolvedRequest.adminReply, 'Your permit is now being processed.')
+
+    const deletedStudentResponse = await request(baseUrl, `/profiles/${createdStudent.id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${registrarLogin.token}`,
+      },
+    })
+
+    assert.equal(deletedStudentResponse.ok, true)
+
+    const deletedStudentLoginAttempt = await requestRaw(baseUrl, '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'STU900', password: 'Permit@2028' }),
+    })
+
+    assert.equal(deletedStudentLoginAttempt.status, 401)
 
     await request(baseUrl, '/permit-activity', {
       method: 'POST',

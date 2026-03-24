@@ -60,6 +60,8 @@ Exam Permit System is a React application backed by a REST API for managing stud
    npm run dev:rest
    ```
 
+For local real-data work, create `examples/rest-backend/.env.local` with your persistent `APP_DB_PATH` and `BOOTSTRAP_ADMIN_*` values. The backend now loads that file automatically on `npm run dev:rest` and `npm run dev:rest:backend`.
+
 This launcher streams both backend and frontend output and is configured to work on Windows shells as well.
 
 During local Vite development, frontend requests first go through `/api` using the built-in dev proxy, then fall back to `http://<current-host>:4000` when needed. This keeps fetches working on localhost, machine hostnames, and LAN IPs without extra CORS setup.
@@ -174,6 +176,8 @@ The admin panel includes:
 - a preview table before applying changes
 - an `Apply Import` action so admins can review rows first
 
+Use [examples/real-student-import-template.csv](c:/Users/kabuy/OneDrive/Desktop/project/examples/real-student-import-template.csv) as the first real-data import file, and follow [examples/REAL_STUDENT_IMPORT.md](c:/Users/kabuy/OneDrive/Desktop/project/examples/REAL_STUDENT_IMPORT.md) for a safe staged rollout.
+
 Accepted spreadsheet columns:
 
 - `student_name`
@@ -182,6 +186,8 @@ Accepted spreadsheet columns:
 - optional `total_fees`
 
 The bundled backend now starts without seeded student records. Use the admin panel to add/import real students after first login with an admin account.
+
+For a real deployment, configure the backend with a persistent SQLite path and your own bootstrap admin credentials instead of using the default example admin accounts. See [examples/rest-backend/README.md](c:/Users/kabuy/OneDrive/Desktop/project/examples/rest-backend/README.md) for the `APP_DB_PATH` and `BOOTSTRAP_ADMIN_*` settings.
 
 ## Project Structure
 

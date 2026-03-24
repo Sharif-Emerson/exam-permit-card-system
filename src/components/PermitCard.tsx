@@ -19,6 +19,10 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
   const paymentPercentage = studentData.totalFees > 0
     ? Math.min((studentData.amountPaid / studentData.totalFees) * 100, 100)
     : studentData.amountPaid > 0 ? 100 : 0
+  const permitOutputLocked = studentData.feesBalance > 0 || studentData.canPrintPermit === false
+  const permitOutputMessage = studentData.feesBalance > 0
+    ? 'Please clear all outstanding fees before printing or downloading.'
+    : studentData.printAccessMessage || 'You have reached the monthly permit print limit. Contact administration for access.'
 
   const profileImage = studentData.profileImage?.trim() ? studentData.profileImage : FALLBACK_PROFILE_IMAGE
 
@@ -96,6 +100,10 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                 <span className="text-sm sm:text-base">{studentData.program ?? studentData.course}</span>
               </div>
               <div className="flex items-center space-x-2">
+                <span className="font-medium text-sm sm:text-base">College:</span>
+                <span className="text-sm sm:text-base">{studentData.college ?? 'Not assigned'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
                 <span className="font-medium text-sm sm:text-base">Department:</span>
                 <span className="text-sm sm:text-base">{studentData.department ?? 'Not assigned'}</span>
               </div>
@@ -104,11 +112,30 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                 <span className="text-sm sm:text-base">{studentData.semester ?? 'Not assigned'}</span>
               </div>
               <div className="flex items-center space-x-2">
+                <span className="font-medium text-sm sm:text-base">Student Category:</span>
+                <span className="text-sm sm:text-base">{studentData.studentCategory === 'international' ? 'International' : 'Local'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="font-medium text-sm sm:text-base">Phone:</span>
+                <span className="text-sm sm:text-base">{studentData.phoneNumber ?? 'Not assigned'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
                 <span className="font-medium text-sm sm:text-base">Remaining Balance:</span>
                 <span className={`font-semibold text-sm sm:text-base ${studentData.feesBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
                   ${studentData.feesBalance.toFixed(2)}
                 </span>
               </div>
+            </div>
+          </div>
+
+          <div className="mb-5 hidden rounded-xl border border-slate-200 bg-white px-4 py-3 print:block print:mb-4">
+            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-700">
+              <p><span className="font-semibold">Program:</span> {studentData.program ?? studentData.course}</p>
+              <p><span className="font-semibold">College:</span> {studentData.college ?? 'Not assigned'}</p>
+              <p><span className="font-semibold">Department:</span> {studentData.department ?? 'Not assigned'}</p>
+              <p><span className="font-semibold">Semester:</span> {studentData.semester ?? 'Not assigned'}</p>
+              <p><span className="font-semibold">Category:</span> {studentData.studentCategory === 'international' ? 'International' : 'Local'}</p>
+              <p><span className="font-semibold">Phone:</span> {studentData.phoneNumber ?? 'Not assigned'}</p>
             </div>
           </div>
 
@@ -237,6 +264,13 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                 All fees have been paid. You are eligible to take the examination.
               </p>
             )}
+            {studentData.feesBalance === 0 && (
+              <p className={`mt-3 text-xs sm:text-sm ${permitOutputLocked ? 'text-red-700' : 'text-slate-600'}`}>
+                Prints this month: {studentData.monthlyPrintCount ?? 0}/{studentData.monthlyPrintLimit ?? 2}
+                {(studentData.grantedPrintsRemaining ?? 0) > 0 ? ` • Extra admin prints left: ${studentData.grantedPrintsRemaining}` : ''}
+                {permitOutputLocked ? ` • ${permitOutputMessage}` : ''}
+              </p>
+            )}
           </div>
 
           <div className="text-center mb-8 print:mb-0 print:mt-4">
@@ -257,35 +291,35 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 no-print">
             <button
               onClick={onPrint}
-              disabled={studentData.feesBalance > 0}
+              disabled={permitOutputLocked}
               className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2 sm:py-2 rounded-lg transition-colors text-sm sm:text-base ${
-                studentData.feesBalance > 0
+                permitOutputLocked
                   ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
               }`}
-              title={studentData.feesBalance > 0 ? 'Please clear all outstanding fees before printing' : ''}
+              title={permitOutputLocked ? permitOutputMessage : ''}
             >
               <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>Print Permit</span>
             </button>
             <button
               onClick={onDownload}
-              disabled={studentData.feesBalance > 0}
+              disabled={permitOutputLocked}
               className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2 sm:py-2 rounded-lg transition-colors text-sm sm:text-base ${
-                studentData.feesBalance > 0
+                permitOutputLocked
                   ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                   : 'bg-green-600 text-white hover:bg-green-700'
               }`}
-              title={studentData.feesBalance > 0 ? 'Please clear all outstanding fees before downloading' : ''}
+              title={permitOutputLocked ? permitOutputMessage : ''}
             >
               <Download className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>Download PDF</span>
             </button>
           </div>
-          {studentData.feesBalance > 0 && (
+          {permitOutputLocked && (
             <div className="text-center mt-3 sm:mt-4">
               <p className="text-red-600 text-xs sm:text-sm font-medium">
-                Printing and downloading are disabled until all fees are cleared
+                {permitOutputMessage}
               </p>
             </div>
           )}

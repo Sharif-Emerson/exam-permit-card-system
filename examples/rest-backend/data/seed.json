@@ -38,6 +38,17 @@
             "name": "Finance Office",
             "campus_id": "main-campus",
             "campus_name": "Main Campus"
+        },
+        {
+            "id": "admin-4",
+            "email": "operations@example.com",
+            "phone_number": "+256700100004",
+            "password": "Permit@2026",
+            "role": "admin",
+            "admin_scope": "operations",
+            "name": "Operations Office",
+            "campus_id": "main-campus",
+            "campus_name": "Main Campus"
         }
     ],
     "profiles": [
@@ -85,6 +96,25 @@
             "phone_number": "+256700100003",
             "role": "admin",
             "name": "Finance Office",
+            "campus_id": "main-campus",
+            "campus_name": "Main Campus",
+            "student_id": null,
+            "course": null,
+            "exam_date": null,
+            "exam_time": null,
+            "venue": null,
+            "seat_number": null,
+            "instructions": null,
+            "profile_image": null,
+            "total_fees": 0,
+            "amount_paid": 0
+        },
+        {
+            "id": "admin-4",
+            "email": "operations@example.com",
+            "phone_number": "+256700100004",
+            "role": "admin",
+            "name": "Operations Office",
             "campus_id": "main-campus",
             "campus_name": "Main Campus",
             "student_id": null,

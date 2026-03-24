@@ -87,7 +87,7 @@ describe('AuthProvider', () => {
         role: 'admin',
         name: 'Finance Office',
         scope: 'finance',
-        permissions: ['view_students', 'manage_financials', 'export_reports'],
+        permissions: ['view_students', 'manage_student_profiles', 'manage_financials', 'manage_support_requests', 'view_audit_logs', 'export_reports', 'write_audit_logs'],
       },
     })
     onAuthStateChange.mockReturnValue(vi.fn())
@@ -108,7 +108,7 @@ describe('AuthProvider', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Finance Office:finance:view_students,manage_financials,export_reports')).toBeTruthy()
+      expect(screen.getByText('Finance Office:finance:view_students,manage_student_profiles,manage_financials,manage_support_requests,view_audit_logs,export_reports,write_audit_logs')).toBeTruthy()
     })
   })
 })

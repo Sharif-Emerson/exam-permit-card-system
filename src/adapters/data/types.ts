@@ -12,6 +12,7 @@ import type {
   StudentListPage,
   StudentListQuery,
   StudentProfile,
+  TrashedStudentProfile,
   SupportContact,
   SupportRequest,
   SupportRequestUpdateInput,
@@ -29,6 +30,7 @@ export interface DataAdapter {
   fetchProfileById: (userId: string) => Promise<AppProfile>
   fetchStudentProfileById: (userId: string) => Promise<StudentProfile>
   fetchStudentProfilesPage: (query?: StudentListQuery) => Promise<StudentListPage>
+  fetchTrashedStudentProfiles: () => Promise<TrashedStudentProfile[]>
   fetchAdminActivityLogs: () => Promise<AdminActivityLog[]>
   fetchAdminActivityLogsPage: (query?: { page?: number; pageSize?: number }) => Promise<AdminActivityLogPage>
   fetchSystemFeeSettings: () => Promise<SystemFeeSettings>
@@ -39,6 +41,8 @@ export interface DataAdapter {
   updateStudentFinancials: (studentId: string, values: FinancialUpdateValues, adminId: string) => Promise<void>
   clearStudentBalance: (studentId: string, adminId: string) => Promise<void>
   deleteStudentProfile: (studentId: string, adminId: string) => Promise<void>
+  restoreStudentProfile: (trashId: string, adminId: string) => Promise<StudentProfile>
+  grantStudentPermitPrintAccess: (studentId: string, additionalPrints: number, adminId: string) => Promise<StudentProfile>
   recordPermitActivity: (studentId: string, action: PermitActivityAction) => Promise<void>
   fetchPermitActivityHistory: () => Promise<PermitActivityRecord[]>
   fetchSupportContacts: () => Promise<SupportContact[]>

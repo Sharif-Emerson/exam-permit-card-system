@@ -5,6 +5,7 @@ import express from 'express'
 import multer from 'multer'
 import Papa from 'papaparse'
 import readXlsxFile from 'read-excel-file/node'
+import './lib/load-env.js'
 import {
   createSession,
   createStudentProfile,
@@ -17,16 +18,20 @@ import {
   getSessionUser,
   getUploadsDir,
   adminUpdateStudentProfile,
+  consumeStudentPermitPrintGrant,
   getUserByEmail,
   getUserByPhoneNumber,
   getUserByStudentId,
+  grantStudentPermitPrintAccess,
   insertActivityLog,
   listActivityLogs,
   listActivityLogsPage,
   listProfiles,
   listProfilesPage,
+  listTrashedStudentProfiles,
   listSupportRequests,
   resetUserPassword,
+  restoreStudentProfile,
   revokeSession,
   updateSupportRequest,
   updateStudentAccount,
@@ -124,6 +129,19 @@ function parseNumber(value) {
 
   const numericValue = typeof value === 'number' ? value : Number(String(value).replace(/,/g, ''))
   return Number.isFinite(numericValue) ? numericValue : undefined
+}
+
+function parseList(value) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return undefined
+  }
+
+  const items = value
+    .split(/\r?\n|,|;/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+  return items.length > 0 ? items : undefined
 }
 
 function parseStudentCategory(value) {
@@ -258,13 +276,93 @@ function mapRowsToFinancialImports(rows) {
         rowNumber: index + 2,
         studentName: normalizedRow.studentname ? String(normalizedRow.studentname).trim() : undefined,
         studentId: normalizedRow.studentid ? String(normalizedRow.studentid).trim() : undefined,
+        studentCategory: parseStudentCategory(normalizedRow.studentcategory ?? normalizedRow.category) ?? undefined,
         email: normalizedRow.email ? String(normalizedRow.email).trim() : undefined,
         userId: normalizedRow.id ? String(normalizedRow.id).trim() : normalizedRow.userid ? String(normalizedRow.userid).trim() : undefined,
+        phoneNumber: normalizedRow.phonenumber
+          ? String(normalizedRow.phonenumber).trim()
+          : normalizedRow.phone
+            ? String(normalizedRow.phone).trim()
+            : undefined,
+        course: normalizedRow.course ? String(normalizedRow.course).trim() : undefined,
+        program: normalizedRow.program ? String(normalizedRow.program).trim() : undefined,
+        college: normalizedRow.college ? String(normalizedRow.college).trim() : undefined,
+        department: normalizedRow.department ? String(normalizedRow.department).trim() : undefined,
+        semester: normalizedRow.semester ? String(normalizedRow.semester).trim() : undefined,
+        password: normalizedRow.password ? String(normalizedRow.password).trim() : undefined,
+        courseUnits: parseList(normalizedRow.courseunits ?? normalizedRow.units),
+        instructions: normalizedRow.instructions ? String(normalizedRow.instructions).trim() : undefined,
+        examDate: normalizedRow.examdate ? String(normalizedRow.examdate).trim() : undefined,
+        examTime: normalizedRow.examtime ? String(normalizedRow.examtime).trim() : undefined,
+        venue: normalizedRow.venue ? String(normalizedRow.venue).trim() : undefined,
+        seatNumber: normalizedRow.seatnumber ? String(normalizedRow.seatnumber).trim() : undefined,
         amountPaid: parseNumber(normalizedRow.amountpaid ?? normalizedRow.paid ?? normalizedRow.amount),
         totalFees: parseNumber(normalizedRow.totalfees ?? normalizedRow.fees ?? normalizedRow.total),
       }
     })
-    .filter((row) => (row.studentId || row.email || row.userId) && (typeof row.amountPaid === 'number' || typeof row.totalFees === 'number'))
+    .filter((row) => {
+      const canUpdate = (row.studentId || row.email || row.userId) && (typeof row.amountPaid === 'number' || typeof row.totalFees === 'number')
+      const canCreate = row.studentName && row.studentId && row.email && row.course && typeof row.totalFees === 'number'
+      return Boolean(canUpdate || canCreate)
+    })
+}
+
+function getImportedStudentPassword(row) {
+  if (typeof row.password === 'string' && row.password.trim()) {
+    return row.password.trim()
+  }
+
+  const seedSource = row.studentId ?? row.email?.split('@')[0] ?? `row${row.rowNumber}`
+  const normalizedSeed = seedSource.replace(/[^a-z0-9]/gi, '').slice(-24) || `row${row.rowNumber}`
+  return `Permit-${normalizedSeed}`
+}
+
+function buildImportedStudentInput(row, requestUser = null) {
+  if (!row.studentName) {
+    return { reason: 'Student name is required to create a new student account.' }
+  }
+
+  if (!row.studentId) {
+    return { reason: 'Registration number is required to create a new student account.' }
+  }
+
+  if (!row.email) {
+    return { reason: 'Email is required to create a new student account.' }
+  }
+
+  if (!row.course) {
+    return { reason: 'Course is required to create a new student account.' }
+  }
+
+  if (typeof row.totalFees !== 'number') {
+    return { reason: 'Expected fees are required to create a new student account.' }
+  }
+
+  return {
+    createStudent: {
+      name: row.studentName,
+      email: row.email,
+      password: getImportedStudentPassword(row),
+      student_id: row.studentId,
+      student_category: row.studentCategory ?? 'local',
+      phone_number: row.phoneNumber ? normalizePhoneNumber(row.phoneNumber) || null : null,
+      course: row.course,
+      program: row.program ?? null,
+      college: row.college ?? null,
+      department: row.department ?? null,
+      semester: row.semester ?? null,
+      course_units: row.courseUnits ?? [],
+      total_fees: row.totalFees,
+      amount_paid: row.amountPaid ?? 0,
+      instructions: row.instructions ?? null,
+      exam_date: row.examDate ?? null,
+      exam_time: row.examTime ?? null,
+      venue: row.venue ?? null,
+      seat_number: row.seatNumber ?? null,
+      campus_id: requestUser?.campusId ?? 'main-campus',
+      campus_name: requestUser?.campusName ?? 'Main Campus',
+    },
+  }
 }
 
 async function parseSpreadsheetRows(buffer, originalName) {
@@ -341,67 +439,39 @@ function resolveAdminScope(user) {
     return user.admin_scope
   }
 
-  const normalizedEmail = user.email.toLowerCase()
-
-  if (normalizedEmail === 'admin@example.com') {
+  if (user.id === 'admin-1') {
     return 'super-admin'
   }
 
-  if (normalizedEmail === 'registrar@example.com') {
+  if (user.id === 'admin-2') {
     return 'registrar'
   }
 
-  if (normalizedEmail === 'finance@example.com') {
+  if (user.id === 'admin-3') {
     return 'finance'
   }
 
-  return 'operations'
+  if (user.id === 'admin-4') {
+    return 'operations'
+  }
+
+  return 'super-admin'
 }
 
 function getAdminPermissions(user) {
   const scope = resolveAdminScope(user)
+  const fullAdminPermissions = [
+    'view_students',
+    'manage_student_profiles',
+    'manage_financials',
+    'manage_support_requests',
+    'view_audit_logs',
+    'export_reports',
+    'write_audit_logs',
+  ]
 
-  if (scope === 'super-admin') {
-    return [
-      'view_students',
-      'manage_student_profiles',
-      'manage_financials',
-      'manage_support_requests',
-      'view_audit_logs',
-      'export_reports',
-      'write_audit_logs',
-    ]
-  }
-
-  if (scope === 'registrar') {
-    return [
-      'view_students',
-      'manage_student_profiles',
-      'manage_support_requests',
-      'view_audit_logs',
-      'export_reports',
-      'write_audit_logs',
-    ]
-  }
-
-  if (scope === 'finance') {
-    return [
-      'view_students',
-      'manage_financials',
-      'view_audit_logs',
-      'export_reports',
-      'write_audit_logs',
-    ]
-  }
-
-  if (scope === 'operations') {
-    return [
-      'view_students',
-      'manage_support_requests',
-      'view_audit_logs',
-      'export_reports',
-      'write_audit_logs',
-    ]
+  if (scope === 'super-admin' || scope === 'registrar' || scope === 'finance' || scope === 'operations') {
+    return fullAdminPermissions
   }
 
   return []
@@ -451,12 +521,36 @@ function resolveImportPreview(rows) {
         || (row.studentId && profile.student_id?.toLowerCase() === row.studentId.toLowerCase())
     })
 
+    if (!matchedProfile) {
+      const importedStudent = buildImportedStudentInput(row)
+
+      if (importedStudent.createStudent) {
+        return {
+          ...row,
+          studentName: importedStudent.createStudent.name,
+          studentRecordId: null,
+          status: 'create',
+          reason: row.password?.trim()
+            ? 'New student account will be created with the provided password.'
+            : `New student account will be created with temporary password ${importedStudent.createStudent.password}.`,
+        }
+      }
+
+      return {
+        ...row,
+        studentName: row.studentName,
+        studentRecordId: null,
+        status: 'skipped',
+        reason: importedStudent.reason ?? 'No matching student was found.',
+      }
+    }
+
     return {
       ...row,
       studentName: matchedProfile?.name ?? row.studentName,
       studentRecordId: matchedProfile?.id,
-      status: matchedProfile ? 'ready' : 'skipped',
-      reason: matchedProfile ? null : 'No matching student was found.',
+      status: 'ready',
+      reason: null,
     }
   })
 }
@@ -1078,6 +1172,38 @@ app.patch('/profiles/:id/financials', authenticate, requireAdminPermission('mana
   response.json(updatedProfile)
 })
 
+app.get('/profiles-trash', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to access deleted student records.'), (_request, response) => {
+  response.json({ items: listTrashedStudentProfiles() })
+})
+
+app.post('/profiles-trash/:id/restore', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to restore student profiles.'), (request, response) => {
+  try {
+    const restoredProfile = restoreStudentProfile(request.params.id, request.userId)
+
+    if (!restoredProfile) {
+      response.status(404).json({ message: 'Deleted student record not found.' })
+      return
+    }
+
+    insertActivityLog({
+      adminId: request.userId,
+      targetProfileId: restoredProfile.id,
+      action: 'restore_student_profile',
+      details: {
+        restoredProfileId: restoredProfile.id,
+        studentId: restoredProfile.studentId,
+        studentName: restoredProfile.name,
+        email: restoredProfile.email,
+      },
+    })
+
+    response.json(restoredProfile)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to restore the deleted student profile.'
+    response.status(400).json({ message })
+  }
+})
+
 app.delete('/profiles/:id', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to delete student profiles.'), (request, response) => {
   const profile = getProfileById(request.params.id)
 
@@ -1091,7 +1217,7 @@ app.delete('/profiles/:id', authenticate, requireAdminPermission('manage_student
     return
   }
 
-  const deletedProfile = deleteStudentProfile(request.params.id)
+  const deletedProfile = deleteStudentProfile(request.params.id, request.userId)
 
   if (!deletedProfile) {
     response.status(404).json({ message: 'Profile not found.' })
@@ -1100,9 +1226,10 @@ app.delete('/profiles/:id', authenticate, requireAdminPermission('manage_student
 
   insertActivityLog({
     adminId: request.userId,
-    targetProfileId: request.params.id,
+    targetProfileId: request.userId,
     action: 'delete_student_profile',
     details: {
+      deletedProfileId: request.params.id,
       studentId: profile.studentId,
       studentName: profile.name,
       email: profile.email,
@@ -1110,6 +1237,38 @@ app.delete('/profiles/:id', authenticate, requireAdminPermission('manage_student
   })
 
   response.json({ ok: true, deletedProfile })
+})
+
+app.post('/profiles/:id/permit-print-grants', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to grant permit print access.'), (request, response) => {
+  const additionalPrints = parseNumber(request.body?.additionalPrints)
+
+  if (typeof additionalPrints !== 'undefined' && (!Number.isInteger(additionalPrints) || additionalPrints < 1 || additionalPrints > 12)) {
+    response.status(400).json({ message: 'Additional print access must be a whole number between 1 and 12.' })
+    return
+  }
+
+  const updatedProfile = grantStudentPermitPrintAccess(request.params.id, additionalPrints ?? 1)
+
+  if (!updatedProfile) {
+    response.status(404).json({ message: 'Student profile not found.' })
+    return
+  }
+
+  insertActivityLog({
+    adminId: request.userId,
+    targetProfileId: request.params.id,
+    action: 'grant_student_permit_print_access',
+    details: {
+      additionalPrints: additionalPrints ?? 1,
+      studentName: updatedProfile.name,
+      studentId: updatedProfile.student_id,
+      email: updatedProfile.email,
+    },
+    campusId: request.user?.campusId,
+    campusName: request.user?.campusName,
+  })
+
+  response.json(updatedProfile)
 })
 
 app.post('/admin-activity-logs', authenticate, requireAdminPermission('write_audit_logs', 'You do not have permission to record admin activity.'), (request, response) => {
@@ -1141,6 +1300,11 @@ app.post('/permit-activity', authenticate, (request, response) => {
     return
   }
 
+  if (profile?.can_print_permit === false) {
+    response.status(403).json({ message: profile?.print_access_message || 'You have reached the monthly permit print limit. Contact administration for access.' })
+    return
+  }
+
   insertActivityLog({
     adminId: request.userId,
     targetProfileId: request.userId,
@@ -1150,6 +1314,8 @@ app.post('/permit-activity', authenticate, (request, response) => {
       semester: profile?.semester ?? null,
     },
   })
+
+  consumeStudentPermitPrintGrant(request.userId)
 
   response.status(201).json({ ok: true })
 })
@@ -1339,31 +1505,80 @@ app.post('/imports/financials/apply', authenticate, requireAdminPermission('mana
   const previewRows = resolveImportPreview(rows)
   const skippedRows = []
   let updatedCount = 0
+  let createdCount = 0
+  const createdStudents = []
 
   for (const row of previewRows) {
-    if (row.status !== 'ready' || !row.studentRecordId) {
-      skippedRows.push({ rowNumber: row.rowNumber, reason: row.reason ?? 'No matching student was found.' })
+    if (row.status === 'ready' && row.studentRecordId) {
+      updateProfileFinancials(row.studentRecordId, row.amountPaid, row.totalFees)
+      insertActivityLog({
+        adminId: request.userId,
+        targetProfileId: row.studentRecordId,
+        action: 'bulk_import_student_financials',
+        details: {
+          rowNumber: row.rowNumber,
+          amountPaid: row.amountPaid,
+          totalFees: row.totalFees,
+        },
+      })
+
+      updatedCount += 1
       continue
     }
 
-    updateProfileFinancials(row.studentRecordId, row.amountPaid, row.totalFees)
-    insertActivityLog({
-      adminId: request.userId,
-      targetProfileId: row.studentRecordId,
-      action: 'bulk_import_student_financials',
-      details: {
-        rowNumber: row.rowNumber,
-        amountPaid: row.amountPaid,
-        totalFees: row.totalFees,
-      },
-    })
+    if (row.status === 'create') {
+      const importedStudent = buildImportedStudentInput(row, request.user)
 
-    updatedCount += 1
+      if (!importedStudent.createStudent) {
+        skippedRows.push({ rowNumber: row.rowNumber, reason: importedStudent.reason ?? 'Unable to create this student account.' })
+        continue
+      }
+
+      try {
+        const createdProfile = createStudentProfile(importedStudent.createStudent)
+        insertActivityLog({
+          adminId: request.userId,
+          targetProfileId: createdProfile.id,
+          action: 'bulk_import_create_student_profile',
+          details: {
+            rowNumber: row.rowNumber,
+            studentId: importedStudent.createStudent.student_id,
+            email: importedStudent.createStudent.email,
+            course: importedStudent.createStudent.course,
+            totalFees: importedStudent.createStudent.total_fees,
+            amountPaid: importedStudent.createStudent.amount_paid,
+          },
+          campusId: request.user?.campusId,
+          campusName: request.user?.campusName,
+        })
+
+        createdCount += 1
+        createdStudents.push({
+          rowNumber: row.rowNumber,
+          name: createdProfile.name,
+          email: createdProfile.email,
+          studentId: createdProfile.student_id,
+          password: importedStudent.createStudent.password,
+        })
+      } catch (error) {
+        skippedRows.push({
+          rowNumber: row.rowNumber,
+          reason: error instanceof Error ? error.message : 'Unable to create this student account.',
+        })
+      }
+
+      continue
+    }
+
+    if (!row.studentRecordId) {
+      skippedRows.push({ rowNumber: row.rowNumber, reason: row.reason ?? 'No matching student was found.' })
+      continue
+    }
   }
 
   await fs.writeFile(path.join(uploadsDir, `${Date.now()}-${request.file.originalname}`), request.file.buffer)
 
-  response.json({ updatedCount, skippedRows })
+  response.json({ updatedCount, createdCount, createdStudents, skippedRows })
 })
 
 const port = Number(process.env.PORT ?? 4000)

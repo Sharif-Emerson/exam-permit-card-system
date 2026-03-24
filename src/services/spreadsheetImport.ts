@@ -28,6 +28,20 @@ function parseList(value: unknown): string[] | undefined {
   return items.length > 0 ? items : undefined
 }
 
+function parseStudentCategory(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const normalizedValue = value.trim().toLowerCase()
+
+  if (normalizedValue === 'local' || normalizedValue === 'international') {
+    return normalizedValue
+  }
+
+  return undefined
+}
+
 function mapRowsToFinancialImportRows(rows: unknown[][]): FinancialImportRow[] {
   const [headerRow, ...dataRows] = rows
 
@@ -56,6 +70,7 @@ function mapRowsToFinancialImportRows(rows: unknown[][]): FinancialImportRow[] {
       const email = typeof normalizedEntries.email === 'string' && normalizedEntries.email.trim()
         ? normalizedEntries.email.trim()
         : undefined
+      const studentCategory = parseStudentCategory(normalizedEntries.studentcategory ?? normalizedEntries.category)
       const phoneNumber = typeof normalizedEntries.phonenumber === 'string' && normalizedEntries.phonenumber.trim()
         ? normalizedEntries.phonenumber.trim()
         : typeof normalizedEntries.phone === 'string' && normalizedEntries.phone.trim()
@@ -112,6 +127,7 @@ function mapRowsToFinancialImportRows(rows: unknown[][]): FinancialImportRow[] {
         rowNumber: index + 2,
         studentName,
         studentId,
+        studentCategory,
         email,
         userId,
         phoneNumber,

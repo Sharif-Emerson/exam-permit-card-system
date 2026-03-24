@@ -1,9 +1,8 @@
 import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useState } from 'react'
-import QRCode from 'qrcode'
 import {
   BarChart2, Bell, CheckCircle2, CreditCard, Download, FileCheck,
   FileSpreadsheet, FileUp, LayoutDashboard, LogOut, Menu,
-  Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Sun, Upload, Users, X,
+  Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Sun, Trash2, Upload, Users, X,
 } from 'lucide-react'
 import BrandMark from './BrandMark'
 import PermitCard from './PermitCard'
@@ -13,9 +12,9 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, clearStudentBalance, createStudentProfile, deleteStudentProfile, fetchAdminActivityLogsPage, fetchStudentProfilesPage, fetchSystemFeeSettings, importStudentFinancials, updateStudentAccount, updateStudentFinancials, updateSystemFeeSettings } from '../services/profileService'
+import { adminUpdateStudentProfile, clearStudentBalance, createStudentProfile, deleteStudentProfile, fetchAdminActivityLogsPage, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, restoreStudentProfile, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings } from '../services/profileService'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
-import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, SystemFeeSettings } from '../types'
+import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile } from '../types'
 
 type PaymentDrafts = Record<string, string>
 type ImportPreviewRow = {
@@ -27,7 +26,7 @@ type ImportPreviewRow = {
   reason?: string
   studentName?: string
 }
-type NavSection = 'dashboard' | 'students' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'settings'
+type NavSection = 'dashboard' | 'students' | 'support' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'settings'
 
 const STUDENT_PAGE_SIZE = 24
 const ACTIVITY_PAGE_SIZE = 12
@@ -79,6 +78,16 @@ type DashboardAlert = {
   onAction?: () => void
 }
 
+type SupportReplyDrafts = Record<string, string>
+type SupportStatusDrafts = Record<string, SupportRequestStatus>
+type PendingConfirmation = {
+  title: string
+  message: string
+  confirmLabel: string
+  tone: 'danger' | 'primary' | 'success'
+  action: () => Promise<void>
+}
+
 function getActivityTimestamp(value: string | null | undefined) {
   if (!value) {
     return 0
@@ -104,6 +113,17 @@ function parseCurrencyDraft(value: string) {
   }
 
   return Number(normalizedValue)
+}
+
+function getDaysUntilDate(targetDate: string) {
+  const targetTime = new Date(targetDate).getTime()
+
+  if (Number.isNaN(targetTime)) {
+    return null
+  }
+
+  const diffMs = targetTime - Date.now()
+  return Math.max(Math.ceil(diffMs / (24 * 60 * 60 * 1000)), 0)
 }
 
 function hasAnyPermission(permissions: Set<AdminPermission>, required: AdminPermission[]) {
@@ -132,6 +152,10 @@ function getAdminSections(permissions: Set<AdminPermission>): NavSection[] {
 
   if (permissions.has('view_audit_logs')) {
     sections.add('permits')
+  }
+
+  if (permissions.has('manage_support_requests')) {
+    sections.add('support')
   }
 
   if (permissions.has('manage_student_profiles')) {
@@ -343,6 +367,7 @@ export default function AdminPanel() {
   const adminCapability = getAdminCapabilityProfile(user)
   const canViewStudents = adminCapability.sections.includes('students')
   const canViewPermitActivity = adminCapability.sections.includes('permits')
+  const canManageSupportRequests = adminCapability.sections.includes('support')
   const canManageStudentProfiles = adminCapability.sections.includes('permit-cards')
   const canManageFinancials = adminCapability.canImportFinancials
   const canAccessReports = adminCapability.sections.includes('reports')
@@ -356,6 +381,11 @@ export default function AdminPanel() {
   const [importPreviewRows, setImportPreviewRows] = useState<ImportPreviewRow[]>([])
   const [pendingImportUpdates, setPendingImportUpdates] = useState<FinancialImportUpdate[]>([])
   const [activityLogs, setActivityLogs] = useState<AdminActivityLog[]>([])
+  const [supportRequests, setSupportRequests] = useState<SupportRequest[]>([])
+  const [supportReplyDrafts, setSupportReplyDrafts] = useState<SupportReplyDrafts>({})
+  const [supportStatusDrafts, setSupportStatusDrafts] = useState<SupportStatusDrafts>({})
+  const [loadingSupportRequests, setLoadingSupportRequests] = useState(false)
+  const [savingSupportRequestId, setSavingSupportRequestId] = useState<string | null>(null)
   const [activityPage, setActivityPage] = useState(1)
   const [activityTotalItems, setActivityTotalItems] = useState(0)
   const [activityTotalPages, setActivityTotalPages] = useState(1)
@@ -372,6 +402,7 @@ export default function AdminPanel() {
   const [totalStudents, setTotalStudents] = useState(0)
   const [clearedStudents, setClearedStudents] = useState(0)
   const [outstandingStudents, setOutstandingStudents] = useState(0)
+  const [trashedStudents, setTrashedStudents] = useState<TrashedStudentProfile[]>([])
   const [editingStudent, setEditingStudent] = useState<StudentProfile | null>(null)
   const [showCreateStudent, setShowCreateStudent] = useState(false)
   const [systemFeeSettings, setSystemFeeSettings] = useState<SystemFeeSettings>(DEFAULT_SYSTEM_FEE_SETTINGS)
@@ -384,6 +415,9 @@ export default function AdminPanel() {
   const [createdStudentWelcome, setCreatedStudentWelcome] = useState<CreatedStudentWelcome | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
   const [deletingStudentId, setDeletingStudentId] = useState('')
+  const [restoringStudentId, setRestoringStudentId] = useState('')
+  const [grantingPrintAccessId, setGrantingPrintAccessId] = useState('')
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null)
   const [savingCreate, setSavingCreate] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [bulkPrintStudents, setBulkPrintStudents] = useState<StudentProfile[]>([])
@@ -450,6 +484,21 @@ export default function AdminPanel() {
     }
   }, [filterStatus, page, pageSize, searchQuery])
 
+  const loadTrashedStudents = useCallback(async () => {
+    if (!canManageStudentProfiles) {
+      setTrashedStudents([])
+      return
+    }
+
+    try {
+      const nextTrashedStudents = await fetchTrashedStudentProfiles()
+      setTrashedStudents(nextTrashedStudents)
+    } catch (loadError) {
+      const nextError = loadError instanceof Error ? loadError.message : 'Unable to load deleted student records.'
+      setError(nextError)
+    }
+  }, [canManageStudentProfiles])
+
   const loadActivityLogs = useCallback(async (options?: { silent?: boolean }) => {
     try {
       const nextActivityPage = await fetchAdminActivityLogsPage({
@@ -467,6 +516,49 @@ export default function AdminPanel() {
       setError(nextError)
     }
   }, [activityPage])
+
+  const loadSupportRequestQueue = useCallback(async (options?: { silent?: boolean }) => {
+    if (!canManageSupportRequests) {
+      setSupportRequests([])
+      setSupportReplyDrafts({})
+      setSupportStatusDrafts({})
+      return
+    }
+
+    try {
+      if (!options?.silent) {
+        setLoadingSupportRequests(true)
+      }
+
+      const nextSupportRequests = await fetchSupportRequests()
+      setSupportRequests(nextSupportRequests)
+      setSupportReplyDrafts((current) => {
+        const nextDrafts: SupportReplyDrafts = {}
+
+        for (const request of nextSupportRequests) {
+          nextDrafts[request.id] = current[request.id] ?? request.adminReply ?? ''
+        }
+
+        return nextDrafts
+      })
+      setSupportStatusDrafts((current) => {
+        const nextDrafts: SupportStatusDrafts = {}
+
+        for (const request of nextSupportRequests) {
+          nextDrafts[request.id] = current[request.id] ?? request.status
+        }
+
+        return nextDrafts
+      })
+    } catch (loadError) {
+      const nextError = loadError instanceof Error ? loadError.message : 'Unable to load support requests'
+      setError(nextError)
+    } finally {
+      if (!options?.silent) {
+        setLoadingSupportRequests(false)
+      }
+    }
+  }, [canManageSupportRequests])
 
   const loadFeeSettings = useCallback(async () => {
     if (!user || user.role !== 'admin') {
@@ -488,6 +580,10 @@ export default function AdminPanel() {
   }, [loadStudents])
 
   useEffect(() => {
+    void loadTrashedStudents()
+  }, [loadTrashedStudents])
+
+  useEffect(() => {
     if (!canViewPermitActivity) {
       setActivityLogs([])
       setActivityTotalItems(0)
@@ -497,6 +593,19 @@ export default function AdminPanel() {
 
     void loadActivityLogs()
   }, [canViewPermitActivity, loadActivityLogs])
+
+  useEffect(() => {
+    if (!canManageSupportRequests) {
+      setSupportRequests([])
+      setSupportReplyDrafts({})
+      setSupportStatusDrafts({})
+      return
+    }
+
+    if (activeSection === 'support') {
+      void loadSupportRequestQueue()
+    }
+  }, [activeSection, canManageSupportRequests, loadSupportRequestQueue])
 
   useEffect(() => {
     void loadFeeSettings()
@@ -523,15 +632,21 @@ export default function AdminPanel() {
 
     const intervalId = window.setInterval(() => {
       void loadStudents({ silent: true })
+      if (canManageStudentProfiles) {
+        void loadTrashedStudents()
+      }
       if (canViewPermitActivity) {
         void loadActivityLogs({ silent: true })
+      }
+      if (canManageSupportRequests && activeSection === 'support') {
+        void loadSupportRequestQueue({ silent: true })
       }
     }, 30000)
 
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [canViewPermitActivity, loadActivityLogs, loadStudents])
+  }, [activeSection, canManageStudentProfiles, canManageSupportRequests, canViewPermitActivity, loadActivityLogs, loadStudents, loadSupportRequestQueue, loadTrashedStudents])
 
   useEffect(() => {
     if (typeof window === 'undefined' || !user) {
@@ -608,6 +723,14 @@ export default function AdminPanel() {
     : students
 
   const filteredStudents = visibleStudents
+  const hasActiveStudentFilters = Boolean(searchQuery.trim()) || filterStatus !== 'all' || showPrintedOnly
+  const activeStudentFilterLabels = [
+    searchQuery.trim() ? `Search: ${searchQuery.trim()}` : null,
+    filterStatus === 'paid' ? 'Status: Cleared only' : null,
+    filterStatus === 'outstanding' ? 'Status: Outstanding only' : null,
+    showPrintedOnly ? 'Permit activity: Printed only' : null,
+  ].filter((label): label is string => Boolean(label))
+  const openSupportRequestCount = supportRequests.filter((request) => request.status !== 'resolved').length
   const permitEventCount = activityTotalItems
   const pageStart = totalItems === 0 ? 0 : ((page - 1) * pageSize) + 1
   const pageEnd = totalItems === 0 ? 0 : Math.min(page * pageSize, totalItems)
@@ -692,6 +815,13 @@ export default function AdminPanel() {
 
     navigate('students')
     setSuccessMessage('Student verification view opened. Search by name, email, or registration number to review a record.')
+  }
+
+  function resetStudentView() {
+    setSearchQuery('')
+    setFilterStatus('all')
+    setShowPrintedOnly(false)
+    setPage(1)
   }
 
   function handleExportDashboardCsv() {
@@ -795,6 +925,7 @@ export default function AdminPanel() {
       setBulkPrinting(true)
       setError('')
       setSuccessMessage('')
+      const { default: QRCode } = await import('qrcode')
 
       const qrEntries = await Promise.all(printableStudents.map(async (student) => {
         const qrValue = publicApiBaseUrl
@@ -1070,24 +1201,115 @@ export default function AdminPanel() {
     }
   }
 
-  async function handleDeleteStudent() {
-    if (!user || !editingStudent) {
+  async function moveStudentToTrash(student: StudentProfile) {
+    if (!user) {
       return
     }
 
     try {
-      setDeletingStudentId(editingStudent.id)
+      setDeletingStudentId(student.id)
       setError('')
       setSuccessMessage('')
-      await deleteStudentProfile(editingStudent.id, user.id)
+      await deleteStudentProfile(student.id, user.id)
       setEditingStudent(null)
       await loadStudents({ page: 1, status: 'all' })
-      setSuccessMessage(`Student profile deleted for ${editingStudent.name}.`)
+      await loadTrashedStudents()
+      setSuccessMessage(`Student profile moved to trash for ${student.name}. It can be restored during the trash retention window.`)
     } catch (deleteError) {
       const nextError = deleteError instanceof Error ? deleteError.message : 'Unable to delete student profile.'
       setError(nextError)
     } finally {
       setDeletingStudentId('')
+    }
+  }
+
+  function handleDeleteStudentProfile(student: StudentProfile) {
+    setPendingConfirmation({
+      title: 'Move Student To Trash',
+      message: `${student.name} will be removed from the active student list and can be restored during the trash retention window.`,
+      confirmLabel: 'Move To Trash',
+      tone: 'danger',
+      action: async () => {
+        await moveStudentToTrash(student)
+      },
+    })
+  }
+
+  async function handleDeleteStudent() {
+    if (!editingStudent) {
+      return
+    }
+
+    await handleDeleteStudentProfile(editingStudent)
+  }
+
+  function handleRestoreStudentProfile(student: TrashedStudentProfile) {
+    setPendingConfirmation({
+      title: 'Restore Student Record',
+      message: `${student.name} will return to the active student list immediately if there are no email, phone, or registration conflicts.`,
+      confirmLabel: 'Restore Student',
+      tone: 'success',
+      action: async () => {
+        await restoreStudentFromTrash(student)
+      },
+    })
+  }
+
+  async function restoreStudentFromTrash(student: TrashedStudentProfile) {
+    if (!user) {
+      return
+    }
+
+    try {
+      setRestoringStudentId(student.id)
+      setError('')
+      setSuccessMessage('')
+      const restoredStudent = await restoreStudentProfile(student.id, user.id)
+      await loadStudents({ page: 1, status: 'all' })
+      await loadTrashedStudents()
+      setSuccessMessage(`Restored student profile for ${restoredStudent.name}.`)
+    } catch (restoreError) {
+      const nextError = restoreError instanceof Error ? restoreError.message : 'Unable to restore student profile.'
+      setError(nextError)
+    } finally {
+      setRestoringStudentId('')
+    }
+  }
+
+  async function handleConfirmPendingAction() {
+    if (!pendingConfirmation) {
+      return
+    }
+
+    try {
+      await pendingConfirmation.action()
+    } finally {
+      setPendingConfirmation(null)
+    }
+  }
+
+  async function handleGrantPrintAccess(student: StudentProfile) {
+    if (!user) {
+      return
+    }
+
+    if (!canManageStudentProfiles) {
+      setError('Your admin view does not allow permit access changes.')
+      return
+    }
+
+    try {
+      setGrantingPrintAccessId(student.id)
+      setError('')
+      setSuccessMessage('')
+      const updatedStudent = await grantStudentPermitPrintAccess(student.id, 1, user.id)
+      await loadStudents({ page, search: searchQuery, status: filterStatus })
+      setSuccessMessage(`Granted one extra permit print copy for ${updatedStudent.name}. ${updatedStudent.grantedPrintsRemaining ?? 0} extra print copy remains for this month.`)
+    } catch (grantError) {
+      const nextError = grantError instanceof Error ? grantError.message : 'Unable to grant permit print access.'
+      setError(nextError)
+    } finally {
+      setGrantingPrintAccessId('')
     }
   }
   
@@ -1357,7 +1579,8 @@ export default function AdminPanel() {
         ...current,
         totalFees: formatFeeDraftValue(getFeeForStudentCategory(nextFeeSettings, current.studentCategory)),
       }))
-      setSuccessMessage('Fee structure settings updated successfully.')
+      await loadStudents({ page: 1, status: 'all' })
+      setSuccessMessage('Fee structure settings updated successfully and applied to existing students.')
     } catch (saveError) {
       const nextError = saveError instanceof Error ? saveError.message : 'Unable to update fee structure settings.'
       setError(nextError)
@@ -1392,6 +1615,7 @@ export default function AdminPanel() {
   const navItems: { key: NavSection; label: string; icon: ReactNode; badge?: number }[] = [
     { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { key: 'students', label: 'Students', icon: <Users className="w-5 h-5" />, badge: outstandingStudents > 0 ? outstandingStudents : undefined },
+    { key: 'support', label: 'Support Requests', icon: <Bell className="w-5 h-5" />, badge: openSupportRequestCount > 0 ? openSupportRequestCount : undefined },
     { key: 'permits', label: 'Permit Activity', icon: <FileCheck className="w-5 h-5" />, badge: permitEventCount > 0 ? permitEventCount : undefined },
     { key: 'permit-cards', label: 'Permit Cards', icon: <CreditCard className="w-5 h-5" />, badge: clearedStudents > 0 ? clearedStudents : undefined },
     { key: 'import', label: 'Bulk Import', icon: <FileUp className="w-5 h-5" /> },
@@ -1470,6 +1694,39 @@ export default function AdminPanel() {
 
     setActiveSection(section)
     setSidebarOpen(false)
+  }
+
+  async function handleSaveSupportRequest(requestId: string) {
+    if (!canManageSupportRequests) {
+      setError('Your admin view does not allow support request updates.')
+      return
+    }
+
+    const nextStatus = supportStatusDrafts[requestId]
+    const nextReply = (supportReplyDrafts[requestId] ?? '').trim()
+
+    try {
+      setSavingSupportRequestId(requestId)
+      setError('')
+      setSuccessMessage('')
+
+      const updatedRequest = await updateSupportRequest(requestId, {
+        status: nextStatus,
+        adminReply: nextReply,
+      })
+
+      setSupportRequests((current) => current.map((request) => (
+        request.id === requestId ? updatedRequest : request
+      )))
+      setSupportReplyDrafts((current) => ({ ...current, [requestId]: updatedRequest.adminReply }))
+      setSupportStatusDrafts((current) => ({ ...current, [requestId]: updatedRequest.status }))
+      setSuccessMessage(`Updated support request for ${updatedRequest.studentName}.`)
+    } catch (saveError) {
+      const nextError = saveError instanceof Error ? saveError.message : 'Unable to update support request.'
+      setError(nextError)
+    } finally {
+      setSavingSupportRequestId(null)
+    }
   }
 
   function handleDragEnter(event: DragEvent<HTMLLabelElement>) {
@@ -2158,7 +2415,11 @@ export default function AdminPanel() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Students</h1>
-                  <p className="text-sm text-gray-500">Showing {pageStart}-{pageEnd} of {totalItems} student(s)</p>
+                  <p className="text-sm text-gray-500">
+                    {showPrintedOnly
+                      ? `Showing ${filteredStudents.length} printed student(s) on this page out of ${totalItems} matched student record(s)`
+                      : `Showing ${pageStart}-${pageEnd} of ${totalItems} student(s)`}
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 self-start">
                   {canManageFinancials && (
@@ -2220,6 +2481,25 @@ export default function AdminPanel() {
                   </label>
                 </div>
               </div>
+
+              {hasActiveStudentFilters && (
+                <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium">Student filters are active</p>
+                    <p className="text-xs text-amber-800">
+                      {activeStudentFilterLabels.join(' • ')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resetStudentView}
+                    className="inline-flex items-center gap-2 self-start rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Reset Student View
+                  </button>
+                </div>
+              )}
 
               <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
@@ -2311,15 +2591,37 @@ export default function AdminPanel() {
                                   <CheckCircle2 className="h-3.5 w-3.5" />
                                 </button>
                               </form>
-                                                          <button
-                                                            type="button"
-                                                            disabled={!canManageStudentProfiles}
-                                                            onClick={() => handleEditStudent(student)}
-                                                            title="Edit student profile"
-                                                            className="rounded bg-blue-500 p-1.5 text-white hover:bg-blue-600 disabled:opacity-50"
-                                                          >
-                                                            <Pencil className="h-3.5 w-3.5" />
-                                                          </button>
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  disabled={!canManageStudentProfiles}
+                                  onClick={() => handleEditStudent(student)}
+                                  title="Edit student profile"
+                                  className="rounded bg-blue-500 p-1.5 text-white hover:bg-blue-600 disabled:opacity-50"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!canManageStudentProfiles || grantingPrintAccessId === student.id}
+                                  onClick={() => void handleGrantPrintAccess(student)}
+                                  title="Grant one extra permit print for this month"
+                                  aria-label={`Grant one extra permit print for ${student.name}`}
+                                  className="rounded bg-indigo-500 p-1.5 text-white hover:bg-indigo-600 disabled:opacity-50"
+                                >
+                                  <Shield className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!canManageStudentProfiles || deletingStudentId === student.id}
+                                  onClick={() => void handleDeleteStudentProfile(student)}
+                                  title="Remove student profile"
+                                  aria-label={`Remove ${student.name}`}
+                                  className="rounded bg-red-500 p-1.5 text-white hover:bg-red-600 disabled:opacity-50"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         )
@@ -2359,6 +2661,184 @@ export default function AdminPanel() {
                     </button>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-xl border border-amber-200 bg-white shadow-sm">
+                <div className="border-b border-amber-100 px-5 py-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="font-semibold text-gray-800">Trash</h2>
+                      <p className="text-xs text-gray-400">Deleted student records stay here until the retention period expires.</p>
+                    </div>
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                      {trashedStudents.length} in trash
+                    </span>
+                  </div>
+                </div>
+                {trashedStudents.length === 0 ? (
+                  <div className="px-5 py-8 text-sm text-gray-400">No deleted student records are waiting in trash.</div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {trashedStudents.map((student) => (
+                      <div key={student.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="font-medium text-gray-900">{student.name}</p>
+                          <p className="text-xs text-gray-400">{student.studentId ?? 'No registration number'} · {student.email}</p>
+                          {(() => {
+                            const daysUntilPurge = getDaysUntilDate(student.purgeAfterAt)
+
+                            return (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Deleted {new Date(student.deletedAt).toLocaleString()} · auto-purge {new Date(student.purgeAfterAt).toLocaleDateString()}
+                            {daysUntilPurge !== null ? ` • ${daysUntilPurge} day${daysUntilPurge === 1 ? '' : 's'} left` : ''}
+                          </p>
+                            )
+                          })()}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={!canManageStudentProfiles || restoringStudentId === student.id}
+                          onClick={() => handleRestoreStudentProfile(student)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                        >
+                          <RefreshCcw className="h-4 w-4" />
+                          {restoringStudentId === student.id ? 'Restoring…' : 'Restore'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'support' && (
+            <div className="space-y-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Support Requests</h1>
+                  <p className="text-sm text-gray-500">Review student help tickets, update statuses, and send replies from the admin desk.</p>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Open or in progress: {openSupportRequestCount}</span>
+                  <button
+                    type="button"
+                    onClick={() => void loadSupportRequestQueue()}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                  >
+                    <RefreshCcw className="h-3.5 w-3.5" />
+                    Refresh Queue
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="rounded-xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-500">Open</p>
+                  <p className="mt-2 text-3xl font-bold text-amber-700">{supportRequests.filter((request) => request.status === 'open').length}</p>
+                  <p className="mt-1 text-xs text-amber-500">Awaiting the first admin response</p>
+                </div>
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">In Progress</p>
+                  <p className="mt-2 text-3xl font-bold text-blue-700">{supportRequests.filter((request) => request.status === 'in_progress').length}</p>
+                  <p className="mt-1 text-xs text-blue-500">Active cases still being worked</p>
+                </div>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Resolved</p>
+                  <p className="mt-2 text-3xl font-bold text-emerald-700">{supportRequests.filter((request) => request.status === 'resolved').length}</p>
+                  <p className="mt-1 text-xs text-emerald-500">Closed with an admin response</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-100 px-5 py-4">
+                  <h2 className="font-semibold text-gray-800">Support Queue</h2>
+                  <p className="text-xs text-gray-400">Student-submitted requests routed to administrators with support permissions.</p>
+                </div>
+                {loadingSupportRequests ? (
+                  <div className="px-5 py-10 text-center text-sm text-gray-400">Loading support requests...</div>
+                ) : supportRequests.length === 0 ? (
+                  <div className="px-5 py-10 text-center text-sm text-gray-400">No support requests have been submitted yet.</div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {supportRequests.map((request) => {
+                      const isSaving = savingSupportRequestId === request.id
+
+                      return (
+                        <div key={request.id} className="px-5 py-5">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-base font-semibold text-gray-900">{request.subject}</h3>
+                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                  request.status === 'resolved'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : request.status === 'in_progress'
+                                      ? 'bg-blue-100 text-blue-700'
+                                      : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {request.status.replace('_', ' ')}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-sm text-gray-500">{request.studentName} • {request.registrationNumber || request.studentEmail}</p>
+                              <p className="mt-1 text-xs text-gray-400">Submitted {new Date(request.createdAt).toLocaleString()} • Updated {new Date(request.updatedAt).toLocaleString()}</p>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              <p>Email: {request.studentEmail}</p>
+                              <p>Request ID: {request.id}</p>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
+                            {request.message}
+                          </div>
+
+                          <div className="mt-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_auto] lg:items-end">
+                            <div>
+                              <label htmlFor={`support-status-${request.id}`} className="mb-2 block text-sm font-medium text-gray-700">Status</label>
+                              <select
+                                id={`support-status-${request.id}`}
+                                value={supportStatusDrafts[request.id] ?? request.status}
+                                onChange={(event) => setSupportStatusDrafts((current) => ({
+                                  ...current,
+                                  [request.id]: event.target.value as SupportRequestStatus,
+                                }))}
+                                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                              >
+                                <option value="open">Open</option>
+                                <option value="in_progress">In progress</option>
+                                <option value="resolved">Resolved</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label htmlFor={`support-reply-${request.id}`} className="mb-2 block text-sm font-medium text-gray-700">Admin reply</label>
+                              <textarea
+                                id={`support-reply-${request.id}`}
+                                rows={3}
+                                value={supportReplyDrafts[request.id] ?? request.adminReply}
+                                onChange={(event) => setSupportReplyDrafts((current) => ({
+                                  ...current,
+                                  [request.id]: event.target.value,
+                                }))}
+                                placeholder="Explain the resolution or next action for the student."
+                                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void handleSaveSupportRequest(request.id)}
+                              disabled={isSaving}
+                              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              <Save className="h-4 w-4" />
+                              {isSaving ? 'Saving...' : 'Save Update'}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -2921,6 +3401,26 @@ export default function AdminPanel() {
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
+                        <button
+                          type="button"
+                          disabled={!canManageStudentProfiles || grantingPrintAccessId === student.id}
+                          onClick={() => void handleGrantPrintAccess(student)}
+                          title="Grant one extra permit print for this month"
+                          aria-label={`Grant one extra permit print for ${student.name}`}
+                          className="rounded bg-indigo-500 p-1.5 text-white hover:bg-indigo-600 disabled:opacity-50"
+                        >
+                          <Shield className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!canManageStudentProfiles || deletingStudentId === student.id}
+                          onClick={() => void handleDeleteStudentProfile(student)}
+                          title="Remove student profile"
+                          aria-label={`Remove ${student.name}`}
+                          className="rounded bg-red-500 p-1.5 text-white hover:bg-red-600 disabled:opacity-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
 
                       <div className="mb-3">
@@ -3259,9 +3759,47 @@ export default function AdminPanel() {
         </main>
       </div>
 
-      {editingStudent && (
+      {pendingConfirmation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-base font-semibold text-gray-900">{pendingConfirmation.title}</h2>
+              <button
+                type="button"
+                title="Close confirmation dialog"
+                aria-label="Close confirmation dialog"
+                onClick={() => setPendingConfirmation(null)}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-3 px-6 py-5 text-sm text-gray-600">
+              <p>{pendingConfirmation.message}</p>
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setPendingConfirmation(null)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmPendingAction()}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${pendingConfirmation.tone === 'danger' ? 'bg-red-500 hover:bg-red-600' : pendingConfirmation.tone === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+              >
+                {pendingConfirmation.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingStudent && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 py-6">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-base font-semibold text-gray-900">Edit Student Profile</h2>
               <button
@@ -3437,7 +3975,7 @@ export default function AdminPanel() {
                   disabled={deletingStudentId === editingStudent.id || savingEdit}
                   className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
                 >
-                  {deletingStudentId === editingStudent.id ? 'Deleting\u2026' : 'Delete Student'}
+                  {deletingStudentId === editingStudent.id ? 'Removing\u2026' : 'Remove Student'}
                 </button>
                 <div className="flex gap-3">
                   <button

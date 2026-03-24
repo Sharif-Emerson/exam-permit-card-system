@@ -43,6 +43,11 @@ export interface DatabaseProfileRow {
   permit_token: string | null
   exams_json: string | null
   exams?: StudentExam[] | null
+  monthly_print_count?: number | null
+  monthly_print_limit?: number | null
+  granted_prints_remaining?: number | null
+  can_print_permit?: boolean | null
+  print_access_message?: string | null
   total_fees: number
   amount_paid: number
 }
@@ -69,6 +74,11 @@ export interface StudentProfile {
   profileImage: string
   permitToken: string
   exams: StudentExam[]
+  monthlyPrintCount?: number
+  monthlyPrintLimit?: number
+  grantedPrintsRemaining?: number
+  canPrintPermit?: boolean
+  printAccessMessage?: string
   totalFees: number
   amountPaid: number
   feesBalance: number
@@ -92,6 +102,20 @@ export interface StudentListPage {
   totalStudents: number
   clearedStudents: number
   outstandingStudents: number
+}
+
+export interface TrashedStudentProfile {
+  id: string
+  profileId: string
+  role: 'student'
+  name: string
+  email: string
+  studentId?: string
+  deletedAt: string
+  purgeAfterAt: string
+  deletedByAdminId?: string | null
+  restoredAt?: string | null
+  restoredByAdminId?: string | null
 }
 
 export type SupportRequestStatus = 'open' | 'in_progress' | 'resolved'

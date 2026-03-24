@@ -1,10 +1,10 @@
-import './reset-data-sqlite.js'
-/*
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomBytes, scryptSync } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
+import '../lib/load-env.js'
+import { getBootstrapAdmins, getBootstrapProfiles } from '../lib/bootstrap-admins.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -96,6 +96,8 @@ async function readExistingAdmins(dbFilePath) {
 
 async function reseedDatabase(preservedAdmins = new Map()) {
 	const seed = JSON.parse(await fs.readFile(seedFile, 'utf8'))
+	const bootstrapAdmins = getBootstrapAdmins()
+	const bootstrapProfiles = getBootstrapProfiles()
 	const db = new DatabaseSync(appDbPath)
 	const timestamp = new Date().toISOString()
 
@@ -243,7 +245,7 @@ async function reseedDatabase(preservedAdmins = new Map()) {
 			insertCampus.run(campus.id, campus.name, timestamp, timestamp)
 		}
 
-		for (const user of seed.users ?? []) {
+		for (const user of bootstrapAdmins) {
 			const preservedAdmin = user.role === 'admin' ? preservedAdmins.get(user.id) : null
 			insertUser.run(
 				user.id,
@@ -260,7 +262,7 @@ async function reseedDatabase(preservedAdmins = new Map()) {
 			)
 		}
 
-		for (const profile of seed.profiles ?? []) {
+		for (const profile of bootstrapProfiles) {
 			const preservedAdmin = profile.role === 'admin' ? preservedAdmins.get(profile.id) : null
 			const permitToken = createPermitToken()
 			const exams = createExamAssignments(profile)
@@ -372,4 +374,3 @@ if (usedInPlaceReset) {
 } else {
 	console.log('Backend database and upload archive reset.')
 }
-*/

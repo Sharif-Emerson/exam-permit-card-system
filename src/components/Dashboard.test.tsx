@@ -17,7 +17,14 @@ const { signOut, refreshUser, fetchStudentProfileById, updateStudentAccount, fet
     role: 'student',
     name: 'John Doe',
     studentId: 'STU001',
+    studentCategory: 'international',
+    phoneNumber: '+256700123456',
     course: 'Computer Science',
+    program: 'BSc Computer Science',
+    college: 'College of Computing',
+    department: 'Computer Science Department',
+    semester: 'Semester 1 2026/2027',
+    courseUnits: ['CSC 401 - Compiler Construction', 'CSC 403 - Distributed Systems'],
     examDate: '2026-04-15',
     examTime: '10:00 AM',
     venue: 'Hall A',
@@ -103,11 +110,18 @@ describe('Dashboard', () => {
 
     updateStudentAccount.mockResolvedValue({
       id: 'student-id',
-      email: 'student@example.com',
+      email: 'john.doe.updated@example.com',
       role: 'student',
       name: 'John Doe Updated',
       studentId: 'STU001',
+      studentCategory: 'international',
+      phoneNumber: '+256700999888',
       course: 'Computer Science',
+      program: 'BSc Computer Science',
+      college: 'College of Computing',
+      department: 'Computer Science Department',
+      semester: 'Semester 1 2026/2027',
+      courseUnits: ['CSC 401 - Compiler Construction', 'CSC 403 - Distributed Systems'],
       examDate: '2026-04-15',
       examTime: '10:00 AM',
       venue: 'Hall A',
@@ -139,8 +153,12 @@ describe('Dashboard', () => {
     })
 
     await user.click(screen.getByRole('button', { name: /profile settings/i }))
-    expect(screen.getByLabelText(/full name/i)).toHaveAttribute('readonly')
-    expect(screen.getByLabelText(/email address/i)).toHaveAttribute('readonly')
+    await user.clear(screen.getByLabelText(/full name/i))
+    await user.type(screen.getByLabelText(/full name/i), 'John Doe Updated')
+    await user.clear(screen.getByLabelText(/email address/i))
+    await user.type(screen.getByLabelText(/email address/i), 'john.doe.updated@example.com')
+    await user.clear(screen.getByLabelText(/phone number/i))
+    await user.type(screen.getByLabelText(/phone number/i), '+256700999888')
     await user.clear(screen.getByLabelText(/profile image url/i))
     await user.type(screen.getByLabelText(/profile image url/i), 'https://cdn.example.com/new-avatar.png')
     await user.type(screen.getByLabelText(/current password/i), 'Permit@2026')
@@ -150,6 +168,9 @@ describe('Dashboard', () => {
 
     await waitFor(() => {
       expect(updateStudentAccount).toHaveBeenCalledWith('student-id', {
+        name: 'John Doe Updated',
+        email: 'john.doe.updated@example.com',
+        phoneNumber: '+256700999888',
         profileImage: 'https://cdn.example.com/new-avatar.png',
         currentPassword: 'Permit@2026',
         password: 'Permit@2027',
@@ -158,6 +179,44 @@ describe('Dashboard', () => {
 
     expect(refreshUser).toHaveBeenCalled()
     expect(await screen.findByText(/profile settings updated successfully\./i)).toBeTruthy()
+  }, 10000)
+
+  it('shows the expanded student profile structure in the student preview', async () => {
+    window.localStorage.clear()
+
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: { id: 'student-id', email: 'student@example.com', role: 'student', name: 'John Doe' },
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signOut,
+      refreshUser,
+    })
+
+    const profileServiceModule = await import('../services/profileService')
+    vi.spyOn(profileServiceModule, 'fetchStudentProfileById').mockImplementation(fetchStudentProfileById)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
+    vi.spyOn(profileServiceModule, 'fetchSupportRequests').mockImplementation(fetchSupportRequests)
+    vi.spyOn(profileServiceModule, 'fetchSupportContacts').mockImplementation(fetchSupportContacts)
+    vi.spyOn(profileServiceModule, 'fetchPermitActivityHistory').mockImplementation(fetchPermitActivityHistory)
+    vi.spyOn(profileServiceModule, 'createSupportRequest').mockImplementation(createSupportRequest)
+    vi.spyOn(profileServiceModule, 'recordPermitActivity').mockImplementation(recordPermitActivity)
+
+    const { default: Dashboard } = await import('./Dashboard')
+    render(<Dashboard />)
+
+    await waitFor(() => {
+      expect(fetchStudentProfileById).toHaveBeenCalledWith('student-id')
+    })
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /profile settings/i }))
+
+    expect(await screen.findByText(/phone: \+256700123456/i)).toBeTruthy()
+    expect(screen.getByText(/student category: international/i)).toBeTruthy()
+    expect(screen.getByText(/college: college of computing/i)).toBeTruthy()
+    expect(screen.getByText(/department: computer science department/i)).toBeTruthy()
+    expect(screen.getByText(/course units: csc 401 - compiler construction, csc 403 - distributed systems/i)).toBeTruthy()
   }, 10000)
 
   it('submits a permit application and stores it in history', async () => {
@@ -216,7 +275,7 @@ describe('Dashboard', () => {
     const printSpy = vi.fn()
     window.print = printSpy
 
-    fetchStudentProfileById.mockResolvedValueOnce({
+    fetchStudentProfileById.mockResolvedValue({
       id: 'student-id',
       email: 'student@example.com',
       role: 'student',
@@ -243,6 +302,11 @@ describe('Dashboard', () => {
       totalFees: 3000,
       amountPaid: 3000,
       feesBalance: 0,
+      monthlyPrintCount: 0,
+      monthlyPrintLimit: 2,
+      grantedPrintsRemaining: 0,
+      canPrintPermit: true,
+      printAccessMessage: '',
     })
 
     const authContextModule = await import('../context/AuthContext')

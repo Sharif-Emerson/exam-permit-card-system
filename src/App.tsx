@@ -1,11 +1,17 @@
 
+import { Suspense, lazy } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import AdminPanel from './components/AdminPanel'
-import Dashboard from './components/Dashboard'
-import Login from './components/Login'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
+
+const Login = lazy(() => import('./components/Login'))
+const Dashboard = lazy(() => import('./components/Dashboard'))
+const AdminPanel = lazy(() => import('./components/AdminPanel'))
+
+function RouteFallback() {
+  return <div className="min-h-screen bg-gray-100 dark:bg-slate-950" />
+}
 
 function HomeRedirect() {
   const { user, loading } = useAuth()
@@ -28,7 +34,11 @@ function LoginRoute() {
     return <Navigate to={user.role === 'admin' ? '/admin' : '/student'} replace />
   }
 
-  return <Login />
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      <Login />
+    </Suspense>
+  )
 }
 
 export default function App() {
@@ -43,7 +53,9 @@ export default function App() {
               path="/student"
               element={
                 <ProtectedRoute requiredRole="student">
-                  <Dashboard />
+                  <Suspense fallback={<RouteFallback />}>
+                    <Dashboard />
+                  </Suspense>
                 </ProtectedRoute>
               }
             />
@@ -51,7 +63,9 @@ export default function App() {
               path="/admin"
               element={
                 <ProtectedRoute requiredRole="admin">
-                  <AdminPanel />
+                  <Suspense fallback={<RouteFallback />}>
+                    <AdminPanel />
+                  </Suspense>
                 </ProtectedRoute>
               }
             />

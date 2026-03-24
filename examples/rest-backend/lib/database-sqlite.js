@@ -1,10 +1,9 @@
-export * from './database-sqlite.js'
-/*
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
+import { getBootstrapAdmins, getBootstrapProfiles } from './bootstrap-admins.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -30,6 +29,7 @@ const defaultSystemFeeSettings = Object.freeze({
   local_student_fee: 3000,
   international_student_fee: 6000,
 })
+const trashRetentionDays = Math.max(Number(process.env.TRASH_RETENTION_DAYS ?? '30') || 30, 1)
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS campuses (
@@ -139,8 +139,27 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS trashed_profiles (
+    id TEXT PRIMARY KEY,
+    profile_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    student_id TEXT,
+    deleted_at TEXT NOT NULL,
+    purge_after_at TEXT NOT NULL,
+    deleted_by_admin_id TEXT,
+    restored_at TEXT,
+    restored_by_admin_id TEXT,
+    snapshot_json TEXT NOT NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
   CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+  CREATE INDEX IF NOT EXISTS idx_trashed_profiles_deleted_at ON trashed_profiles(deleted_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_trashed_profiles_purge_after_at ON trashed_profiles(purge_after_at);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_trashed_profiles_active_profile_id ON trashed_profiles(profile_id)
+  WHERE restored_at IS NULL;
 `)
 
 function hasColumn(tableName, columnName) {
@@ -164,6 +183,8 @@ ensureColumn('profiles', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
 ensureColumn('profiles', 'phone_number TEXT')
 ensureColumn('profiles', "student_category TEXT NOT NULL DEFAULT 'local'")
 ensureColumn('profiles', 'permit_token TEXT')
+ensureColumn('profiles', 'permit_print_grant_month TEXT')
+ensureColumn('profiles', 'permit_print_grants_remaining INTEGER NOT NULL DEFAULT 0')
 ensureColumn('profiles', "exams_json TEXT NOT NULL DEFAULT '[]'")
 ensureColumn('profiles', 'program TEXT')
 ensureColumn('profiles', 'college TEXT')
@@ -202,10 +223,12 @@ db.prepare(`
     WHEN id = 'admin-1' THEN 'super-admin'
     WHEN id = 'admin-2' THEN 'registrar'
     WHEN id = 'admin-3' THEN 'finance'
+    WHEN id = 'admin-4' THEN 'operations'
     WHEN admin_scope IS NOT NULL AND admin_scope != '' THEN admin_scope
     WHEN lower(email) = 'admin@example.com' THEN 'super-admin'
     WHEN lower(email) = 'registrar@example.com' THEN 'registrar'
     WHEN lower(email) = 'finance@example.com' THEN 'finance'
+    WHEN lower(email) = 'operations@example.com' THEN 'operations'
     ELSE 'operations'
   END
 `).run()
@@ -215,6 +238,7 @@ db.prepare(`
   SET campus_id = COALESCE(NULLIF(campus_id, ''), 'main-campus'),
   campus_name = COALESCE(NULLIF(campus_name, ''), 'Main Campus'),
   permit_token = COALESCE(NULLIF(permit_token, ''), ''),
+  permit_print_grants_remaining = COALESCE(permit_print_grants_remaining, 0),
   exams_json = COALESCE(NULLIF(exams_json, ''), '[]'),
   course_units_json = COALESCE(NULLIF(course_units_json, ''), '[]')
 `).run()
@@ -227,6 +251,23 @@ db.prepare(`
 
 function nowIso() {
   return new Date().toISOString()
+}
+
+function addDaysIso(dateValue, days) {
+  const baseDate = dateValue instanceof Date ? dateValue : new Date(dateValue)
+  return new Date(baseDate.getTime() + (days * 24 * 60 * 60 * 1000)).toISOString()
+}
+
+function parseJsonValue(value, fallbackValue) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return fallbackValue
+  }
+
+  try {
+    return JSON.parse(value)
+  } catch {
+    return fallbackValue
+  }
 }
 
 function normalizeStudentCategory(value) {
@@ -418,6 +459,49 @@ function mapExamRecord(row) {
   }
 }
 
+function getPermitPrintMonthKey(dateValue = new Date()) {
+  const year = dateValue.getUTCFullYear()
+  const month = String(dateValue.getUTCMonth() + 1).padStart(2, '0')
+  return `${year}-${month}`
+}
+
+function getCurrentPermitPrintMonthKey() {
+  return getPermitPrintMonthKey(new Date())
+}
+
+function getStudentPermitOutputCountForMonth(profileId, monthKey = getCurrentPermitPrintMonthKey()) {
+  return Number(db.prepare(`
+    SELECT COUNT(*) AS total
+    FROM admin_activity_logs
+    WHERE target_profile_id = ?
+      AND action IN ('print_permit', 'download_permit')
+      AND substr(created_at, 1, 7) = ?
+  `).get(profileId, monthKey)?.total ?? 0)
+}
+
+function getStudentPermitAccess(row) {
+  const monthKey = getCurrentPermitPrintMonthKey()
+  const monthlyPrintCount = getStudentPermitOutputCountForMonth(row.id, monthKey)
+  const grantedPrintsRemaining = row.permit_print_grant_month === monthKey
+    ? Number(row.permit_print_grants_remaining ?? 0)
+    : 0
+  const monthlyPrintLimit = 2 + grantedPrintsRemaining
+  const canPrintPermit = monthlyPrintCount < monthlyPrintLimit
+  const printAccessMessage = canPrintPermit
+    ? grantedPrintsRemaining > 0 && monthlyPrintCount >= 2
+      ? `Administration has granted ${grantedPrintsRemaining} extra permit print ${grantedPrintsRemaining === 1 ? 'copy' : 'copies'} for this month.`
+      : `You have used ${monthlyPrintCount} of ${monthlyPrintLimit} permit print copies this month.`
+    : 'You have used your two monthly permit print copies. Contact administration to request extra print permission.'
+
+  return {
+    monthly_print_count: monthlyPrintCount,
+    monthly_print_limit: monthlyPrintLimit,
+    granted_prints_remaining: grantedPrintsRemaining,
+    can_print_permit: canPrintPermit,
+    print_access_message: printAccessMessage,
+  }
+}
+
 function listProfileExamsByIds(profileIds) {
   const uniqueIds = [...new Set(profileIds.filter(Boolean))]
   const examsByProfileId = new Map(uniqueIds.map((profileId) => [profileId, []]))
@@ -481,6 +565,7 @@ function mapProfile(row, examsByProfileId = new Map()) {
 
   const exams = examsByProfileId.get(row.id) ?? parseLegacyExamAssignments(row)
   const profile = { ...row }
+  const permitAccess = row.role === 'student' ? getStudentPermitAccess(row) : {}
   delete profile.campus_id
   delete profile.campus_name
   delete profile.exams_json
@@ -488,6 +573,7 @@ function mapProfile(row, examsByProfileId = new Map()) {
 
   return {
     ...profile,
+    ...permitAccess,
     permit_token: row.permit_token,
     course_units: parseCourseUnits(row),
     exams,
@@ -579,6 +665,8 @@ async function seedDatabaseIfNeeded() {
   }
 
   const seed = JSON.parse(await fs.readFile(seedFile, 'utf8'))
+  const bootstrapAdmins = getBootstrapAdmins()
+  const bootstrapProfiles = getBootstrapProfiles()
   const insertCampus = db.prepare(`
     INSERT INTO campuses (id, name, created_at, updated_at)
     VALUES (?, ?, ?, ?)
@@ -617,7 +705,7 @@ async function seedDatabaseIfNeeded() {
       )
     }
 
-    for (const user of seed.users ?? []) {
+    for (const user of bootstrapAdmins) {
       insertUser.run(
         user.id,
         user.email,
@@ -633,7 +721,7 @@ async function seedDatabaseIfNeeded() {
       )
     }
 
-    for (const profile of seed.profiles ?? []) {
+    for (const profile of bootstrapProfiles) {
       const permitToken = createPermitToken()
       const exams = normalizeExamAssignments(profile.exams ?? null, { id: profile.id, ...profile })
 
@@ -774,6 +862,7 @@ export function revokeSession(token) {
 }
 
 export function getProfileById(id) {
+  pruneExpiredTrashedProfiles()
   const row = db.prepare('SELECT * FROM profiles WHERE id = ?').get(id)
 
   if (!row) {
@@ -800,16 +889,40 @@ export function updateSystemSettings(updates) {
     ? normalizeNumber(updates.international_student_fee)
     : normalizeNumber(existing.international_student_fee)
 
-  db.prepare(`
-    UPDATE system_settings
-    SET local_student_fee = ?, international_student_fee = ?, updated_at = ?
-    WHERE id = ?
-  `).run(nextLocalStudentFee, nextInternationalStudentFee, updatedAt, 'default')
+  db.exec('BEGIN')
+
+  try {
+    db.prepare(`
+      UPDATE system_settings
+      SET local_student_fee = ?, international_student_fee = ?, updated_at = ?
+      WHERE id = ?
+    `).run(nextLocalStudentFee, nextInternationalStudentFee, updatedAt, 'default')
+
+    db.prepare(`
+      UPDATE profiles
+      SET total_fees = CASE
+        WHEN role != 'student' THEN total_fees
+        WHEN student_category = 'international' THEN ?
+        ELSE ?
+      END,
+      updated_at = CASE
+        WHEN role = 'student' THEN ?
+        ELSE updated_at
+      END
+      WHERE role = 'student'
+    `).run(nextInternationalStudentFee, nextLocalStudentFee, updatedAt)
+
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
 
   return getSystemSettings()
 }
 
 export function listProfiles(role) {
+  pruneExpiredTrashedProfiles()
   const rows = role
     ? db.prepare('SELECT * FROM profiles WHERE role = ? ORDER BY name ASC').all(role)
     : db.prepare('SELECT * FROM profiles ORDER BY name ASC').all()
@@ -823,6 +936,7 @@ export function listProfiles(role) {
 }
 
 export function listProfilesPage({ role, search, status, page = 1, pageSize = 25 } = {}) {
+  pruneExpiredTrashedProfiles()
   const whereClauses = []
   const params = []
 
@@ -895,6 +1009,7 @@ export function listProfilesPage({ role, search, status, page = 1, pageSize = 25
 }
 
 export function getPermitByToken(permitToken) {
+  pruneExpiredTrashedProfiles()
   const row = db.prepare('SELECT * FROM profiles WHERE permit_token = ? AND role = ?').get(permitToken, 'student')
 
   if (!row) {
@@ -928,6 +1043,55 @@ export function updateProfileFinancials(profileId, amountPaid, totalFees) {
   db.prepare(
     'UPDATE profiles SET amount_paid = ?, total_fees = ?, updated_at = ? WHERE id = ?',
   ).run(nextAmountPaid, nextTotalFees, updatedAt, profileId)
+
+  return getProfileById(profileId)
+}
+
+export function grantStudentPermitPrintAccess(profileId, additionalPrints = 1) {
+  const profileRow = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profileId)
+
+  if (!profileRow || profileRow.role !== 'student') {
+    return null
+  }
+
+  const nextAdditionalPrints = Math.max(1, Math.min(Number(additionalPrints) || 1, 12))
+  const monthKey = getCurrentPermitPrintMonthKey()
+  const currentRemaining = profileRow.permit_print_grant_month === monthKey
+    ? Number(profileRow.permit_print_grants_remaining ?? 0)
+    : 0
+
+  db.prepare(`
+    UPDATE profiles
+    SET permit_print_grant_month = ?, permit_print_grants_remaining = ?, updated_at = ?
+    WHERE id = ?
+  `).run(monthKey, currentRemaining + nextAdditionalPrints, nowIso(), profileId)
+
+  return getProfileById(profileId)
+}
+
+export function consumeStudentPermitPrintGrant(profileId) {
+  const profileRow = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profileId)
+
+  if (!profileRow || profileRow.role !== 'student') {
+    return null
+  }
+
+  const permitAccess = getStudentPermitAccess(profileRow)
+
+  if (permitAccess.monthly_print_count < 2 || permitAccess.granted_prints_remaining <= 0) {
+    return getProfileById(profileId)
+  }
+
+  db.prepare(`
+    UPDATE profiles
+    SET permit_print_grants_remaining = ?, permit_print_grant_month = ?, updated_at = ?
+    WHERE id = ?
+  `).run(
+    permitAccess.granted_prints_remaining - 1,
+    getCurrentPermitPrintMonthKey(),
+    nowIso(),
+    profileId,
+  )
 
   return getProfileById(profileId)
 }
@@ -1257,7 +1421,7 @@ export function updateSupportRequest(requestId, { status, adminReply }) {
   return listSupportRequests().find((request) => request.id === requestId) ?? null
 }
 
-export function deleteStudentProfile(profileId) {
+export function deleteStudentProfile(profileId, deletedByAdminId = null) {
   const profileRow = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profileId)
 
   if (!profileRow || profileRow.role !== 'student') {
@@ -1265,11 +1429,45 @@ export function deleteStudentProfile(profileId) {
   }
 
   const existingProfile = getProfileById(profileId)
+  const userRow = db.prepare('SELECT * FROM users WHERE id = ?').get(profileId)
+  const examRows = db.prepare('SELECT * FROM profile_exams WHERE profile_id = ? ORDER BY created_at ASC').all(profileId)
+  const supportRows = db.prepare('SELECT * FROM support_requests WHERE student_id = ? ORDER BY created_at ASC').all(profileId)
+  const activityRows = db.prepare(`
+    SELECT * FROM admin_activity_logs
+    WHERE target_profile_id = ? OR admin_id = ?
+    ORDER BY created_at ASC
+  `).all(profileId, profileId)
+  const trashId = randomBytes(12).toString('hex')
   const deletedAt = nowIso()
+  const purgeAfterAt = addDaysIso(deletedAt, trashRetentionDays)
+  const snapshot = JSON.stringify({
+    user: userRow,
+    profile: profileRow,
+    exams: examRows,
+    supportRequests: supportRows,
+    activityLogs: activityRows,
+  })
 
   db.exec('BEGIN')
 
   try {
+    db.prepare(`
+      INSERT INTO trashed_profiles (
+        id, profile_id, role, name, email, student_id, deleted_at, purge_after_at, deleted_by_admin_id, snapshot_json
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      trashId,
+      profileId,
+      profileRow.role,
+      profileRow.name,
+      profileRow.email,
+      profileRow.student_id ?? null,
+      deletedAt,
+      purgeAfterAt,
+      deletedByAdminId,
+      snapshot,
+    )
     db.prepare('DELETE FROM sessions WHERE user_id = ?').run(profileId)
     db.prepare('DELETE FROM admin_activity_logs WHERE target_profile_id = ?').run(profileId)
     db.prepare('DELETE FROM support_requests WHERE student_id = ?').run(profileId)
@@ -1283,9 +1481,209 @@ export function deleteStudentProfile(profileId) {
   }
 
   return {
+    trashId,
     ...existingProfile,
     deletedAt,
+    purgeAfterAt,
   }
+}
+
+function mapTrashedProfile(row) {
+  return {
+    id: row.id,
+    profile_id: row.profile_id,
+    role: row.role,
+    name: row.name,
+    email: row.email,
+    student_id: row.student_id,
+    deleted_at: row.deleted_at,
+    purge_after_at: row.purge_after_at,
+    deleted_by_admin_id: row.deleted_by_admin_id,
+    restored_at: row.restored_at,
+    restored_by_admin_id: row.restored_by_admin_id,
+  }
+}
+
+export function listTrashedStudentProfiles() {
+  pruneExpiredTrashedProfiles()
+  const rows = db.prepare(`
+    SELECT * FROM trashed_profiles
+    WHERE role = 'student' AND restored_at IS NULL
+    ORDER BY deleted_at DESC
+  `).all()
+
+  return rows.map(mapTrashedProfile)
+}
+
+export function restoreStudentProfile(trashId, restoredByAdminId = null) {
+  pruneExpiredTrashedProfiles()
+  const trashRow = db.prepare('SELECT * FROM trashed_profiles WHERE id = ?').get(trashId)
+
+  if (!trashRow || trashRow.role !== 'student' || trashRow.restored_at) {
+    return null
+  }
+
+  const snapshot = parseJsonValue(trashRow.snapshot_json, null)
+  const userRow = snapshot?.user ?? null
+  const profileRow = snapshot?.profile ?? null
+  const examRows = Array.isArray(snapshot?.exams) ? snapshot.exams : []
+  const supportRows = Array.isArray(snapshot?.supportRequests) ? snapshot.supportRequests : []
+  const activityRows = Array.isArray(snapshot?.activityLogs) ? snapshot.activityLogs : []
+
+  if (!userRow || !profileRow || profileRow.role !== 'student') {
+    throw new Error('The trashed student snapshot is incomplete and cannot be restored.')
+  }
+
+  const conflictingEmailUser = db.prepare('SELECT id FROM users WHERE lower(email) = lower(?)').get(userRow.email)
+  if (conflictingEmailUser) {
+    throw new Error('A user with this email already exists. Update the active record before restoring from trash.')
+  }
+
+  if (userRow.phone_number) {
+    const conflictingPhoneUser = db.prepare('SELECT id FROM users WHERE phone_number = ?').get(userRow.phone_number)
+    if (conflictingPhoneUser) {
+      throw new Error('A user with this phone number already exists. Update the active record before restoring from trash.')
+    }
+  }
+
+  if (profileRow.student_id) {
+    const conflictingStudent = db.prepare('SELECT id FROM profiles WHERE student_id = ?').get(profileRow.student_id)
+    if (conflictingStudent) {
+      throw new Error('A student with this registration number already exists. Update the active record before restoring from trash.')
+    }
+  }
+
+  db.exec('BEGIN')
+
+  try {
+    db.prepare(`
+      INSERT INTO users (
+        id, email, phone_number, role, admin_scope, name, campus_id, campus_name, password_hash, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      userRow.id,
+      userRow.email,
+      userRow.phone_number ?? null,
+      userRow.role,
+      userRow.admin_scope ?? null,
+      userRow.name,
+      userRow.campus_id ?? 'main-campus',
+      userRow.campus_name ?? 'Main Campus',
+      userRow.password_hash,
+      userRow.created_at,
+      userRow.updated_at,
+    )
+
+    db.prepare(`
+      INSERT INTO profiles (
+        id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, course, program, college,
+        department, semester, course_units_json, exam_date, exam_time, venue, seat_number, instructions, profile_image,
+        permit_token, permit_print_grant_month, permit_print_grants_remaining, exams_json, total_fees, amount_paid, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      profileRow.id,
+      profileRow.email,
+      profileRow.phone_number ?? null,
+      profileRow.role,
+      profileRow.name,
+      profileRow.campus_id ?? 'main-campus',
+      profileRow.campus_name ?? 'Main Campus',
+      profileRow.student_id ?? null,
+      normalizeStudentCategory(profileRow.student_category),
+      profileRow.course ?? null,
+      profileRow.program ?? null,
+      profileRow.college ?? null,
+      profileRow.department ?? null,
+      profileRow.semester ?? null,
+      profileRow.course_units_json ?? '[]',
+      profileRow.exam_date ?? null,
+      profileRow.exam_time ?? null,
+      profileRow.venue ?? null,
+      profileRow.seat_number ?? null,
+      profileRow.instructions ?? null,
+      profileRow.profile_image ?? null,
+      profileRow.permit_token ?? createPermitToken(),
+      profileRow.permit_print_grant_month ?? null,
+      Number(profileRow.permit_print_grants_remaining ?? 0),
+      profileRow.exams_json ?? '[]',
+      Number(profileRow.total_fees ?? 0),
+      Number(profileRow.amount_paid ?? 0),
+      profileRow.created_at,
+      profileRow.updated_at,
+    )
+
+    for (const examRow of examRows) {
+      db.prepare(`
+        INSERT INTO profile_exams (id, profile_id, title, exam_date, exam_time, venue, seat_number, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        examRow.id,
+        examRow.profile_id,
+        examRow.title,
+        examRow.exam_date,
+        examRow.exam_time,
+        examRow.venue,
+        examRow.seat_number,
+        examRow.created_at,
+        examRow.updated_at,
+      )
+    }
+
+    for (const supportRow of supportRows) {
+      db.prepare(`
+        INSERT INTO support_requests (id, student_id, subject, message, status, admin_reply, resolved_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        supportRow.id,
+        supportRow.student_id,
+        supportRow.subject,
+        supportRow.message,
+        supportRow.status,
+        supportRow.admin_reply,
+        supportRow.resolved_at ?? null,
+        supportRow.created_at,
+        supportRow.updated_at,
+      )
+    }
+
+    for (const activityRow of activityRows) {
+      const adminUser = db.prepare('SELECT id FROM users WHERE id = ?').get(activityRow.admin_id)
+      const targetProfile = db.prepare('SELECT id FROM profiles WHERE id = ?').get(activityRow.target_profile_id)
+
+      if (!adminUser || !targetProfile) {
+        continue
+      }
+
+      db.prepare(`
+        INSERT INTO admin_activity_logs (id, admin_id, target_profile_id, action, details, campus_id, campus_name, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        activityRow.id,
+        activityRow.admin_id,
+        activityRow.target_profile_id,
+        activityRow.action,
+        activityRow.details,
+        activityRow.campus_id ?? 'main-campus',
+        activityRow.campus_name ?? 'Main Campus',
+        activityRow.created_at,
+      )
+    }
+
+    db.prepare(`
+      UPDATE trashed_profiles
+      SET restored_at = ?, restored_by_admin_id = ?
+      WHERE id = ?
+    `).run(nowIso(), restoredByAdminId, trashId)
+
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+
+  return getProfileById(profileRow.id)
 }
 
 export function listActivityLogsPage({ page = 1, pageSize = 20 } = {}) {
@@ -1307,4 +1705,11 @@ export function listActivityLogsPage({ page = 1, pageSize = 20 } = {}) {
     totalPages: Math.max(Math.ceil(totalItems / safePageSize), 1),
   }
 }
-*/
+
+function pruneExpiredTrashedProfiles() {
+  db.prepare(`
+    DELETE FROM trashed_profiles
+    WHERE restored_at IS NULL
+      AND datetime(purge_after_at) <= datetime('now')
+  `).run()
+}

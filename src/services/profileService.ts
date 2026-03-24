@@ -17,6 +17,7 @@ import type {
   StudentListQuery,
   StudentProfile,
   SystemFeeSettings,
+  TrashedStudentProfile,
   SupportRequest,
   SupportRequestUpdateInput,
 } from '../types'
@@ -35,6 +36,10 @@ export async function fetchStudentProfileById(userId: string): Promise<StudentPr
 
 export async function fetchStudentProfilesPage(query?: StudentListQuery): Promise<StudentListPage> {
   return activeDataAdapter.fetchStudentProfilesPage(query)
+}
+
+export async function fetchTrashedStudentProfiles(): Promise<TrashedStudentProfile[]> {
+  return activeDataAdapter.fetchTrashedStudentProfiles()
 }
 
 export async function fetchAdminActivityLogs(): Promise<AdminActivityLog[]> {
@@ -75,6 +80,14 @@ export async function clearStudentBalance(studentId: string, adminId: string) {
 
 export async function deleteStudentProfile(studentId: string, adminId: string) {
   return activeDataAdapter.deleteStudentProfile(studentId, adminId)
+}
+
+export async function restoreStudentProfile(trashId: string, adminId: string): Promise<StudentProfile> {
+  return activeDataAdapter.restoreStudentProfile(trashId, adminId)
+}
+
+export async function grantStudentPermitPrintAccess(studentId: string, additionalPrints: number, adminId: string): Promise<StudentProfile> {
+  return activeDataAdapter.grantStudentPermitPrintAccess(studentId, additionalPrints, adminId)
 }
 
 export async function recordPermitActivity(studentId: string, action: PermitActivityAction) {
