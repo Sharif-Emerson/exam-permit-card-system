@@ -1600,6 +1600,7 @@ app.post('/imports/financials/apply', authenticate, requireAdminPermission('mana
 })
 
 const port = Number(process.env.PORT ?? 4000)
+let shuttingDown = false
 
 app.use((error, _request, response) => {
   if (error instanceof multer.MulterError) {
@@ -1621,6 +1622,44 @@ app.use((error, _request, response) => {
   response.status(500).json({ message: 'Internal server error.' })
 })
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`REST backend starter listening on http://localhost:${port}`)
+})
+
+function shutdown(signal) {
+  if (shuttingDown) {
+    return
+  }
+
+  shuttingDown = true
+  console.log(`Received ${signal}. Closing REST backend starter...`)
+
+  server.close((error) => {
+    if (error) {
+      console.error('Failed to close the HTTP server cleanly.', error)
+      process.exit(1)
+      return
+    }
+
+    console.log('REST backend starter stopped cleanly.')
+    process.exit(0)
+  })
+
+  setTimeout(() => {
+    console.error('Forced shutdown after waiting 10 seconds for active requests to finish.')
+    process.exit(1)
+  }, 10_000).unref()
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'))
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception in REST backend starter.', error)
+  shutdown('uncaughtException')
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection in REST backend starter.', reason)
+  shutdown('unhandledRejection')
 })

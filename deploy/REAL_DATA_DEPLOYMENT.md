@@ -51,6 +51,14 @@ docker compose --env-file deploy/backend.env.example -f docker-compose.deploy.ym
 
 For real deployment, use your own env file instead of the example file.
 
+The packaged deployment stack now includes:
+
+- backend container health checks against `/health`
+- frontend container health checks against `/`
+- automatic restart with `unless-stopped`
+- frontend startup waiting for a healthy backend container
+- graceful backend shutdown on `SIGINT`, `SIGTERM`, uncaught exceptions, and unhandled rejections
+
 ## 5. First login
 
 On a brand-new database, log in with the bootstrap admin credentials you set above.
