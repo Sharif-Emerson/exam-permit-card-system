@@ -172,4 +172,20 @@ Typical deployment shape:
 3. Set `CORS_ALLOWED_ORIGINS` to your frontend domain
 4. Point the frontend's `VITE_API_BASE_URL` to the deployed backend URL
 
+This repository also includes a Render Blueprint at [render.yaml](c:/Users/kabuy/OneDrive/Desktop/project/render.yaml) for deploying the backend as a Render web service with a persistent disk.
+
+When using Render, set at least:
+
+- `BOOTSTRAP_ADMIN_EMAIL`
+- `BOOTSTRAP_ADMIN_PASSWORD`
+- `CORS_ALLOWED_ORIGINS`
+
+The blueprint already sets:
+
+- `APP_DB_PATH=/var/data/production.sqlite`
+- `APP_UPLOADS_DIR=/var/data/uploads`
+- `SESSION_TTL_HOURS=12`
+
+After the first Render deploy finishes, copy the generated Render service URL and set Vercel `API_BASE_URL` to that value.
+
 For the packaged Docker/Nginx deployment path, see [deploy/REAL_DATA_DEPLOYMENT.md](c:/Users/kabuy/OneDrive/Desktop/project/deploy/REAL_DATA_DEPLOYMENT.md).

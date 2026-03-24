@@ -9,9 +9,12 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const backendRoot = path.resolve(__dirname, '..')
 const dataDir = path.resolve(backendRoot, 'data')
-const uploadsDir = path.resolve(backendRoot, 'uploads')
 const seedFile = path.join(dataDir, 'seed.json')
 const defaultDbPath = path.join(dataDir, 'app.sqlite')
+const configuredUploadsDir = process.env.APP_UPLOADS_DIR?.trim()
+const uploadsDir = configuredUploadsDir
+  ? path.resolve(backendRoot, configuredUploadsDir)
+  : path.resolve(backendRoot, 'uploads')
 
 const configuredDbPath = process.env.APP_DB_PATH?.trim()
 const dbPath = configuredDbPath

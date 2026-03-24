@@ -280,10 +280,13 @@ To deploy:
 4. Set backend environment variables:
    - `PORT`
    - `APP_DB_PATH`
+  - `APP_UPLOADS_DIR`
    - `SESSION_TTL_HOURS`
    - `CORS_ALLOWED_ORIGINS`
 
 For Vercel Preview deployments, this repository now includes a same-origin `/api` proxy function. Set `API_BASE_URL=https://your-backend.example.com` in the Vercel project settings for `Preview` and `Production` so the proxy knows where to forward requests. If `API_BASE_URL` is missing, `/api/*` returns a deployment error instead of silently falling through to the SPA.
+
+If you want a faster backend deployment path, this repository now includes a Render Blueprint at [render.yaml](c:/Users/kabuy/OneDrive/Desktop/project/render.yaml). It deploys [examples/rest-backend](c:/Users/kabuy/OneDrive/Desktop/project/examples/rest-backend) with a persistent disk and gives you the backend URL you can paste into Vercel `API_BASE_URL`.
 
 If the frontend is public but the backend is still only running on your laptop, users in other locations will never be able to fetch data from it.
 
