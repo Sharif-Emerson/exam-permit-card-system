@@ -149,6 +149,8 @@ npm run smoke-test
 - `SESSION_TTL_HOURS`: token lifetime in hours, default `12`
 - `CORS_ALLOWED_ORIGINS`: optional comma-separated frontend origin allowlist
 
+When `CORS_ALLOWED_ORIGINS` is set, loopback frontend origins such as `http://localhost:<port>` and `http://127.0.0.1:<port>` are still allowed so local development and Playwright runs keep working.
+
 ## Local Full-Stack Workflow
 
 From the project root you can run the frontend and this backend together with:

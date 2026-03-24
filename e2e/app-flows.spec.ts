@@ -16,6 +16,12 @@ async function signIn(page: Page, identifier: string, password: string) {
   await page.getByRole('button', { name: 'Sign in' }).click()
 }
 
+async function completeDocumentChecklist(page: Page) {
+  await page.getByLabel('Current course registration details').check()
+  await page.getByLabel('Valid student identification').check()
+  await page.getByLabel('Payment evidence when requested').check()
+}
+
 function createUniqueStudentSeed(prefix: string) {
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`
 
@@ -43,7 +49,7 @@ async function createStudentAsAdmin(page: Page, values: {
   await page.getByLabel('Email').fill(values.email)
   await page.getByLabel('Initial Password').fill(values.password)
   await page.getByLabel('Registration No.').fill(values.studentId)
-  await page.getByLabel('Course').fill(values.course ?? 'Computer Science')
+  await page.getByRole('textbox', { name: /^Course$/ }).fill(values.course ?? 'Computer Science')
   await page.getByLabel('Expected Total Fees ($)').fill(values.totalFees)
   await page.getByLabel('Amount Paid ($)').fill(values.amountPaid)
   await page.getByRole('button', { name: 'Create Student' }).click()
@@ -60,6 +66,7 @@ test('student can submit a permit application', async ({ page }) => {
   await expect(page.getByText(`Welcome, ${student.name}`)).toBeVisible()
 
   await page.getByRole('button', { name: 'Open full application view' }).click()
+  await completeDocumentChecklist(page)
   await page.getByLabel('Course units').fill('CSC 499 - Capstone Project')
   await page.getByRole('button', { name: 'Apply for Permit' }).last().click()
 

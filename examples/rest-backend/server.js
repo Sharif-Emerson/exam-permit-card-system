@@ -55,9 +55,27 @@ const corsAllowedOrigins = process.env.CORS_ALLOWED_ORIGINS
   ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
   : null
 
+function isLoopbackOrigin(origin) {
+  if (typeof origin !== 'string' || !origin.trim()) {
+    return false
+  }
+
+  try {
+    const { protocol, hostname } = new URL(origin)
+
+    if (protocol !== 'http:' && protocol !== 'https:') {
+      return false
+    }
+
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+  } catch {
+    return false
+  }
+}
+
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || !corsAllowedOrigins || corsAllowedOrigins.includes(origin)) {
+    if (!origin || isLoopbackOrigin(origin) || !corsAllowedOrigins || corsAllowedOrigins.includes(origin)) {
       callback(null, true)
       return
     }

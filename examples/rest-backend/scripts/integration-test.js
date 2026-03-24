@@ -48,9 +48,20 @@ async function requestRaw(baseUrl, pathname, options = {}) {
   const response = await fetch(`${baseUrl}${pathname}`, options)
   const text = await response.text()
 
+  let body = null
+
+  if (text) {
+    try {
+      body = JSON.parse(text)
+    } catch {
+      body = text
+    }
+  }
+
   return {
     status: response.status,
-    body: text ? JSON.parse(text) : null,
+    body,
+    headers: response.headers,
   }
 }
 
@@ -98,6 +109,7 @@ async function main() {
       DISABLE_ENV_FILE_LOADING: '1',
       PORT: String(port),
       APP_DB_PATH: relativeDbPath,
+      CORS_ALLOWED_ORIGINS: 'https://portal.example.com',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -108,6 +120,30 @@ async function main() {
   try {
     const baseUrl = `http://127.0.0.1:${port}`
     await waitForServer(`${baseUrl}/health`)
+
+    const allowedLoopbackOrigin = await requestRaw(baseUrl, '/auth/login', {
+      method: 'POST',
+      headers: {
+        Origin: 'http://127.0.0.1:4173',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ identifier: 'admin@example.com', password: 'Permit@2026' }),
+    })
+
+    assert.equal(allowedLoopbackOrigin.status, 200)
+    assert.equal(allowedLoopbackOrigin.headers.get('access-control-allow-origin'), 'http://127.0.0.1:4173')
+
+    const rejectedOrigin = await requestRaw(baseUrl, '/auth/login', {
+      method: 'POST',
+      headers: {
+        Origin: 'https://evil.example.com',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ identifier: 'admin@example.com', password: 'Permit@2026' }),
+    })
+
+    assert.equal(rejectedOrigin.status, 500)
+    assert.match(String(rejectedOrigin.body), /origin is not allowed by cors/i)
 
     const adminLogin = await request(baseUrl, '/auth/login', {
       method: 'POST',
