@@ -135,15 +135,7 @@ export async function importStudentFinancials(updates: FinancialImportUpdate[], 
         continue
       }
 
-      await activeDataAdapter.createStudentProfile(update.createStudent, adminId)
-      createdCount += 1
-      createdStudents.push({
-        rowNumber: update.rowNumber,
-        name: update.createStudent.name,
-        email: update.createStudent.email,
-        studentId: update.createStudent.studentId,
-        password: update.createStudent.password,
-      })
+      // Creation of new students via import is disabled. Only updates to existing students are allowed.
     } catch (error) {
       skippedRows.push({
         rowNumber: update.rowNumber,

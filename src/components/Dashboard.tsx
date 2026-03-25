@@ -164,7 +164,7 @@ function deriveStatus(student: StudentProfile, history: PermitApplicationRecord[
     return 'pending'
   }
 
-  if (student.feesBalance === 0 && student.exams.length > 0) {
+  if (student.feesBalance === 0) {
     return 'approved'
   }
 
@@ -299,7 +299,7 @@ function getNotificationToneClasses(tone: NotificationItem['tone']) {
     return 'border-red-200 bg-red-50 text-red-800'
   }
 
-  return 'border-blue-200 bg-blue-50 text-blue-800'
+  return 'border-green-200 bg-green-50 text-green-800'
 }
 
 export default function Dashboard() {
@@ -493,7 +493,8 @@ export default function Dashboard() {
 
     try {
       setSuccessMessage('')
-      await syncStudentProfile({ showLoading: true, clearError: true, syncDrafts: true })
+      setRefreshing(true)
+      await syncStudentProfile({ showLoading: false, clearError: true, syncDrafts: true })
       await Promise.all([
         loadSupportRequests(),
         loadSupportContactsAndHistory(),
@@ -501,6 +502,8 @@ export default function Dashboard() {
     } catch (refreshError) {
       const nextError = refreshError instanceof Error ? refreshError.message : 'Unable to refresh dashboard details'
       setError(nextError)
+    } finally {
+      setRefreshing(false)
     }
   }
 
@@ -642,7 +645,7 @@ export default function Dashboard() {
     setError('')
     setSuccessMessage('')
 
-    const nextStatus: PermitStatus = studentData.feesBalance === 0 && studentData.exams.length > 0 ? 'approved' : 'pending'
+    const nextStatus: PermitStatus = studentData.feesBalance === 0 ? 'approved' : 'pending'
     const nextRecord: PermitApplicationRecord = {
       id: `${user.id}-${Date.now()}`,
       createdAt: new Date().toISOString(),
@@ -725,6 +728,8 @@ export default function Dashboard() {
       setSavingSettings(false)
     }
   }
+  // Add state for button-level loading
+  const [refreshing, setRefreshing] = useState(false)
 
   const qrValue = studentData
     ? publicApiBaseUrl
@@ -823,7 +828,7 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600" />
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-green-600" />
           <p className="text-base text-slate-600">Loading your student dashboard...</p>
         </div>
       </div>
@@ -840,7 +845,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={handleRefresh}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
             >
               <RefreshCcw className="h-4 w-4" />
               Retry
@@ -891,7 +896,7 @@ export default function Dashboard() {
           <aside className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-white/60 bg-white/85 px-4 py-5 shadow-2xl shadow-slate-200/60 backdrop-blur-xl transition-transform duration-300 dark:border-slate-800 dark:bg-slate-950/85 dark:shadow-none lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
             <div className="flex items-center justify-between px-2 pb-5">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-blue-600 dark:text-blue-300">Student Portal</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-green-600 dark:text-green-300">Student Portal</p>
                 <h1 className="mt-1 text-xl font-semibold">Exam Permit Hub</h1>
               </div>
               <button
@@ -905,7 +910,7 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <div className="mb-6 rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 to-emerald-50 p-4 dark:border-slate-800 dark:from-slate-900 dark:to-slate-900">
+            <div className="mb-6 rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50 p-4 dark:border-slate-800 dark:from-slate-900 dark:to-slate-900">
               <div className="flex items-center gap-3">
                 <img
                   src={profileImage}
@@ -977,7 +982,7 @@ export default function Dashboard() {
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Search applications, semesters, or remarks"
-                    className="w-full rounded-full border border-white/70 bg-white/90 py-3 pl-11 pr-4 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900/90 dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-950"
+                    className="w-full rounded-full border border-white/70 bg-white/90 py-3 pl-11 pr-4 text-sm text-slate-900 shadow-sm outline-none transition focus:border-green-300 focus:ring-2 focus:ring-green-200 dark:border-slate-700 dark:bg-slate-900/90 dark:text-white dark:focus:border-green-400 dark:focus:ring-green-950"
                   />
                 </div>
 
@@ -1101,10 +1106,10 @@ export default function Dashboard() {
               )}
 
               <section className="mb-6 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-                <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/40 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-green-100/40 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
                   <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Welcome Section</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-green-600 dark:text-green-300">Welcome Section</p>
                       <h1 className="mt-3 text-3xl font-semibold tracking-tight">Welcome, {studentData.name}</h1>
                       <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                         Manage your exam permit, review status updates, and keep your profile ready for exam-day verification.
@@ -1114,9 +1119,13 @@ export default function Dashboard() {
                       type="button"
                       onClick={handleRefresh}
                       className="inline-flex items-center gap-2 self-start rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                      disabled={refreshing}
                     >
-                      <RefreshCcw className="h-4 w-4" />
-                      Refresh
+                      {refreshing ? (
+                        <span className="flex items-center gap-2"><RefreshCcw className="h-4 w-4 animate-spin" />Refreshing...</span>
+                      ) : (
+                        <><RefreshCcw className="h-4 w-4" />Refresh</>
+                      )}
                     </button>
                   </div>
 
@@ -1164,10 +1173,10 @@ export default function Dashboard() {
               {activeSection === 'overview' && (
                 <div className="grid gap-6 xl:grid-cols-[1.55fr_1fr]">
                   <div className="space-y-6">
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-green-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
                       <div className="mb-5 flex items-center justify-between">
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Permit Card Preview</p>
+                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-green-600 dark:text-green-300">Permit Card Preview</p>
                           <h2 className="mt-2 text-2xl font-semibold">Digital Exam Permit</h2>
                         </div>
                         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusView.badgeClass}`}>
@@ -1196,7 +1205,12 @@ export default function Dashboard() {
                           </div>
                           <div className="rounded-3xl bg-white/80 p-3 shadow-sm dark:bg-slate-950/70">
                             {qrCodeUrl ? (
-                              <img src={qrCodeUrl} alt="Verification QR code" className="h-28 w-28" />
+                              <>
+                                <img src={qrCodeUrl} alt="Verification QR code" className="h-28 w-28" />
+                                <div className="mt-2 break-all text-xs text-green-700 dark:text-green-300 text-center">
+                                  {qrValue}
+                                </div>
+                              </>
                             ) : (
                               <div className="flex h-28 w-28 items-center justify-center rounded-2xl bg-slate-100 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                                 QR unavailable
@@ -1247,7 +1261,7 @@ export default function Dashboard() {
                             type="button"
                             onClick={handlePrint}
                             disabled={permitOutputLocked}
-                            className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${permitOutputLocked ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                            className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${permitOutputLocked ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-green-600 text-white hover:bg-green-500'}`}
                             title={permitOutputLocked ? permitOutputMessage : 'Print permit'}
                           >
                             <Printer className="h-4 w-4" />
@@ -1257,7 +1271,7 @@ export default function Dashboard() {
                       </div>
                     </section>
 
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-green-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
                       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Apply for Exam Permit</p>
@@ -1281,7 +1295,7 @@ export default function Dashboard() {
                             type="text"
                             value={applicationDraft.semester}
                             onChange={(event) => setApplicationDraft((current) => ({ ...current, semester: event.target.value }))}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-950"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-green-300 focus:ring-2 focus:ring-green-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:focus:border-green-400 dark:focus:ring-green-950"
                           />
                         </div>
                         <div>
@@ -1302,7 +1316,7 @@ export default function Dashboard() {
                         </div>
                         <div>
                           <label htmlFor="documents" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Upload required documents</label>
-                          <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:bg-slate-800">
+                          <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-green-300 bg-green-50 px-4 py-3 text-sm text-slate-600 transition hover:border-green-300 hover:bg-green-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-green-500 dark:hover:bg-slate-800">
                             <Upload className="h-4 w-4" />
                             <span>{applicationDraft.documents.length > 0 ? applicationDraft.documents.join(', ') : 'Choose files'}</span>
                             <input id="documents" type="file" multiple className="sr-only" onChange={handleDocumentSelection} />
@@ -1554,6 +1568,17 @@ export default function Dashboard() {
                   <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
                     <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Profile Settings</p>
                     <h2 className="mt-2 text-2xl font-semibold">Update your info</h2>
+                    <div className="flex justify-end mb-2">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200"
+                        onClick={() => void syncStudentProfile({ showLoading: true, clearError: true, syncDrafts: true })}
+                        aria-label="Refresh profile"
+                      >
+                        <RefreshCcw className="w-4 h-4" />
+                        Refresh
+                      </button>
+                    </div>
                     <form className="mt-6 space-y-4" onSubmit={(event) => void handleSettingsSave(event)}>
                       <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
                         Identity and contact changes update both your student profile and your login details. Use a valid email address and reachable phone number.
@@ -1567,6 +1592,7 @@ export default function Dashboard() {
                             value={settingsDraft.name}
                             onChange={(event) => setSettingsDraft((current) => ({ ...current, name: event.target.value }))}
                             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            readOnly={user?.role === 'student'}
                           />
                         </div>
                         <div>
@@ -1577,6 +1603,7 @@ export default function Dashboard() {
                             value={settingsDraft.email}
                             onChange={(event) => setSettingsDraft((current) => ({ ...current, email: event.target.value }))}
                             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            readOnly={user?.role === 'student'}
                           />
                         </div>
                         <div className="sm:col-span-2">

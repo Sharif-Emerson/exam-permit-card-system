@@ -1,2 +1,2 @@
-student_name,student_id,email,student_category,phone_number,course,program,college,department,semester,password,course_units,instructions,exam_date,exam_time,venue,seat_number,amount_paid,total_fees
+student_id,email,amount_paid,total_fees
 Jane Student,REG001,jane.student@yourdomain.com,local,+256700000101,Computer Science,BSc Computer Science,School of Computing,Computer Science,Semester 1 2026/2027,Permit-REG001,"CSC101;CSC102",Bring your student ID,2026-11-14,09:00 AM,Main Hall,A-014,0,4500

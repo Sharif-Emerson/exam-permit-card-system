@@ -272,7 +272,7 @@ export default function Login() {
           </form>
         )}
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200">
-          Use the credentials from your configured backend. Profiles and roles are loaded from the active data provider.
+          Please sign in with your assigned username and password. If you do not have an account or have trouble signing in, contact your system administrator for assistance.
         </div>
       </div>
     </div>

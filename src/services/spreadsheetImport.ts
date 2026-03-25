@@ -25,60 +25,6 @@ function parseList(value: unknown): string[] | undefined {
     .map((item) => item.trim())
     .filter(Boolean)
 
-  return items.length > 0 ? items : undefined
-}
-
-function parseStudentCategory(value: unknown) {
-  if (typeof value !== 'string') {
-    return undefined
-  }
-
-  const normalizedValue = value.trim().toLowerCase()
-
-  if (normalizedValue === 'local' || normalizedValue === 'international') {
-    return normalizedValue
-  }
-
-  return undefined
-}
-
-function mapRowsToFinancialImportRows(rows: unknown[][]): FinancialImportRow[] {
-  const [headerRow, ...dataRows] = rows
-
-  if (!headerRow) {
-    return []
-  }
-
-  const normalizedHeaders = headerRow.map((cell) => normalizeHeader(String(cell ?? '')))
-
-  return dataRows
-    .map((row, index) => {
-      const normalizedEntries = normalizedHeaders.reduce<Record<string, unknown>>((result, header, columnIndex) => {
-        if (header) {
-          result[header] = row[columnIndex] ?? ''
-        }
-
-        return result
-      }, {})
-
-      const studentId = typeof normalizedEntries.studentid === 'string' && normalizedEntries.studentid.trim()
-        ? normalizedEntries.studentid.trim()
-        : undefined
-      const studentName = typeof normalizedEntries.studentname === 'string' && normalizedEntries.studentname.trim()
-        ? normalizedEntries.studentname.trim()
-        : undefined
-      const email = typeof normalizedEntries.email === 'string' && normalizedEntries.email.trim()
-        ? normalizedEntries.email.trim()
-        : undefined
-      const studentCategory = parseStudentCategory(normalizedEntries.studentcategory ?? normalizedEntries.category)
-      const phoneNumber = typeof normalizedEntries.phonenumber === 'string' && normalizedEntries.phonenumber.trim()
-        ? normalizedEntries.phonenumber.trim()
-        : typeof normalizedEntries.phone === 'string' && normalizedEntries.phone.trim()
-          ? normalizedEntries.phone.trim()
-          : undefined
-      const course = typeof normalizedEntries.course === 'string' && normalizedEntries.course.trim()
-        ? normalizedEntries.course.trim()
-        : undefined
       const program = typeof normalizedEntries.program === 'string' && normalizedEntries.program.trim()
         ? normalizedEntries.program.trim()
         : undefined

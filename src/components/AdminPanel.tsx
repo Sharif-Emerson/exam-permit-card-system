@@ -362,6 +362,7 @@ function buildImportedStudentInput(row: FinancialImportRow): { createStudent?: C
 }
 
 export default function AdminPanel() {
+    const [refreshing, setRefreshing] = useState(false)
   const { user, signOut, refreshUser } = useAuth()
   const { darkMode, toggleTheme } = useTheme()
   const adminCapability = getAdminCapabilityProfile(user)
@@ -395,6 +396,8 @@ export default function AdminPanel() {
   const [activeSection, setActiveSection] = useState<NavSection>('students')
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'outstanding'>('all')
+  const [filterDepartment, setFilterDepartment] = useState<string>('')
+  const [filterProgram, setFilterProgram] = useState<string>('')
   const [page, setPage] = useState(1)
   const [pageSize] = useState(STUDENT_PAGE_SIZE)
   const [totalItems, setTotalItems] = useState(0)
@@ -443,11 +446,15 @@ export default function AdminPanel() {
     page?: number
     search?: string
     status?: 'all' | 'paid' | 'outstanding'
+    department?: string
+    program?: string
   }) => {
     const silent = options?.silent ?? false
     const nextPage = options?.page ?? page
     const nextSearch = options?.search ?? searchQuery
     const nextStatus = options?.status ?? filterStatus
+    const nextDepartment = options?.department ?? filterDepartment
+    const nextProgram = options?.program ?? filterProgram
 
     try {
       if (!silent) {
@@ -459,6 +466,8 @@ export default function AdminPanel() {
         pageSize,
         search: nextSearch,
         status: nextStatus,
+        department: nextDepartment,
+        program: nextProgram,
       })
       const nextStudents = nextStudentPage.items
 
@@ -483,7 +492,7 @@ export default function AdminPanel() {
         setLoading(false)
       }
     }
-  }, [filterStatus, page, pageSize, searchQuery])
+  }, [filterStatus, page, pageSize, searchQuery, filterDepartment, filterProgram])
 
   const loadTrashedStudents = useCallback(async () => {
     if (!canManageStudentProfiles) {
@@ -918,8 +927,13 @@ export default function AdminPanel() {
   }
 
   async function handleBulkPrintCleared() {
-    const printableStudents = filteredStudents.filter((student) => student.feesBalance === 0)
-
+    let printableStudents = filteredStudents.filter((student) => student.feesBalance === 0);
+    if (filterDepartment) {
+      printableStudents = printableStudents.filter((student) => student.department === filterDepartment);
+    }
+    if (filterProgram) {
+      printableStudents = printableStudents.filter((student) => student.program === filterProgram);
+    }
     await handleBulkPrintStudents(printableStudents, `Cleared_Permits_Page_${page}`, 'There are no cleared students on this page to print.')
   }
 
@@ -1383,40 +1397,16 @@ export default function AdminPanel() {
       })
   
       if (!matchedStudent) {
-        const importedStudent = buildImportedStudentInput(row)
-  
-        if (!importedStudent.createStudent) {
-          previewRows.push({
-            rowNumber: row.rowNumber,
-            matcher,
-            studentName: row.studentName,
-            amountPaid: row.amountPaid,
-            totalFees: row.totalFees,
-            status: 'skipped',
-            reason: importedStudent.reason ?? 'No matching student was found.',
-          })
-          continue
-        }
-  
-        updates.push({
-          rowNumber: row.rowNumber,
-          action: 'create',
-          createStudent: importedStudent.createStudent,
-        })
-  
         previewRows.push({
           rowNumber: row.rowNumber,
           matcher,
-          studentName: importedStudent.createStudent.name,
-          amountPaid: importedStudent.createStudent.amountPaid,
-          totalFees: importedStudent.createStudent.totalFees,
-          status: 'create',
-          reason: row.password?.trim()
-            ? 'New student account will be created with the provided password.'
-            : `New student account will be created with temporary password ${importedStudent.createStudent.password}.`,
+          studentName: row.studentName,
+          amountPaid: row.amountPaid,
+          totalFees: row.totalFees,
+          status: 'skipped',
+          reason: 'No matching student was found. Only existing students can be updated.',
         })
-  
-        continue
+        continue;
       }
   
       updates.push({
@@ -2201,6 +2191,25 @@ export default function AdminPanel() {
 
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between mb-6">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200"
+                      onClick={async () => {
+                        setRefreshing(true)
+                        await loadStudents()
+                        setRefreshing(false)
+                      }}
+                      aria-label="Refresh student list"
+                      disabled={refreshing}
+                    >
+                      {refreshing ? (
+                        <span className="flex items-center gap-2"><RefreshCcw className="w-4 h-4 animate-spin" />Refreshing...</span>
+                      ) : (
+                        <><RefreshCcw className="w-4 h-4" />Refresh</>
+                      )}
+                    </button>
+                  </div>
                   <div>
                     <h2 className="font-semibold text-gray-900">Quick Actions</h2>
                     <p className="text-sm text-gray-500">High-frequency actions for permit operations, reporting, and alerts.</p>
@@ -3350,6 +3359,26 @@ export default function AdminPanel() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
+                <label className="text-xs font-medium text-gray-700">
+                  Department:
+                  <input
+                    type="text"
+                    value={filterDepartment}
+                    onChange={e => setFilterDepartment(e.target.value)}
+                    placeholder="Filter by department"
+                    className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
+                  />
+                </label>
+                <label className="text-xs font-medium text-gray-700">
+                  Program:
+                  <input
+                    type="text"
+                    value={filterProgram}
+                    onChange={e => setFilterProgram(e.target.value)}
+                    placeholder="Filter by program"
+                    className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
+                  />
+                </label>
                 <button
                   type="button"
                   disabled={!canManageStudentProfiles || bulkPrinting || filteredStudents.every((student) => student.feesBalance > 0)}
@@ -3376,7 +3405,7 @@ export default function AdminPanel() {
                   <CreditCard className="h-4 w-4" />
                   Print Selected Permits ({clearedSelectedPermitStudents.length})
                 </button>
-                <span className="text-xs text-gray-500">Bulk printing uses the currently loaded page and current filters.</span>
+                <span className="text-xs text-gray-500">Bulk printing uses the currently loaded page and current filters, including department and program.</span>
               </div>
 
               {/* Summary strip */}
