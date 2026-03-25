@@ -224,54 +224,24 @@ export interface CreateStudentInput {
 }
 
 export interface FinancialImportRow {
-  rowNumber: number
-  studentName?: string
-  studentId?: string
-  studentCategory?: StudentCategory
-  email?: string
-  userId?: string
-  phoneNumber?: string
-  course?: string
-  program?: string
-  college?: string
-  department?: string
-  semester?: string
-  password?: string
-  courseUnits?: string[]
-  instructions?: string
-  examDate?: string
-  examTime?: string
-  venue?: string
-  seatNumber?: string
-  amountPaid?: number
-  totalFees?: number
+  rowNumber: number;
+  studentName?: string;
+  studentId?: string;
+  amountPaid?: number;
+  totalFees?: number;
 }
 
-export type FinancialImportUpdate =
-  | {
-    rowNumber: number
-    action: 'update'
-    studentId: string
-    amountPaid?: number
-    totalFees?: number
-  }
-  | {
-    rowNumber: number
-    action: 'create'
-    createStudent: CreateStudentInput
-  }
+export type FinancialImportUpdate = {
+  rowNumber: number;
+  action: 'update';
+  studentId: string;
+  amountPaid?: number;
+  totalFees?: number;
+};
 
 export interface FinancialImportResult {
-  updatedCount: number
-  createdCount: number
-  createdStudents: Array<{
-    rowNumber: number
-    name: string
-    email: string
-    studentId: string
-    password: string
-  }>
-  skippedRows: Array<{ rowNumber: number; reason: string }>
+  updatedCount: number;
+  skippedRows: Array<{ rowNumber: number; reason: string }>;
 }
 
 export interface SystemFeeSettings {

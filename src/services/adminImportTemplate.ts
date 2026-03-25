@@ -1,6 +1,8 @@
+
 const templateContent = [
-  ['student_name', 'student_id', 'email', 'student_category', 'phone_number', 'course', 'program', 'college', 'department', 'semester', 'password', 'course_units', 'instructions', 'exam_date', 'exam_time', 'venue', 'seat_number', 'amount_paid', 'total_fees'],
-].map((row) => row.join(',')).join('\n')
+  ['student_name', 'student_id_or_email', 'amount_paid', 'total_fees'],
+  ['Jane Student', 'REG001', '1000', '4500'],
+].map((row) => row.join(',')).join('\n');
 
 export function downloadFinancialImportTemplate() {
   const blob = new Blob([templateContent], { type: 'text/csv;charset=utf-8' })

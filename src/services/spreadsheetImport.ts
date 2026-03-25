@@ -1,3 +1,46 @@
+function mapRowsToFinancialImportRows(rows: unknown[][]): FinancialImportRow[] {
+  const [headerRow, ...dataRows] = rows;
+  if (!headerRow) return [];
+  const normalizedHeaders = headerRow.map((cell) => normalizeHeader(String(cell ?? '')));
+  return dataRows
+    .map((row, index) => {
+      const normalizedEntries = normalizedHeaders.reduce<Record<string, unknown>>((result, header, columnIndex) => {
+        if (header) {
+          result[header] = row[columnIndex] ?? '';
+        }
+        return result;
+      }, {});
+      const studentName = typeof normalizedEntries.student_name === 'string' && normalizedEntries.student_name.trim()
+        ? normalizedEntries.student_name.trim()
+        : undefined;
+      let studentId: string | undefined = undefined;
+      let email: string | undefined = undefined;
+      if (typeof normalizedEntries.student_id_or_email === 'string') {
+        const value = normalizedEntries.student_id_or_email.trim();
+        if (value.includes('@')) {
+          email = value;
+        } else if (value) {
+          studentId = value;
+        }
+      }
+      const amountPaid = parseNumber(normalizedEntries.amount_paid);
+      const totalFees = parseNumber(normalizedEntries.total_fees);
+      return {
+        rowNumber: index + 2,
+        studentName,
+        studentId,
+        email,
+        amountPaid,
+        totalFees,
+      };
+    })
+    .filter((row) => {
+      // Only allow updates, not creation
+      const hasId = row.studentId || row.email;
+      const canUpdate = hasId && (typeof row.amountPaid === 'number' || typeof row.totalFees === 'number');
+      return Boolean(canUpdate);
+    });
+}
 import Papa from 'papaparse'
 import readXlsxFile from 'read-excel-file/browser'
 import type { FinancialImportRow } from '../types'
@@ -17,87 +60,13 @@ function parseNumber(value: unknown): number | undefined {
 
 function parseList(value: unknown): string[] | undefined {
   if (typeof value !== 'string' || !value.trim()) {
-    return undefined
+    return undefined;
   }
-
   const items = value
     .split(/\r?\n|,|;/)
     .map((item) => item.trim())
-    .filter(Boolean)
-
-      const program = typeof normalizedEntries.program === 'string' && normalizedEntries.program.trim()
-        ? normalizedEntries.program.trim()
-        : undefined
-      const college = typeof normalizedEntries.college === 'string' && normalizedEntries.college.trim()
-        ? normalizedEntries.college.trim()
-        : undefined
-      const department = typeof normalizedEntries.department === 'string' && normalizedEntries.department.trim()
-        ? normalizedEntries.department.trim()
-        : undefined
-      const semester = typeof normalizedEntries.semester === 'string' && normalizedEntries.semester.trim()
-        ? normalizedEntries.semester.trim()
-        : undefined
-      const password = typeof normalizedEntries.password === 'string' && normalizedEntries.password.trim()
-        ? normalizedEntries.password.trim()
-        : undefined
-      const courseUnits = parseList(normalizedEntries.courseunits ?? normalizedEntries.units)
-      const instructions = typeof normalizedEntries.instructions === 'string' && normalizedEntries.instructions.trim()
-        ? normalizedEntries.instructions.trim()
-        : undefined
-      const examDate = typeof normalizedEntries.examdate === 'string' && normalizedEntries.examdate.trim()
-        ? normalizedEntries.examdate.trim()
-        : undefined
-      const examTime = typeof normalizedEntries.examtime === 'string' && normalizedEntries.examtime.trim()
-        ? normalizedEntries.examtime.trim()
-        : undefined
-      const venue = typeof normalizedEntries.venue === 'string' && normalizedEntries.venue.trim()
-        ? normalizedEntries.venue.trim()
-        : undefined
-      const seatNumber = typeof normalizedEntries.seatnumber === 'string' && normalizedEntries.seatnumber.trim()
-        ? normalizedEntries.seatnumber.trim()
-        : undefined
-      const userId = typeof normalizedEntries.id === 'string' && normalizedEntries.id.trim()
-        ? normalizedEntries.id.trim()
-        : typeof normalizedEntries.userid === 'string' && normalizedEntries.userid.trim()
-          ? normalizedEntries.userid.trim()
-          : undefined
-
-      const amountPaid = parseNumber(
-        normalizedEntries.amountpaid ?? normalizedEntries.paid ?? normalizedEntries.amount,
-      )
-      const totalFees = parseNumber(
-        normalizedEntries.totalfees ?? normalizedEntries.fees ?? normalizedEntries.total,
-      )
-
-      return {
-        rowNumber: index + 2,
-        studentName,
-        studentId,
-        studentCategory,
-        email,
-        userId,
-        phoneNumber,
-        course,
-        program,
-        college,
-        department,
-        semester,
-        password,
-        courseUnits,
-        instructions,
-        examDate,
-        examTime,
-        venue,
-        seatNumber,
-        amountPaid,
-        totalFees,
-      }
-    })
-    .filter((row) => {
-      const canUpdate = (row.studentId || row.email || row.userId) && (typeof row.amountPaid === 'number' || typeof row.totalFees === 'number')
-      const canCreate = row.studentName && row.studentId && row.email && row.course && typeof row.totalFees === 'number'
-      return Boolean(canUpdate || canCreate)
-    })
+    .filter(Boolean);
+  return items.length > 0 ? items : undefined;
 }
 
 async function parseCsvFile(file: File) {
