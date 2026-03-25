@@ -1015,6 +1015,9 @@ export default function AdminPanel() {
       setSuccessMessage('')
       await updateStudentFinancials(student.id, { amountPaid: draftValue }, user.id)
       await loadStudents()
+      // Fetch and update the individual student profile to ensure permit status is up-to-date
+      const updatedProfile = await fetchStudentProfileById(student.id)
+      setStudents((prev) => prev.map((s) => (s.id === student.id ? updatedProfile : s)))
       setSuccessMessage(`Saved received payment for ${student.name}.`)
     } catch (saveError) {
       const nextError = saveError instanceof Error ? saveError.message : 'Unable to save payment changes'
@@ -1040,6 +1043,9 @@ export default function AdminPanel() {
       setSuccessMessage('')
       await clearStudentBalance(student.id, user.id)
       await loadStudents()
+      // Fetch and update the individual student profile to ensure permit status is up-to-date
+      const updatedProfile = await fetchStudentProfileById(student.id)
+      setStudents((prev) => prev.map((s) => (s.id === student.id ? updatedProfile : s)))
       setSuccessMessage(`${student.name} has been cleared for printing.`)
     } catch (clearError) {
       const nextError = clearError instanceof Error ? clearError.message : 'Unable to clear student balance'
