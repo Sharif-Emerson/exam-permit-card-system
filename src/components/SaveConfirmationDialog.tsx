@@ -57,18 +57,18 @@ export function useNavigationWithConfirmation() {
   const navigate = useNavigate()
   const { hasUnsavedChanges, savePendingChanges, setHasUnsavedChanges } = useUnsavedChanges()
   const [showDialog, setShowDialog] = useState(false)
-  const [pendingNav, setPendingNav] = useState<{ to: string; replace?: boolean; action?: 'navigate' | 'back' | 'close' } | null>(null)
+  const [pendingNav, setPendingNav] = useState<{ to?: string; replace?: boolean; action?: 'navigate' | 'back' | 'close' } | null>(null)
 
   const handleConfirmSave = useCallback(async () => {
     setShowDialog(false)
     const saved = await savePendingChanges()
-    if (saved && pendingNav) {
-      setHasUnsavedChanges(false)
-      if (pendingNav.action === 'back') {
-        window.history.back()
-      } else if (pendingNav.to) {
-        navigate(pendingNav.to, { replace: pendingNav.replace })
-      }
+    setHasUnsavedChanges(false)
+    
+    if (pendingNav?.action === 'back') {
+      // Force navigate to login on back
+      navigate('/login', { replace: true })
+    } else if (pendingNav?.to) {
+      navigate(pendingNav.to, { replace: pendingNav.replace })
     }
     setPendingNav(null)
   }, [savePendingChanges, pendingNav, navigate, setHasUnsavedChanges])
@@ -76,12 +76,12 @@ export function useNavigationWithConfirmation() {
   const handleDontSave = useCallback(() => {
     setShowDialog(false)
     setHasUnsavedChanges(false)
-    if (pendingNav) {
-      if (pendingNav.action === 'back') {
-        window.history.back()
-      } else if (pendingNav.to) {
-        navigate(pendingNav.to, { replace: pendingNav.replace })
-      }
+    
+    if (pendingNav?.action === 'back') {
+      // Force navigate to login on back
+      navigate('/login', { replace: true })
+    } else if (pendingNav?.to) {
+      navigate(pendingNav.to, { replace: pendingNav.replace })
     }
     setPendingNav(null)
   }, [pendingNav, navigate, setHasUnsavedChanges])
@@ -96,7 +96,7 @@ export function useNavigationWithConfirmation() {
     if (!hasUnsavedChanges) return
 
     const handlePopState = () => {
-      setPendingNav({ to: '', action: 'back' })
+      setPendingNav({ action: 'back' })
       setShowDialog(true)
     }
 
