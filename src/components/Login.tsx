@@ -28,9 +28,19 @@ export default function Login() {
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setLoading(true)
     setError('')
 
+    // Frontend validation for identifier and password
+    if (!identifier.trim()) {
+      setError('Please enter your email, phone number, or registration number.')
+      return
+    }
+    if (!password) {
+      setError('Please enter your password.')
+      return
+    }
+
+    setLoading(true)
     try {
       const user = await signIn(identifier, password)
       navigate(user.role === 'admin' ? '/admin' : '/student', { replace: true })

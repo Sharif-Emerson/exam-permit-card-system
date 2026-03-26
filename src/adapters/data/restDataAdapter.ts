@@ -8,6 +8,7 @@ import type {
   CreateSupportRequestInput,
   DatabaseProfileRow,
   PermitActivityAction,
+  PermitActivityRecord,
   StudentAccountUpdateInput,
   StudentExam,
   StudentListPage,
@@ -234,17 +235,27 @@ function toSupportRequest(payload: unknown): SupportRequest {
   }
 }
 
-function toPermitActivityRecord(payload: unknown) {
+function toPermitActivityRecord(payload: unknown): PermitActivityRecord {
   if (!payload || typeof payload !== 'object') {
     throw new Error('The API returned an invalid permit activity record.')
   }
 
   const record = payload as Record<string, unknown>
+  const action = String(record.action ?? '')
+
+  if (
+    action !== 'download_permit' &&
+    action !== 'print_permit' &&
+    action !== 'create_permit' &&
+    action !== 'view_permit'
+  ) {
+    throw new Error('The API returned an invalid permit activity action.')
+  }
 
   return {
     id: String(record.id ?? ''),
     studentId: String(record.student_id ?? record.studentId ?? ''),
-    action: record.action === 'download_permit' ? 'download_permit' : 'print_permit',
+    action,
     semester: String(record.semester ?? 'General'),
     source: String(record.source ?? 'student-portal'),
     createdAt: String(record.created_at ?? record.createdAt ?? ''),
