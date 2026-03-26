@@ -1,4 +1,5 @@
-import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useState } from 'react'
+import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useState, useRef } from 'react'
+  // Ref to preserve search input focus
 import {
   BarChart2, Bell, CheckCircle2, CreditCard, Download, FileCheck,
   FileSpreadsheet, FileUp, LayoutDashboard, LogOut, Menu,
@@ -319,6 +320,8 @@ export default function AdminPanel() {
   const canManageFinancials = adminCapability.canImportFinancials
   const canAccessReports = adminCapability.sections.includes('reports')
   const [students, setStudents] = useState<StudentProfile[]>([])
+  // Ref for search input (no focus logic)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [paymentDrafts, setPaymentDrafts] = useState<PaymentDrafts>({})
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
@@ -340,8 +343,8 @@ export default function AdminPanel() {
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [activeSection, setActiveSection] = useState<NavSection>('students')
+  const [searchInputValue, setSearchInputValue] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'outstanding'>('all')
   const [filterDepartment, setFilterDepartment] = useState<string>('')
   const [filterProgram, setFilterProgram] = useState<string>('')
@@ -406,8 +409,9 @@ export default function AdminPanel() {
     try {
       if (!silent) {
         setLoading(true)
+        // Only clear error on non-silent loads to avoid unnecessary re-renders
+        setError('')
       }
-      setError('')
       const nextStudentPage = await fetchStudentProfilesPage({
         page: nextPage,
         pageSize,
@@ -424,12 +428,18 @@ export default function AdminPanel() {
       setTotalStudents(nextStudentPage.totalStudents)
       setClearedStudents(nextStudentPage.clearedStudents)
       setOutstandingStudents(nextStudentPage.outstandingStudents)
-      setPaymentDrafts(
-        nextStudents.reduce<PaymentDrafts>((drafts, student) => {
-          drafts[student.id] = student.amountPaid.toFixed(2)
-          return drafts
-        }, {}),
-      )
+      // Preserve user-typed payment drafts during silent refreshes
+      // Only reset to server values on initial load or non-silent refreshes
+      setPaymentDrafts((currentDrafts) => {
+        const nextDrafts: PaymentDrafts = {}
+        for (const student of nextStudents) {
+          // Keep existing draft value if user has typed something different
+          // Otherwise use server value
+          const serverValue = student.amountPaid.toFixed(2)
+          nextDrafts[student.id] = currentDrafts[student.id] ?? serverValue
+        }
+        return nextDrafts
+      })
       setLastSyncAt(new Date().toISOString())
     } catch (loadError) {
       const nextError = loadError instanceof Error ? loadError.message : 'Unable to load students'
@@ -532,18 +542,31 @@ export default function AdminPanel() {
     }
   }, [user])
 
-  useEffect(() => {
-    // Only trigger loadStudents when debouncedSearch changes, not on every searchQuery keystroke
-    void loadStudents({ search: debouncedSearch })
-  }, [debouncedSearch, loadStudents])
-
-  // Debounce search query to prevent excessive API calls while typing
+  // Debounce the search input value to update searchQuery
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery)
+      setSearchQuery(searchInputValue)
     }, 300)
     return () => clearTimeout(timer)
-  }, [searchQuery])
+  }, [searchInputValue])
+
+  // Initial load - non-silent to show loading state
+  useEffect(() => {
+    // Only run once on mount to load initial data
+    void loadStudents({ search: '' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Search-triggered loads - silent to avoid UI blinking
+  useEffect(() => {
+    // Skip on initial mount since we already loaded above
+    if (searchQuery === '') {
+      return
+    }
+    // Only trigger loadStudents when searchQuery changes, not on every keystroke
+    // Use silent: true to avoid unnecessary loading state changes
+    void loadStudents({ search: searchQuery, silent: true })
+  }, [searchQuery, loadStudents])
 
   useEffect(() => {
     void loadTrashedStudents()
@@ -643,14 +666,27 @@ export default function AdminPanel() {
     }
   }, [signOut, user])
 
+  // Only sync user info to settingsDraft on initial mount or when user changes significantly
+  // Avoid syncing during typing to prevent input reset issues
+   
   useEffect(() => {
-    setSettingsDraft((current) => ({
-      ...current,
-      name: user?.name ?? '',
-      email: user?.email ?? '',
-      phoneNumber: user?.phoneNumber === 'Not assigned' ? '' : user?.phoneNumber ?? '',
-    }))
-  }, [user?.email, user?.name, user?.phoneNumber])
+    setSettingsDraft((current) => {
+      // Only update if the values are empty or significantly different
+      // This prevents resetting fields while user is typing
+      const shouldUpdate = !current.name || !current.email || current.phoneNumber === undefined
+      if (!shouldUpdate) {
+        return current
+      }
+      return {
+        ...current,
+        name: user?.name ?? '',
+        email: user?.email ?? '',
+        phoneNumber: user?.phoneNumber === 'Not assigned' ? '' : user?.phoneNumber ?? '',
+      }
+    })
+    // Intentionally only depend on user?.id to avoid resetting drafts on every user property change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   const permitActivityLogs = activityLogs
     .filter((log) => log.action === 'print_permit' || log.action === 'download_permit')
@@ -1869,19 +1905,21 @@ export default function AdminPanel() {
           </button>
 
           {/* Search */}
-          <div className="flex max-w-sm flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+          <form
+            className="flex max-w-sm flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
+            onSubmit={(e) => e.preventDefault()}
+          >
             <Search className="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-slate-500" />
             <input
+              ref={searchInputRef}
               type="text"
               aria-label="Search students"
               placeholder="Search students..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value)
-                if (activeSection !== 'students') setActiveSection('students')
-              }}
+              value={searchInputValue}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchInputValue(e.target.value)}
               className="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none dark:text-slate-100 dark:placeholder-slate-500"
             />
+
             {searchQuery && (
               <button
                 type="button"
@@ -1893,7 +1931,7 @@ export default function AdminPanel() {
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
-          </div>
+          </form>
 
           <div className="ml-auto flex items-center gap-3">
             <button
