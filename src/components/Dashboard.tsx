@@ -27,6 +27,7 @@ import PermitCard from './PermitCard'
 import { createSupportRequest, fetchPermitActivityHistory, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, recordPermitActivity, updateStudentAccount } from '../services/profileService'
 import type { PermitActivityRecord, StudentProfile, SupportContact, SupportRequest } from '../types'
 import { FALLBACK_PROFILE_IMAGE } from './PermitCard'
+import Select from 'react-select'
 
 type PermitStatus = 'approved' | 'pending' | 'rejected'
 type PortalSection = 'overview' | 'applications' | 'settings' | 'support'
@@ -324,9 +325,19 @@ export default function Dashboard() {
   const [supportRequests, setSupportRequests] = useState<SupportRequest[]>([])
   const [supportContacts, setSupportContacts] = useState<SupportContact[]>([])
   const [permitHistory, setPermitHistory] = useState<PermitActivityRecord[]>([])
+  // Course options for dropdown
+  const allCourseUnits = useMemo(() => {
+    const units = new Set<string>()
+    applicationHistory.forEach((rec) => rec.courseUnits.forEach((u) => units.add(u)))
+    if (studentData?.courseUnits) {
+      studentData.courseUnits.forEach((u) => units.add(u))
+    }
+    return Array.from(units).sort()
+  }, [applicationHistory, studentData])
+
   const [applicationDraft, setApplicationDraft] = useState<ApplicationDraft>({
     semester: `${deriveAcademicSession()} ${deriveSemesterLabel()}`,
-    courseUnits: '',
+    courseUnits: [],
     documents: [],
     checklist: [],
   })
@@ -1290,13 +1301,17 @@ export default function Dashboard() {
                       <form className="mt-6 grid gap-4 lg:grid-cols-2" onSubmit={(event) => void handleApplicationSubmit(event)}>
                         <div>
                           <label htmlFor="semester" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Exam session / semester</label>
-                          <input
+                          <select
                             id="semester"
-                            type="text"
                             value={applicationDraft.semester}
                             onChange={(event) => setApplicationDraft((current) => ({ ...current, semester: event.target.value }))}
                             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-green-300 focus:ring-2 focus:ring-green-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:focus:border-green-400 dark:focus:ring-green-950"
-                          />
+                          >
+                            <option value="">Select semester</option>
+                            {availableSemesters.map((sem) => (
+                              <option key={sem} value={sem}>{sem}</option>
+                            ))}
+                          </select>
                         </div>
                         <div>
                           <p className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Document checklist</p>
@@ -1324,14 +1339,27 @@ export default function Dashboard() {
                         </div>
                         <div className="lg:col-span-2">
                           <label htmlFor="courseUnits" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Course units</label>
-                          <textarea
+                          <Select
                             id="courseUnits"
-                            rows={5}
-                            value={applicationDraft.courseUnits}
-                            onChange={(event) => setApplicationDraft((current) => ({ ...current, courseUnits: event.target.value }))}
-                            placeholder="Enter one course unit per line"
-                            className="w-full rounded-[1.75rem] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-950"
+                            isMulti
+                            options={allCourseUnits.map((u) => ({ value: u, label: u }))}
+                            value={applicationDraft.courseUnits.map((u) => ({ value: u, label: u }))}
+                            onChange={(selected) => {
+                              const unique = Array.from(new Set(selected.map((s) => s.value)))
+                              setApplicationDraft((current) => ({ ...current, courseUnits: unique }))
+                            }}
+                            classNamePrefix="react-select"
+                            placeholder="Select or type to add course units"
+                            isClearable={false}
+                            isSearchable
+                            noOptionsMessage={() => 'Type to add new course unit'}
                           />
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {applicationDraft.courseUnits.length === 0 && <span className="text-slate-400">No course units selected</span>}
+                            {applicationDraft.courseUnits.map((u) => (
+                              <span key={u} className="inline-block rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">{u}</span>
+                            ))}
+                          </div>
                         </div>
                         <div className="lg:col-span-2 flex justify-end">
                           <button
@@ -1619,14 +1647,46 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div>
-                        <label htmlFor="settings-image" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Profile image URL</label>
+                        <label htmlFor="settings-image" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Profile photo</label>
+                        <div className="flex gap-3 items-center">
+                          <input
+                            id="settings-image-upload"
+                            type="file"
+                            accept="image/*"
+                            title="Upload profile photo"
+                            placeholder="Choose profile photo"
+                            onChange={async (event) => {
+                              const file = event.target.files?.[0];
+                              if (!file) return;
+                              const formData = new FormData();
+                              formData.append('profilePhoto', file);
+                              try {
+                                const res = await fetch('/uploads/profile-photo', {
+                                  method: 'POST',
+                                  body: formData,
+                                });
+                                if (!res.ok) throw new Error('Upload failed');
+                                const data = await res.json();
+                                if (data.url) {
+                                  setSettingsDraft((current) => ({ ...current, profileImage: data.url }));
+                                }
+                              } catch (err) {
+                                alert('Failed to upload image.');
+                              }
+                            }}
+                            className="block w-full text-sm text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                          />
+                          {settingsDraft.profileImage && (
+                            <img src={settingsDraft.profileImage} alt="Profile preview" className="h-12 w-12 rounded-full object-cover border" />
+                          )}
+                        </div>
                         <input
                           id="settings-image"
                           type="url"
                           value={settingsDraft.profileImage}
                           onChange={(event) => setSettingsDraft((current) => ({ ...current, profileImage: event.target.value }))}
                           placeholder="https://example.com/profile.jpg"
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900 mt-2"
                         />
                       </div>
                       <div className="grid gap-4 sm:grid-cols-3">

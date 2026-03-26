@@ -1,13 +1,13 @@
-import fs from 'node:fs/promises'
-import path from 'node:path'
-import cors from 'cors'
 import express from 'express'
+
+import cors from 'cors'
 import multer from 'multer'
 import Papa from 'papaparse'
 import readXlsxFile from 'read-excel-file/node'
+import fs from 'fs/promises'
+import path from 'path'
 import './lib/load-env.js'
 import {
-  createSession,
   createStudentProfile,
   createSupportRequest,
   deleteStudentProfile,
@@ -38,22 +38,57 @@ import {
   updateSystemSettings,
   updateProfileFinancials,
   verifyPassword,
+  // Session helpers
+  createSession,
 } from './lib/database.js'
+import { sendEmail, sendSms } from './lib/notification.js'
+// Default session TTL for login tokens (in hours)
+const sessionTtlHours = 24
 
-const app = express()
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 2 * 1024 * 1024,
-    files: 1,
-  },
-})
 
-const sessionTtlHours = Number(process.env.SESSION_TTL_HOURS ?? '12')
-const uploadsDir = getUploadsDir()
+
+
+// Initialize multer for file uploads
+const upload = multer();
+
+// Set uploads directory
+const uploadsDir = getUploadsDir();
+
+
 const corsAllowedOrigins = process.env.CORS_ALLOWED_ORIGINS
   ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
   : null
+const app = express()
+
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || isLoopbackOrigin(origin) || !corsAllowedOrigins || corsAllowedOrigins.includes(origin)) {
+      callback(null, true)
+      return
+    }
+
+    callback(new Error('Origin is not allowed by CORS.'))
+  },
+}))
+
+// Profile photo upload endpoint (must be after app is initialized)
+app.post('/uploads/profile-photo', upload.single('photo'), async (request, response) => {
+  if (!request.file) {
+    response.status(400).json({ message: 'No file uploaded.' })
+    return
+  }
+  const ext = path.extname(request.file.originalname) || '.jpg'
+  const fileName = `profile_${Date.now()}_${Math.floor(Math.random()*10000)}${ext}`
+  const filePath = path.join(uploadsDir, fileName)
+  await fs.writeFile(filePath, request.file.buffer)
+  // Assuming uploadsDir is served statically at /uploads
+  const fileUrl = `/uploads/${fileName}`
+  response.json({ url: fileUrl })
+})
+
 
 function isLoopbackOrigin(origin) {
   if (typeof origin !== 'string' || !origin.trim()) {
@@ -73,24 +108,6 @@ function isLoopbackOrigin(origin) {
   }
 }
 
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || isLoopbackOrigin(origin) || !corsAllowedOrigins || corsAllowedOrigins.includes(origin)) {
-      callback(null, true)
-      return
-    }
-
-    callback(new Error('Origin is not allowed by CORS.'))
-  },
-}))
-app.use(express.json({ limit: '256kb' }))
-app.use((request, response, next) => {
-  response.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-  response.setHeader('Pragma', 'no-cache')
-  response.setHeader('Expires', '0')
-
-  next()
-})
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i
 
@@ -628,13 +645,26 @@ app.post('/auth/login', (request, response) => {
   const password = typeof request.body?.password === 'string' ? request.body.password : ''
 
   if (!identifier || password.length < 8 || password.length > 128) {
+    console.warn('[auth/login] rejected invalid payload', {
+      hasIdentifier: Boolean(identifier),
+      passwordLength: password.length,
+    })
     response.status(400).json({ message: 'Email, phone number, or registration number and password are required.' })
     return
   }
 
   const user = resolveUserByIdentifier(identifier)
+  const passwordMatches = user ? verifyPassword(password, user.password_hash) : false
 
-  if (!user || !verifyPassword(password, user.password_hash)) {
+  console.info('[auth/login] login attempt', {
+    identifier,
+    resolvedUserId: user?.id ?? null,
+    resolvedUserEmail: user?.email ?? null,
+    resolvedRole: user?.role ?? null,
+    passwordMatches,
+  })
+
+  if (!user || !passwordMatches) {
     response.status(401).json({ message: 'Invalid login credentials.' })
     return
   }
@@ -1188,6 +1218,16 @@ app.patch('/profiles/:id/financials', authenticate, requireAdminPermission('mana
   })
 
   response.json(updatedProfile)
+
+  // Send payment reminder if not fully paid
+  if (updatedProfile.amount_paid < updatedProfile.total_fees) {
+    if (updatedProfile.email) {
+      sendEmail(updatedProfile.email, 'Payment Reminder', `Dear ${updatedProfile.name}, your outstanding balance is $${updatedProfile.total_fees - updatedProfile.amount_paid}. Please clear your fees to print your permit.`).catch(() => {})
+    }
+    if (updatedProfile.phone_number) {
+      sendSms(updatedProfile.phone_number, `Payment reminder: Outstanding balance $${updatedProfile.total_fees - updatedProfile.amount_paid}.`).catch(() => {})
+    }
+  }
 })
 
 app.get('/profiles-trash', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to access deleted student records.'), (_request, response) => {
@@ -1287,6 +1327,14 @@ app.post('/profiles/:id/permit-print-grants', authenticate, requireAdminPermissi
   })
 
   response.json(updatedProfile)
+
+  // Send permit ready notification
+  if (updatedProfile.email) {
+    sendEmail(updatedProfile.email, 'Permit Ready', `Dear ${updatedProfile.name}, your exam permit is now ready for download and printing.`).catch(() => {})
+  }
+  if (updatedProfile.phone_number) {
+    sendSms(updatedProfile.phone_number, 'Your exam permit is now ready for download and printing.').catch(() => {})
+  }
 })
 
 app.post('/admin-activity-logs', authenticate, requireAdminPermission('write_audit_logs', 'You do not have permission to record admin activity.'), (request, response) => {
@@ -1691,41 +1739,3 @@ async function startServer() {
     shutdown('unhandledRejection')
   })
 }
-
-function shutdown(signal) {
-  if (shuttingDown) {
-    return
-  }
-
-  shuttingDown = true
-  console.log(`Received ${signal}. Closing REST backend starter...`)
-
-  server.close((error) => {
-    if (error) {
-      console.error('Failed to close the HTTP server cleanly.', error)
-      process.exit(1)
-      return
-    }
-
-    console.log('REST backend starter stopped cleanly.')
-    process.exit(0)
-  })
-
-  setTimeout(() => {
-    console.error('Forced shutdown after waiting 10 seconds for active requests to finish.')
-    process.exit(1)
-  }, 10_000).unref()
-}
-
-process.on('SIGINT', () => shutdown('SIGINT'))
-process.on('SIGTERM', () => shutdown('SIGTERM'))
-
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception in REST backend starter.', error)
-  shutdown('uncaughtException')
-})
-
-process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled promise rejection in REST backend starter.', reason)
-  shutdown('unhandledRejection')
-})

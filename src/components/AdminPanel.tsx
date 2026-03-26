@@ -12,7 +12,7 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, clearStudentBalance, createStudentProfile, deleteStudentProfile, fetchAdminActivityLogsPage, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, restoreStudentProfile, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings } from '../services/profileService'
+import { adminUpdateStudentProfile, clearStudentBalance, createStudentProfile, deleteStudentProfile, fetchAdminActivityLogsPage, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, restoreStudentProfile, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById } from '../services/profileService'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
 import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile } from '../types'
 
@@ -305,61 +305,7 @@ function generateTemporaryPassword() {
   return `Permit-${token}`
 }
 
-function getImportedStudentPassword(row: FinancialImportRow) {
-  if (typeof row.password === 'string' && row.password.trim()) {
-    return row.password.trim()
-  }
 
-  const seedSource = row.studentId ?? row.email?.split('@')[0] ?? `row${row.rowNumber}`
-  const normalizedSeed = seedSource.replace(/[^a-z0-9]/gi, '').slice(-24) || `row${row.rowNumber}`
-  return `Permit-${normalizedSeed}`
-}
-
-function buildImportedStudentInput(row: FinancialImportRow): { createStudent?: CreateStudentInput; reason?: string } {
-  if (!row.studentName) {
-    return { reason: 'Student name is required to create a new student account.' }
-  }
-
-  if (!row.studentId) {
-    return { reason: 'Registration number is required to create a new student account.' }
-  }
-
-  if (!row.email) {
-    return { reason: 'Email is required to create a new student account.' }
-  }
-
-  if (!row.course) {
-    return { reason: 'Course is required to create a new student account.' }
-  }
-
-  if (typeof row.totalFees !== 'number') {
-    return { reason: 'Expected fees are required to create a new student account.' }
-  }
-
-  return {
-    createStudent: {
-      name: row.studentName,
-      email: row.email,
-      password: getImportedStudentPassword(row),
-      studentId: row.studentId,
-      studentCategory: row.studentCategory ?? 'local',
-      phoneNumber: row.phoneNumber,
-      course: row.course,
-      program: row.program,
-      college: row.college,
-      department: row.department,
-      semester: row.semester,
-      courseUnits: row.courseUnits,
-      totalFees: row.totalFees,
-      amountPaid: row.amountPaid ?? 0,
-      instructions: row.instructions,
-      examDate: row.examDate,
-      examTime: row.examTime,
-      venue: row.venue,
-      seatNumber: row.seatNumber,
-    },
-  }
-}
 
 export default function AdminPanel() {
     const [refreshing, setRefreshing] = useState(false)
@@ -4020,13 +3966,45 @@ export default function AdminPanel() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="edit-student-profile-image" className="mb-1 block text-xs font-medium text-gray-700">Profile Photo URL</label>
+                  <label htmlFor="edit-student-profile-image" className="mb-1 block text-xs font-medium text-gray-700">Profile Photo</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      id="edit-student-profile-image-upload"
+                      type="file"
+                      accept="image/*"
+                      title="Upload profile photo"
+                      placeholder="Choose image file"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        const formData = new FormData();
+                        formData.append('profilePhoto', file);
+                        try {
+                          const res = await fetch('/uploads/profile-photo', {
+                            method: 'POST',
+                            body: formData,
+                          });
+                          if (!res.ok) throw new Error('Upload failed');
+                          const data = await res.json();
+                          if (data.url) {
+                            setEditDraft((d) => ({ ...d, profileImage: data.url }));
+                          }
+                        } catch {
+                          alert('Failed to upload image.');
+                        }
+                      }}
+                      className="block w-full text-xs text-gray-700 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                    />
+                    {editDraft.profileImage && (
+                      <img src={editDraft.profileImage} alt="Profile preview" className="h-8 w-8 rounded-full object-cover border" />
+                    )}
+                  </div>
                   <input
                     id="edit-student-profile-image"
                     type="url"
                     value={editDraft.profileImage ?? ''}
                     onChange={(e) => setEditDraft((d) => ({ ...d, profileImage: e.target.value }))}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 mt-2"
                     placeholder="https://example.com/student-photo.jpg"
                   />
                 </div>
@@ -4319,13 +4297,45 @@ export default function AdminPanel() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="create-student-profile-image" className="mb-1 block text-xs font-medium text-gray-700">Profile Photo URL</label>
+                  <label htmlFor="create-student-profile-image" className="mb-1 block text-xs font-medium text-gray-700">Profile Photo</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      id="create-student-profile-image-upload"
+                      type="file"
+                      accept="image/*"
+                      title="Upload profile photo"
+                      placeholder="Choose image file"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        const formData = new FormData();
+                        formData.append('profilePhoto', file);
+                        try {
+                          const res = await fetch('/uploads/profile-photo', {
+                            method: 'POST',
+                            body: formData,
+                          });
+                          if (!res.ok) throw new Error('Upload failed');
+                          const data = await res.json();
+                          if (data.url) {
+                            setCreateDraft((current) => ({ ...current, profileImage: data.url }));
+                          }
+                        } catch {
+                          alert('Failed to upload image.');
+                        }
+                      }}
+                      className="block w-full text-xs text-gray-700 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                    />
+                    {createDraft.profileImage && (
+                      <img src={createDraft.profileImage} alt="Profile preview" className="h-8 w-8 rounded-full object-cover border" />
+                    )}
+                  </div>
                   <input
                     id="create-student-profile-image"
                     type="url"
                     value={createDraft.profileImage ?? ''}
                     onChange={(event) => setCreateDraft((current) => ({ ...current, profileImage: event.target.value }))}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 mt-2"
                     placeholder="https://example.com/student-photo.jpg"
                   />
                 </div>
