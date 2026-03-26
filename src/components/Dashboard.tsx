@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react'
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell,
   Download,
@@ -63,7 +63,7 @@ type SettingsDraft = {
 
 type ApplicationDraft = {
   semester: string
-  courseUnits: string
+  courseUnits: string[]
   documents: string[]
   checklist: string[]
 }
@@ -325,6 +325,7 @@ export default function Dashboard() {
   const [supportRequests, setSupportRequests] = useState<SupportRequest[]>([])
   const [supportContacts, setSupportContacts] = useState<SupportContact[]>([])
   const [permitHistory, setPermitHistory] = useState<PermitActivityRecord[]>([])
+  const hasInitializedProfileRef = useRef(false)
   // Course options for dropdown
   const allCourseUnits = useMemo(() => {
     const units = new Set<string>()
@@ -355,7 +356,7 @@ export default function Dashboard() {
     message: '',
   })
 
-  async function loadSupportRequests() {
+  const loadSupportRequests = useCallback(async () => {
     if (!user || user.role !== 'student') {
       return
     }
@@ -370,9 +371,9 @@ export default function Dashboard() {
     } finally {
       setLoadingSupport(false)
     }
-  }
+  }, [user])
 
-  async function loadSupportContactsAndHistory() {
+  const loadSupportContactsAndHistory = useCallback(async () => {
     if (!user || user.role !== 'student') {
       return
     }
@@ -388,9 +389,9 @@ export default function Dashboard() {
       const nextError = loadError instanceof Error ? loadError.message : 'Unable to load support contacts or permit history.'
       setError(nextError)
     }
-  }
+  }, [user])
 
-  async function syncStudentProfile(options?: { showLoading?: boolean; clearError?: boolean; syncDrafts?: boolean; initializeLocalState?: boolean }) {
+  const syncStudentProfile = useCallback(async (options?: { showLoading?: boolean; clearError?: boolean; syncDrafts?: boolean; initializeLocalState?: boolean }) => {
     if (!user || user.role !== 'student') {
       setLoading(false)
       return null
@@ -437,7 +438,7 @@ export default function Dashboard() {
     } catch (loadError) {
       const nextError = loadError instanceof Error ? loadError.message : 'Unable to load your dashboard'
 
-      if (clearError || !studentData) {
+      if (clearError || !hasInitializedProfileRef.current) {
         setError(nextError)
       }
 
@@ -447,16 +448,23 @@ export default function Dashboard() {
         setLoading(false)
       }
     }
-  }
+  }, [user, loadSupportRequests, loadSupportContactsAndHistory])
+
 
   useEffect(() => {
+    if (hasInitializedProfileRef.current) {
+      return
+    }
+
+    hasInitializedProfileRef.current = true
     void syncStudentProfile({
       showLoading: true,
       clearError: true,
       syncDrafts: true,
       initializeLocalState: true,
     })
-  }, [user])
+     
+  }, [syncStudentProfile])
 
   useEffect(() => {
     if (!user || user.role !== 'student' || typeof window === 'undefined') {
@@ -487,7 +495,8 @@ export default function Dashboard() {
       window.removeEventListener('focus', handleFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [user])
+     
+  }, [user, syncStudentProfile])
 
   useEffect(() => {
     if (!user) {
@@ -637,10 +646,7 @@ export default function Dashboard() {
       return
     }
 
-    const courseUnits = applicationDraft.courseUnits
-      .split('\n')
-      .map((value) => value.trim())
-      .filter(Boolean)
+    const courseUnits = [...applicationDraft.courseUnits]
 
     if (courseUnits.length === 0) {
       setError('Add at least one course unit before submitting your permit request.')
@@ -679,7 +685,7 @@ export default function Dashboard() {
     setApplicationHistory((current) => [nextRecord, ...current])
     setApplicationDraft({
       semester: applicationDraft.semester,
-      courseUnits: '',
+      courseUnits: [],
       documents: [],
       checklist: [],
     })
@@ -1475,8 +1481,8 @@ export default function Dashboard() {
                           <textarea
                             id="application-course-units"
                             rows={6}
-                            value={applicationDraft.courseUnits}
-                            onChange={(event) => setApplicationDraft((current) => ({ ...current, courseUnits: event.target.value }))}
+                            value={applicationDraft.courseUnits.join('\n')}
+                            onChange={(event) => setApplicationDraft((current) => ({ ...current, courseUnits: event.target.value.split('\n').map(v => v.trim()).filter(Boolean) }))}
                             placeholder="CSC 401 - Compiler Construction"
                             className="w-full rounded-[1.75rem] border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
                           />
@@ -1656,23 +1662,20 @@ export default function Dashboard() {
                             title="Upload profile photo"
                             placeholder="Choose profile photo"
                             onChange={async (event) => {
-                              const file = event.target.files?.[0];
-                              if (!file) return;
-                              const formData = new FormData();
-                              formData.append('profilePhoto', file);
-                              try {
-                                const res = await fetch('/uploads/profile-photo', {
-                                  method: 'POST',
-                                  body: formData,
-                                });
-                                if (!res.ok) throw new Error('Upload failed');
-                                const data = await res.json();
-                                if (data.url) {
-                                  setSettingsDraft((current) => ({ ...current, profileImage: data.url }));
+                              const file = event.target.files?.[0]
+                              if (!file) return
+
+                              const reader = new FileReader()
+                              reader.onload = () => {
+                                const result = typeof reader.result === 'string' ? reader.result : ''
+                                if (result) {
+                                  setSettingsDraft((current) => ({ ...current, profileImage: result }))
                                 }
-                              } catch (err) {
-                                alert('Failed to upload image.');
                               }
+                              reader.onerror = () => {
+                                alert('Failed to upload image.')
+                              }
+                              reader.readAsDataURL(file)
                             }}
                             className="block w-full text-sm text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
                           />
