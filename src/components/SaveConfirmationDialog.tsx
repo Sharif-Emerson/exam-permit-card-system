@@ -57,52 +57,55 @@ export function useNavigationWithConfirmation() {
   const navigate = useNavigate()
   const { hasUnsavedChanges, savePendingChanges, setHasUnsavedChanges } = useUnsavedChanges()
   const [showDialog, setShowDialog] = useState(false)
-  const [pendingNav, setPendingNav] = useState<{ to?: string; replace?: boolean; action?: 'navigate' | 'back' | 'close' } | null>(null)
+  const [isBlocked, setIsBlocked] = useState(false)
 
   const handleConfirmSave = useCallback(async () => {
     setShowDialog(false)
+    setIsBlocked(false)
     const saved = await savePendingChanges()
     setHasUnsavedChanges(false)
-    
-    if (pendingNav?.action === 'back') {
-      // Force navigate to login on back
-      navigate('/login', { replace: true })
-    } else if (pendingNav?.to) {
-      navigate(pendingNav.to, { replace: pendingNav.replace })
-    }
-    setPendingNav(null)
-  }, [savePendingChanges, pendingNav, navigate, setHasUnsavedChanges])
+    // After saving, navigate to login
+    navigate('/login', { replace: true })
+  }, [savePendingChanges, navigate, setHasUnsavedChanges])
 
   const handleDontSave = useCallback(() => {
     setShowDialog(false)
+    setIsBlocked(false)
     setHasUnsavedChanges(false)
-    
-    if (pendingNav?.action === 'back') {
-      // Force navigate to login on back
-      navigate('/login', { replace: true })
-    } else if (pendingNav?.to) {
-      navigate(pendingNav.to, { replace: pendingNav.replace })
-    }
-    setPendingNav(null)
-  }, [pendingNav, navigate, setHasUnsavedChanges])
+    // Navigate to login without saving
+    navigate('/login', { replace: true })
+  }, [navigate, setHasUnsavedChanges])
 
   const handleCancel = useCallback(() => {
     setShowDialog(false)
-    setPendingNav(null)
+    // Push state back to prevent back navigation
+    window.history.pushState({ page: window.location.pathname }, '', window.location.pathname)
   }, [])
 
-  // Intercept back button
+  // Intercept back button when there are unsaved changes
   useEffect(() => {
     if (!hasUnsavedChanges) return
 
-    const handlePopState = () => {
-      setPendingNav({ action: 'back' })
-      setShowDialog(true)
+    // Push a state to intercept back button
+    window.history.pushState({ page: window.location.pathname, protected: true }, '')
+    setIsBlocked(true)
+
+    const handlePopState = (event: PopStateEvent) => {
+      // Only show dialog if we're still on a protected page
+      if (hasUnsavedChanges && isBlocked) {
+        event.preventDefault()
+        event.stopPropagation()
+        setShowDialog(true)
+      }
     }
 
     window.addEventListener('popstate', handlePopState)
-    return () => window.removeEventListener('popstate', handlePopState)
-  }, [hasUnsavedChanges])
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      setIsBlocked(false)
+    }
+  }, [hasUnsavedChanges, isBlocked])
 
   return {
     showDialog,
