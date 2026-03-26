@@ -645,24 +645,12 @@ app.post('/auth/login', (request, response) => {
   const password = typeof request.body?.password === 'string' ? request.body.password : ''
 
   if (!identifier || password.length < 8 || password.length > 128) {
-    console.warn('[auth/login] rejected invalid payload', {
-      hasIdentifier: Boolean(identifier),
-      passwordLength: password.length,
-    })
     response.status(400).json({ message: 'Email, phone number, or registration number and password are required.' })
     return
   }
 
   const user = resolveUserByIdentifier(identifier)
   const passwordMatches = user ? verifyPassword(password, user.password_hash) : false
-
-  console.info('[auth/login] login attempt', {
-    identifier,
-    resolvedUserId: user?.id ?? null,
-    resolvedUserEmail: user?.email ?? null,
-    resolvedRole: user?.role ?? null,
-    passwordMatches,
-  })
 
   if (!user || !passwordMatches) {
     response.status(401).json({ message: 'Invalid login credentials.' })

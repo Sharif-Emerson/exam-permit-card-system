@@ -1555,13 +1555,9 @@ describe('AdminPanel', () => {
         role: 'student',
         name: 'John Doe',
         studentId: 'STU001',
+        studentCategory: 'local',
         course: 'Computer Science',
-        examDate: '2026-04-15',
-        examTime: '10:00 AM',
-        venue: 'Hall A',
-        seatNumber: 'A-001',
-        instructions: 'Bring valid ID.',
-        profileImage: 'https://via.placeholder.com/150',
+        semester: 'Semester 1 2026/2027',
         exams: [
           {
             id: 'student-1-exam-1',

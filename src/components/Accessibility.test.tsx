@@ -18,7 +18,9 @@ describe('Accessibility', () => {
       refreshUser: vi.fn().mockResolvedValue(undefined),
     })
     vi.spyOn(themeContextModule, 'useTheme').mockReturnValue({
+      theme: 'light',
       darkMode: false,
+      setTheme: vi.fn(),
       toggleTheme: vi.fn(),
     })
 
@@ -71,10 +73,10 @@ describe('Accessibility', () => {
           amountPaid: 3000,
           feesBalance: 0,
           canPrintPermit: true,
-          printAccessMessage: null,
+          printAccessMessage: undefined,
           permitPrintsUsedThisMonth: 0,
           permitPrintsRemainingThisMonth: 2,
-          permitPrintGrantMonth: null,
+          permitPrintGrantMonth: undefined,
           permitPrintGrantsRemaining: 0,
         }}
         qrCodeUrl="data:image/png;base64,permit-qr"

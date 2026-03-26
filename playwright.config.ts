@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
+// eslint-disable-next-line no-undef
+const isCI = process.env.CI === 'true'
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -23,7 +26,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev:rest:e2e',
     url: 'http://127.0.0.1:4173/login',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !isCI,
     timeout: 120_000,
   },
 })

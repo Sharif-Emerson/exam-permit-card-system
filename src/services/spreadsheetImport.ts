@@ -58,16 +58,17 @@ function parseNumber(value: unknown): number | undefined {
   return Number.isFinite(numericValue) ? numericValue : undefined
 }
 
-function parseList(value: unknown): string[] | undefined {
-  if (typeof value !== 'string' || !value.trim()) {
-    return undefined;
-  }
-  const items = value
-    .split(/\r?\n|,|;/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-  return items.length > 0 ? items : undefined;
-}
+// parseList function kept for future use
+// function parseList(value: unknown): string[] | undefined {
+//   if (typeof value !== 'string' || !value.trim()) {
+//     return undefined;
+//   }
+//   const items = value
+//     .split(/\r?\n|,|;/)
+//     .map((item) => item.trim())
+//     .filter(Boolean);
+//   return items.length > 0 ? items : undefined;
+// }
 
 async function parseCsvFile(file: File) {
   const csvText = await file.text()

@@ -38,6 +38,15 @@ export default defineConfig(({ mode }) => {
       globals: true,
       include: ['src/**/*.test.{ts,tsx}'],
       exclude: ['node_modules/**', 'e2e/**', 'playwright.config.ts'],
+      define: {
+        'import.meta.env': JSON.stringify({
+          DEV: true,
+          VITE_API_BASE_URL: '',
+          MODE: 'test',
+          BASE_URL: '/',
+          PROD: false,
+        }),
+      },
     },
   }
 })

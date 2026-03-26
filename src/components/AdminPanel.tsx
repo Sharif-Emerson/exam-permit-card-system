@@ -341,6 +341,7 @@ export default function AdminPanel() {
   const [successMessage, setSuccessMessage] = useState('')
   const [activeSection, setActiveSection] = useState<NavSection>('students')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'outstanding'>('all')
   const [filterDepartment, setFilterDepartment] = useState<string>('')
   const [filterProgram, setFilterProgram] = useState<string>('')
@@ -532,8 +533,17 @@ export default function AdminPanel() {
   }, [user])
 
   useEffect(() => {
-    void loadStudents()
-  }, [loadStudents])
+    // Only trigger loadStudents when debouncedSearch changes, not on every searchQuery keystroke
+    void loadStudents({ search: debouncedSearch })
+  }, [debouncedSearch, loadStudents])
+
+  // Debounce search query to prevent excessive API calls while typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   useEffect(() => {
     void loadTrashedStudents()
@@ -569,7 +579,7 @@ export default function AdminPanel() {
 
   useEffect(() => {
     setPage(1)
-  }, [searchQuery, filterStatus])
+  }, [filterStatus])
 
   useEffect(() => {
     setSelectedPermitStudentIds((current) => current.filter((studentId) => students.some((student) => student.id === studentId)))

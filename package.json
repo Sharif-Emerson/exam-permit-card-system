@@ -31,14 +31,18 @@
     "preview": "node scripts/run-vite-rest.mjs preview"
   },
   "dependencies": {
-    "react-select": "^5.7.3",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "lucide-react": "^0.264.0",
+    "nodemailer": "^8.0.4",
     "papaparse": "^5.5.3",
     "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.13.1",
-    "read-excel-file": "^7.0.2"
+    "react-select": "^5.7.3",
+    "read-excel-file": "^7.0.2",
+    "twilio": "^5.13.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",

@@ -1,8 +1,9 @@
+import React from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 import ErrorBoundary from './ErrorBoundary'
 
-function ThrowingChild() {
+function ThrowingChild(): React.ReactElement {
   throw new Error('Permit application failed')
 }
 

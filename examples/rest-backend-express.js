@@ -72,12 +72,21 @@ function authenticate(request, response, next) {
 }
 
 app.post('/auth/login', (request, response) => {
-  const { email, password } = request.body
-  const user = users.find((candidate) => candidate.email === email && candidate.password === password)
+  const { identifier, password } = request.body;
+  // Accept login by email, phone, or registration number (student_id)
+  const user = users.find((candidate) => {
+    const profile = profiles.find((p) => p.id === candidate.id);
+    return (
+      (candidate.email === identifier ||
+        (profile && profile.student_id === identifier) ||
+        (profile && profile.phone === identifier)) &&
+      candidate.password === password
+    );
+  });
 
   if (!user) {
-    response.status(401).json({ message: 'Invalid login credentials.' })
-    return
+    response.status(401).json({ message: 'Invalid login credentials.' });
+    return;
   }
 
   response.json({
@@ -88,8 +97,8 @@ app.post('/auth/login', (request, response) => {
       role: user.role,
       name: user.name,
     },
-  })
-})
+  });
+});
 
 app.post('/auth/logout', authenticate, (request, response) => {
   const authorization = request.header('Authorization')

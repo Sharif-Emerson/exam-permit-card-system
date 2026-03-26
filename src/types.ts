@@ -79,6 +79,10 @@ export interface StudentProfile {
   grantedPrintsRemaining?: number
   canPrintPermit?: boolean
   printAccessMessage?: string
+  permitPrintsUsedThisMonth?: number
+  permitPrintsRemainingThisMonth?: number
+  permitPrintGrantMonth?: string
+  permitPrintGrantsRemaining?: number
   totalFees: number
   amountPaid: number
   feesBalance: number
@@ -91,6 +95,8 @@ export interface StudentListQuery {
   pageSize?: number
   search?: string
   status?: StudentListStatusFilter
+  department?: string
+  program?: string
 }
 
 export interface StudentListPage {
@@ -158,6 +164,7 @@ export interface AdminProfile {
   email: string
   role: 'admin'
   name: string
+  phoneNumber?: string
   totalFees: number
   amountPaid: number
   feesBalance: number
@@ -227,6 +234,8 @@ export interface FinancialImportRow {
   rowNumber: number;
   studentName?: string;
   studentId?: string;
+  email?: string;
+  userId?: string;
   amountPaid?: number;
   totalFees?: number;
 }
@@ -241,6 +250,8 @@ export type FinancialImportUpdate = {
 
 export interface FinancialImportResult {
   updatedCount: number;
+  createdCount?: number;
+  createdStudents?: number[];
   skippedRows: Array<{ rowNumber: number; reason: string }>;
 }
 
@@ -249,7 +260,7 @@ export interface SystemFeeSettings {
   internationalStudentFee: number
 }
 
-export type PermitActivityAction = 'print_permit' | 'download_permit'
+export type PermitActivityAction = 'print_permit' | 'download_permit' | 'create_permit' | 'view_permit'
 
 export interface PermitActivityRecord {
   id: string

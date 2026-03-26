@@ -58,27 +58,6 @@ const createdStudent = await request('/profiles', {
   }),
 })
 
-const secondStudent = await request('/profiles', {
-  method: 'POST',
-  headers: {
-    Authorization: `Bearer ${login.token}`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    name: 'Smoke Student Two',
-    email: 'smoke-student-2@example.com',
-    password: 'Permit@2026',
-    student_id: 'SMOKE002',
-    course: 'Mathematics',
-    total_fees: 3000,
-    amount_paid: 3000,
-    exam_date: '2026-04-16',
-    exam_time: '2:00 PM',
-    venue: 'Hall B',
-    seat_number: 'B-002',
-  }),
-})
-
 await fs.writeFile(smokeCsvPath, 'student_name,student_id,amount_paid,total_fees\nSmoke Student One,SMOKE001,2800,3000\n')
 
 const formData = new FormData()
