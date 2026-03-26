@@ -52,60 +52,38 @@ export function SaveConfirmationDialog({ isOpen, onConfirm, onCancel, onDontSave
   )
 }
 
-// Hook to handle navigation with unsaved changes
+// Hook to handle smooth navigation to login on back/close
 export function useNavigationWithConfirmation() {
   const navigate = useNavigate()
   const { hasUnsavedChanges, savePendingChanges, setHasUnsavedChanges } = useUnsavedChanges()
   const [showDialog, setShowDialog] = useState(false)
-  const [isBlocked, setIsBlocked] = useState(false)
 
   const handleConfirmSave = useCallback(async () => {
     setShowDialog(false)
-    setIsBlocked(false)
-    const saved = await savePendingChanges()
+    await savePendingChanges()
     setHasUnsavedChanges(false)
-    // After saving, navigate to login
     navigate('/login', { replace: true })
   }, [savePendingChanges, navigate, setHasUnsavedChanges])
 
   const handleDontSave = useCallback(() => {
     setShowDialog(false)
-    setIsBlocked(false)
     setHasUnsavedChanges(false)
-    // Navigate to login without saving
     navigate('/login', { replace: true })
   }, [navigate, setHasUnsavedChanges])
 
   const handleCancel = useCallback(() => {
     setShowDialog(false)
-    // Push state back to prevent back navigation
-    window.history.pushState({ page: window.location.pathname }, '', window.location.pathname)
   }, [])
 
-  // Intercept back button when there are unsaved changes
+  // Smooth back to login on back button
   useEffect(() => {
-    if (!hasUnsavedChanges) return
-
-    // Push a state to intercept back button
-    window.history.pushState({ page: window.location.pathname, protected: true }, '')
-    setIsBlocked(true)
-
-    const handlePopState = (event: PopStateEvent) => {
-      // Only show dialog if we're still on a protected page
-      if (hasUnsavedChanges && isBlocked) {
-        event.preventDefault()
-        event.stopPropagation()
-        setShowDialog(true)
-      }
+    const handlePopState = () => {
+      navigate('/login', { replace: true })
     }
 
     window.addEventListener('popstate', handlePopState)
-    
-    return () => {
-      window.removeEventListener('popstate', handlePopState)
-      setIsBlocked(false)
-    }
-  }, [hasUnsavedChanges, isBlocked])
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [navigate])
 
   return {
     showDialog,

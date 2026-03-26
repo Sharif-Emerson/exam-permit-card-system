@@ -315,7 +315,6 @@ export default function AdminPanel() {
   const { user, signOut, refreshUser } = useAuth()
   const { darkMode, toggleTheme } = useTheme()
   const { hasUnsavedChanges, setHasUnsavedChanges, registerSaveHandler } = useUnsavedChanges()
-  const { showDialog, handleConfirmSave, handleDontSave, handleCancel } = useNavigationWithConfirmation()
   const adminCapability = getAdminCapabilityProfile(user)
   const canViewStudents = adminCapability.sections.includes('students')
   const canViewPermitActivity = adminCapability.sections.includes('permits')
@@ -4531,12 +4530,6 @@ export default function AdminPanel() {
           </div>
         </div>
       )}
-      <SaveConfirmationDialog
-        isOpen={showDialog}
-        onConfirm={handleConfirmSave}
-        onDontSave={handleDontSave}
-        onCancel={handleCancel}
-      />
       </div>
     </>
   )
