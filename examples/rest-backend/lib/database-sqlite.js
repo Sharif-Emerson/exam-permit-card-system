@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto'
-import { DatabaseSync } from 'node:sqlite'
+import Database from 'better-sqlite3'
 import { fileURLToPath } from 'node:url'
 import { getBootstrapAdmins, getBootstrapProfiles } from './bootstrap-admins.js'
 
@@ -24,7 +24,7 @@ const dbPath = configuredDbPath
 await fs.mkdir(path.dirname(dbPath), { recursive: true })
 await fs.mkdir(uploadsDir, { recursive: true })
 
-const db = new DatabaseSync(dbPath)
+const db = new Database(dbPath)
 db.exec('PRAGMA journal_mode = WAL;')
 db.exec('PRAGMA foreign_keys = ON;')
 

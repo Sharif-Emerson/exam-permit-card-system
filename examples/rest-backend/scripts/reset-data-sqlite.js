@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomBytes, scryptSync } from 'node:crypto'
-import { DatabaseSync } from 'node:sqlite'
+import Database from 'better-sqlite3'
 import { fileURLToPath } from 'node:url'
 import '../lib/load-env.js'
 import { getBootstrapAdmins, getBootstrapProfiles } from '../lib/bootstrap-admins.js'
@@ -66,7 +66,7 @@ async function readExistingAdmins(dbFilePath) {
 		return new Map()
 	}
 
-	const db = new DatabaseSync(dbFilePath)
+	const db = new Database(dbFilePath)
 
 	try {
 		if (!hasColumn(db, 'users', 'phone_number')) {
@@ -98,7 +98,7 @@ async function reseedDatabase(preservedAdmins = new Map()) {
 	const seed = JSON.parse(await fs.readFile(seedFile, 'utf8'))
 	const bootstrapAdmins = getBootstrapAdmins()
 	const bootstrapProfiles = getBootstrapProfiles()
-	const db = new DatabaseSync(appDbPath)
+	const db = new Database(appDbPath)
 	const timestamp = new Date().toISOString()
 
 	db.exec(`

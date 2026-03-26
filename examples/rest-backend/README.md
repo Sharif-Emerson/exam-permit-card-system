@@ -7,6 +7,8 @@ This is a hardened backend starter for the provider-agnostic exam permit fronten
 - Node.js 24 recommended
 - npm
 
+This backend now uses the stable [`better-sqlite3`](examples/rest-backend/package.json:18) package instead of Node's experimental [`node:sqlite`](examples/rest-backend/lib/database-sqlite.js:4), so the experimental SQLite runtime warning is removed.
+
 ## Run
 
 1. Install dependencies:
@@ -52,6 +54,7 @@ VITE_API_BASE_URL=http://localhost:4000
 	- `registrar@example.com` / `Permit@2026`
 	- `finance@example.com` / `Permit@2026`
 	- `operations@example.com` / `Permit@2026`
+- If [`BOOTSTRAP_ADMIN_EMAIL`](examples/rest-backend/.env.example:5) and [`BOOTSTRAP_ADMIN_PASSWORD`](examples/rest-backend/.env.example:6) are set in `.env` or `.env.local`, those values replace the demo admin credentials on first startup, so always sign in with the configured bootstrap admin instead of the demo defaults.
 - After you change a bootstrap admin's email, phone number, or password in the app, `npm run reset-data` preserves those customized values for the same bootstrap admin ID while still clearing students, permits, uploads, and activity data.
 
 ## Real Data Setup
