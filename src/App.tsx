@@ -70,8 +70,8 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <UnsavedChangesProvider>
-          <BrowserRouter>
+        <BrowserRouter>
+          <UnsavedChangesProvider>
             <LeaveConfirmation />
             <Routes>
               <Route path="/" element={<HomeRedirect />} />
@@ -98,8 +98,8 @@ export default function App() {
               />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-          </BrowserRouter>
-        </UnsavedChangesProvider>
+          </UnsavedChangesProvider>
+        </BrowserRouter>
       </AuthProvider>
     </ThemeProvider>
   )
