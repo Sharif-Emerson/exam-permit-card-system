@@ -1670,6 +1670,7 @@ export default function Dashboard() {
                                 const result = typeof reader.result === 'string' ? reader.result : ''
                                 if (result) {
                                   setSettingsDraft((current) => ({ ...current, profileImage: result }))
+                                  setStudentData((current) => current ? { ...current, profileImage: result } : current)
                                 }
                               }
                               reader.onerror = () => {
