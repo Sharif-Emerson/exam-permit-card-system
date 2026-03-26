@@ -24,11 +24,11 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   }
 
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+    return <Navigate to="/login" state={{ from: location.pathname }} />
   }
 
   if (requiredRole && user.role !== requiredRole) {
-    return <Navigate to={user.role === 'admin' ? '/admin' : '/student'} replace />
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/student'} />
   }
 
   return <>{children}</>

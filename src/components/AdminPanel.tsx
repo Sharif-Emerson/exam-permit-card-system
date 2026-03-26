@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import BrandMark from './BrandMark'
 import PermitCard from './PermitCard'
+import { SaveConfirmationDialog, useNavigationWithConfirmation } from './SaveConfirmationDialog'
+import { useUnsavedChanges } from '../context/UnsavedChangesContext'
 import { apiBaseUrl, publicApiBaseUrl } from '../config/provider'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -309,9 +311,11 @@ function generateTemporaryPassword() {
 
 
 export default function AdminPanel() {
-    const [refreshing, setRefreshing] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const { user, signOut, refreshUser } = useAuth()
   const { darkMode, toggleTheme } = useTheme()
+  const { hasUnsavedChanges, setHasUnsavedChanges, registerSaveHandler } = useUnsavedChanges()
+  const { showDialog, handleConfirmSave, handleDontSave, handleCancel, navigateWithConfirmation } = useNavigationWithConfirmation()
   const adminCapability = getAdminCapabilityProfile(user)
   const canViewStudents = adminCapability.sections.includes('students')
   const canViewPermitActivity = adminCapability.sections.includes('permits')
@@ -571,6 +575,55 @@ export default function AdminPanel() {
   useEffect(() => {
     void loadTrashedStudents()
   }, [loadTrashedStudents])
+
+  // Auto-save handler registration
+  useEffect(() => {
+    // Register save handler for unsaved changes
+    registerSaveHandler(async () => {
+      // Auto-save any pending changes
+      if (editingStudent) {
+        await handleSaveEdit({ preventDefault: () => {} } as FormEvent)
+        return true
+      }
+      if (showCreateStudent) {
+        await handleCreateStudent({ preventDefault: () => {} } as FormEvent)
+        return true
+      }
+      // Save any pending payment drafts
+      const pendingPayments = Object.entries(paymentDrafts).filter(([_, value]) => value !== '')
+      if (pendingPayments.length > 0) {
+        // Trigger save for all pending payments
+        for (const [studentId, amount] of pendingPayments) {
+          const student = students.find(s => s.id === studentId)
+          if (student) {
+            await handleSavePayment({ preventDefault: () => {} } as FormEvent, student)
+          }
+        }
+        return true
+      }
+      return true
+    })
+
+    return () => {
+      registerSaveHandler(() => Promise.resolve(false))
+    }
+  }, [editingStudent, showCreateStudent, paymentDrafts, students, registerSaveHandler])
+
+  // Auto-save effect - saves changes after 2 seconds of inactivity
+  useEffect(() => {
+    if (!hasUnsavedChanges) {
+      return
+    }
+
+    const autoSaveTimer = setTimeout(async () => {
+      // Auto-save logic here
+      if (editingStudent) {
+        await handleSaveEdit({ preventDefault: () => {} } as FormEvent)
+      }
+    }, 2000)
+
+    return () => clearTimeout(autoSaveTimer)
+  }, [hasUnsavedChanges, editingStudent])
 
   useEffect(() => {
     if (!canViewPermitActivity) {
@@ -879,9 +932,9 @@ export default function AdminPanel() {
 
     try {
       printAdminDashboardReport(students, activityLogs)
-      setSuccessMessage('Opened a print-friendly dashboard report. Use the browser print dialog to save as PDF if needed.')
+      setSuccessMessage('Print preview opened! The print dialog should appear. Use it to save as PDF or print.')
     } catch (printError) {
-      const nextError = printError instanceof Error ? printError.message : 'Unable to open the print-friendly report.'
+      const nextError = printError instanceof Error ? printError.message : 'Unable to open the print preview.'
       setError(nextError)
     }
   }
@@ -4471,6 +4524,12 @@ export default function AdminPanel() {
           </div>
         </div>
       )}
+      <SaveConfirmationDialog
+        isOpen={showDialog}
+        onConfirm={handleConfirmSave}
+        onDontSave={handleDontSave}
+        onCancel={handleCancel}
+      />
       </div>
     </>
   )
