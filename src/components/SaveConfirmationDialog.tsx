@@ -55,46 +55,59 @@ export function SaveConfirmationDialog({ isOpen, onConfirm, onCancel, onDontSave
 // Hook to handle navigation with unsaved changes
 export function useNavigationWithConfirmation() {
   const navigate = useNavigate()
-  const { hasUnsavedChanges, savePendingChanges } = useUnsavedChanges()
+  const { hasUnsavedChanges, savePendingChanges, setHasUnsavedChanges } = useUnsavedChanges()
   const [showDialog, setShowDialog] = useState(false)
-  const [pendingNav, setPendingNav] = useState<{ to: string; replace?: boolean } | null>(null)
+  const [pendingNav, setPendingNav] = useState<{ to: string; replace?: boolean; action?: 'navigate' | 'back' | 'close' } | null>(null)
 
   const handleConfirmSave = useCallback(async () => {
     setShowDialog(false)
-    await savePendingChanges()
-    if (pendingNav) {
-      navigate(pendingNav.to, { replace: pendingNav.replace })
-      setPendingNav(null)
+    const saved = await savePendingChanges()
+    if (saved && pendingNav) {
+      setHasUnsavedChanges(false)
+      if (pendingNav.action === 'back') {
+        window.history.back()
+      } else if (pendingNav.to) {
+        navigate(pendingNav.to, { replace: pendingNav.replace })
+      }
     }
-  }, [savePendingChanges, pendingNav, navigate])
+    setPendingNav(null)
+  }, [savePendingChanges, pendingNav, navigate, setHasUnsavedChanges])
 
   const handleDontSave = useCallback(() => {
     setShowDialog(false)
+    setHasUnsavedChanges(false)
     if (pendingNav) {
-      navigate(pendingNav.to, { replace: pendingNav.replace })
-      setPendingNav(null)
+      if (pendingNav.action === 'back') {
+        window.history.back()
+      } else if (pendingNav.to) {
+        navigate(pendingNav.to, { replace: pendingNav.replace })
+      }
     }
-  }, [pendingNav, navigate])
+    setPendingNav(null)
+  }, [pendingNav, navigate, setHasUnsavedChanges])
 
   const handleCancel = useCallback(() => {
     setShowDialog(false)
     setPendingNav(null)
   }, [])
 
-  const navigateWithConfirmation = useCallback((to: string, options?: { replace?: boolean }) => {
-    if (hasUnsavedChanges) {
-      setPendingNav({ to, replace: options?.replace })
+  // Intercept back button
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+
+    const handlePopState = () => {
+      setPendingNav({ to: '', action: 'back' })
       setShowDialog(true)
-    } else {
-      navigate(to, options)
     }
-  }, [hasUnsavedChanges, navigate])
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [hasUnsavedChanges])
 
   return {
     showDialog,
     handleConfirmSave,
     handleDontSave,
     handleCancel,
-    navigateWithConfirmation,
   }
 }

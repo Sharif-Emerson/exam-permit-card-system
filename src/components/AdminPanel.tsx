@@ -315,7 +315,7 @@ export default function AdminPanel() {
   const { user, signOut, refreshUser } = useAuth()
   const { darkMode, toggleTheme } = useTheme()
   const { hasUnsavedChanges, setHasUnsavedChanges, registerSaveHandler } = useUnsavedChanges()
-  const { showDialog, handleConfirmSave, handleDontSave, handleCancel, navigateWithConfirmation } = useNavigationWithConfirmation()
+  const { showDialog, handleConfirmSave, handleDontSave, handleCancel } = useNavigationWithConfirmation()
   const adminCapability = getAdminCapabilityProfile(user)
   const canViewStudents = adminCapability.sections.includes('students')
   const canViewPermitActivity = adminCapability.sections.includes('permits')
@@ -607,7 +607,14 @@ export default function AdminPanel() {
     return () => {
       registerSaveHandler(() => Promise.resolve(false))
     }
-  }, [editingStudent, showCreateStudent, paymentDrafts, students, registerSaveHandler])
+  }, [editingStudent, showCreateStudent, paymentDrafts, students, registerSaveHandler, handleSaveEdit, handleCreateStudent, handleSavePayment])
+
+  // Track unsaved changes when editing or creating students
+  useEffect(() => {
+    if (editingStudent || showCreateStudent) {
+      setHasUnsavedChanges(true)
+    }
+  }, [editingStudent, showCreateStudent, setHasUnsavedChanges])
 
   // Auto-save effect - saves changes after 2 seconds of inactivity
   useEffect(() => {
@@ -623,7 +630,7 @@ export default function AdminPanel() {
     }, 2000)
 
     return () => clearTimeout(autoSaveTimer)
-  }, [hasUnsavedChanges, editingStudent])
+  }, [hasUnsavedChanges, editingStudent, handleSaveEdit])
 
   useEffect(() => {
     if (!canViewPermitActivity) {
