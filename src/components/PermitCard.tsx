@@ -1,6 +1,6 @@
 import { Calendar, Clock, Download, LogOut, MapPin, Printer, RefreshCcw, User } from 'lucide-react'
 import { generalExamRules } from '../config/examRules'
-import { institutionLogo, institutionName } from '../config/branding'
+import { institutionLogo, institutionName, examPermitConfig } from '../config/branding'
 import type { StudentProfile } from '../types'
 import BrandMark from './BrandMark'
 
@@ -274,7 +274,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                 )}
                 {studentData.feesBalance === 0 && (
                   <p className={`mt-3 text-xs sm:text-sm ${permitOutputLocked ? 'text-red-700' : 'text-slate-600'}`}>
-                    Prints this month: {studentData.monthlyPrintCount ?? 0}/{studentData.monthlyPrintLimit ?? 2}
+                    Prints this month: {studentData.monthlyPrintCount ?? 0}/{studentData.monthlyPrintLimit ?? examPermitConfig.printLimitPerMonth}
                     {(studentData.grantedPrintsRemaining ?? 0) > 0 ? ` • Extra admin prints left: ${studentData.grantedPrintsRemaining}` : ''}
                     {permitOutputLocked ? ` • ${permitOutputMessage}` : ''}
                   </p>
@@ -303,11 +303,10 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
             <button
               onClick={onPrint}
               disabled={permitOutputLocked}
-              className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2 sm:py-2 rounded-lg transition-colors text-sm sm:text-base ${
-                permitOutputLocked
-                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+              className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2 sm:py-2 rounded-lg transition-colors text-sm sm:text-base ${permitOutputLocked
+                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
               title={permitOutputLocked ? permitOutputMessage : ''}
             >
               <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -316,11 +315,10 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
             <button
               onClick={onDownload}
               disabled={permitOutputLocked}
-              className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2 sm:py-2 rounded-lg transition-colors text-sm sm:text-base ${
-                permitOutputLocked
-                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-700'
-              }`}
+              className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2 sm:py-2 rounded-lg transition-colors text-sm sm:text-base ${permitOutputLocked
+                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
               title={permitOutputLocked ? permitOutputMessage : ''}
             >
               <Download className="w-4 h-4 sm:w-5 sm:h-5" />

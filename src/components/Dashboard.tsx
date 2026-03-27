@@ -31,6 +31,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { publicApiBaseUrl } from '../config/provider'
+import { examPermitConfig } from '../config/branding'
 import PermitCard from './PermitCard'
 import { createSupportRequest, fetchPermitActivityHistory, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, fetchSystemFeeSettings, recordPermitActivity, updateStudentAccount } from '../services/profileService'
 import type { PermitActivityRecord, StudentProfile, SupportContact, SupportRequest } from '../types'
@@ -442,23 +443,29 @@ export default function Dashboard() {
         setError('')
       }
 
-      const [profile, settings] = await Promise.all([
+      const [profile, settings] = await Promise.allSettled([
         fetchStudentProfileById(user.id),
         fetchSystemFeeSettings(),
       ])
 
-      setStudentData(profile)
-      if (settings.deadlines) {
-        setDeadlines(settings.deadlines)
+      if (profile.status === 'rejected') {
+        throw profile.reason
       }
 
-      if (syncDrafts) {
+      setStudentData(profile.value)
+      if (settings.status === 'fulfilled' && settings.value.deadlines) {
+        setDeadlines(settings.value.deadlines)
+      }
+
+      if (syncDrafts && profile.status === 'fulfilled' && profile.value) {
+        const p = profile.value
+        setStudentData(p)
         setSettingsDraft((current) => ({
           ...current,
-          name: profile.name,
-          email: profile.email,
-          phoneNumber: profile.phoneNumber ?? '',
-          profileImage: profile.profileImage,
+          name: p.name,
+          email: p.email,
+          phoneNumber: p.phoneNumber || '',
+          profileImage: p.profileImage || '',
         }))
       }
 
@@ -799,9 +806,9 @@ export default function Dashboard() {
       try {
         const { default: QRCode } = await import('qrcode')
         const nextUrl = await QRCode.toDataURL(qrValue, {
-          errorCorrectionLevel: 'M',
-          margin: 1,
-          width: 160,
+          errorCorrectionLevel: examPermitConfig.qrErrorCorrection,
+          margin: examPermitConfig.qrCodeMargin,
+          width: examPermitConfig.qrCodeSize,
         })
 
         if (!cancelled) {
@@ -934,8 +941,8 @@ export default function Dashboard() {
             qrCodeUrl={qrCodeUrl}
             onRefresh={handleRefresh}
             onSignOut={() => setShowSignOut(true)}
-            onPrint={() => {}}
-            onDownload={() => {}}
+            onPrint={() => { }}
+            onDownload={() => { }}
           />
         </div>
       )}
@@ -1007,13 +1014,12 @@ export default function Dashboard() {
                       {item.icon}
                       <span className="flex-1 text-left">{item.label}</span>
                       {item.badge && (
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                          activeSection === item.key
-                            ? 'bg-white/20 text-white'
-                            : item.badge === 'Due'
-                              ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
-                              : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
-                        }`}>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${activeSection === item.key
+                          ? 'bg-white/20 text-white'
+                          : item.badge === 'Due'
+                            ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                            : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+                          }`}>
                           {item.badge}
                         </span>
                       )}
@@ -1204,14 +1210,13 @@ export default function Dashboard() {
                       <p className="mt-3 text-lg font-semibold">{studentData.studentId}</p>
                     </div>
                     <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
-                      <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Course / Program</p>
-                      <p className="mt-3 text-lg font-semibold">{studentData.program || studentData.course || 'Not assigned'}</p>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{studentData.department || 'Department not assigned'}</p>
+                      <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Permit Courses</p>
+                      <p className="mt-3 text-lg font-semibold">{studentData.courseUnits?.length || 0} Registered Units</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">View codes in permit preview</p>
                     </div>
                     <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
                       <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Year / Semester</p>
                       <p className="mt-3 text-lg font-semibold">{studentData.semester || currentSession}</p>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{studentData.college || 'College not assigned'}</p>
                     </div>
                     <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
                       <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Permit Status</p>
@@ -1309,7 +1314,7 @@ export default function Dashboard() {
                                   {permitOutputLocked ? permitOutputMessage : 'Eligible for printing'}
                                 </p>
                                 <p className="text-slate-500 dark:text-slate-400">
-                                  Prints this month: {studentData.monthlyPrintCount ?? 0}/{studentData.monthlyPrintLimit ?? 2}
+                                  Prints this month: {studentData.monthlyPrintCount ?? 0}/{studentData.monthlyPrintLimit ?? examPermitConfig.printLimitPerMonth}
                                   {(studentData.grantedPrintsRemaining ?? 0) > 0 ? ` • Extra admin prints left: ${studentData.grantedPrintsRemaining}` : ''}
                                 </p>
                               </div>
@@ -2011,45 +2016,45 @@ export default function Dashboard() {
                           <p className="text-xs text-right mt-1 text-slate-500 font-medium">{paymentProgress}% of Annual Target</p>
                         </div>
                       </section>
-                      
+
                       {/* Upcoming Deadlines */}
-                       <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none xl:col-span-1 md:col-span-2">
-                         <div className="flex items-center gap-3 mb-4">
-                            <CalendarDays className="h-5 w-5 text-orange-500" />
-                            <h3 className="font-semibold text-slate-900 dark:text-white">Important Deadlines</h3>
-                         </div>
-                         <div className="space-y-4">
-                           {deadlines && deadlines.length > 0 ? (
-                             deadlines.map((dl: any, idx: number) => (
-                               <div key={idx} className="flex items-center justify-between border-l-2 border-orange-500 pl-3">
-                                  <div>
-                                    <p className="text-sm font-medium text-slate-900 dark:text-white">{dl.title}</p>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">{dl.description}</p>
-                                  </div>
-                                  <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/40 dark:text-orange-300">
-                                    {dl.dateLabel}
-                                  </span>
-                               </div>
-                             ))
-                           ) : (
-                             <>
-                               <div className="flex items-center justify-between border-l-2 border-orange-500 pl-3">
-                                  <div>
-                                    <p className="text-sm font-medium text-slate-900 dark:text-white">Final Exam Clearance</p>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">Clear all balances to generate permit</p>
-                                  </div>
-                                  <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/40 dark:text-orange-300">In 14 Days</span>
-                               </div>
-                               <div className="flex items-center justify-between border-l-2 border-slate-300 dark:border-slate-600 pl-3">
-                                  <div>
-                                    <p className="text-sm font-medium text-slate-900 dark:text-white">Next Semester Reg.</p>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">Early bird registration fee</p>
-                                  </div>
-                                  <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded-full dark:bg-slate-800 dark:text-slate-300">August 1st</span>
-                               </div>
-                             </>
-                           )}
-                         </div>
+                      <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none xl:col-span-1 md:col-span-2">
+                        <div className="flex items-center gap-3 mb-4">
+                          <CalendarDays className="h-5 w-5 text-orange-500" />
+                          <h3 className="font-semibold text-slate-900 dark:text-white">Important Deadlines</h3>
+                        </div>
+                        <div className="space-y-4">
+                          {deadlines && deadlines.length > 0 ? (
+                            deadlines.map((dl: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between border-l-2 border-orange-500 pl-3">
+                                <div>
+                                  <p className="text-sm font-medium text-slate-900 dark:text-white">{dl.title}</p>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">{dl.description}</p>
+                                </div>
+                                <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/40 dark:text-orange-300">
+                                  {dl.dateLabel}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <>
+                              <div className="flex items-center justify-between border-l-2 border-orange-500 pl-3">
+                                <div>
+                                  <p className="text-sm font-medium text-slate-900 dark:text-white">Final Exam Clearance</p>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">Clear all balances to generate permit</p>
+                                </div>
+                                <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/40 dark:text-orange-300">In 14 Days</span>
+                              </div>
+                              <div className="flex items-center justify-between border-l-2 border-slate-300 dark:border-slate-600 pl-3">
+                                <div>
+                                  <p className="text-sm font-medium text-slate-900 dark:text-white">Next Semester Reg.</p>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">Early bird registration fee</p>
+                                </div>
+                                <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded-full dark:bg-slate-800 dark:text-slate-300">August 1st</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </section>
                     </div>
 
@@ -2058,8 +2063,8 @@ export default function Dashboard() {
                       <div className="flex items-center justify-between mb-6">
                         <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Recent Transactions</h2>
                         <button className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex text-center gap-1">
-                           <Download className="h-4 w-4" />
-                           Statement
+                          <Download className="h-4 w-4" />
+                          Statement
                         </button>
                       </div>
                       <div className="overflow-x-auto">
@@ -2076,19 +2081,19 @@ export default function Dashboard() {
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                             {/* Dynamic Transactions based on balance */}
                             {(amountPaid > 0 ? [
-                              { 
-                                date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }), 
-                                desc: feesBalance === 0 ? 'Full Tuition Settlement' : 'Tuition Installment', 
-                                method: 'System Sync', 
-                                amount: `UGX ${amountPaid.toLocaleString()}`, 
-                                status: 'Completed' 
+                              {
+                                date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+                                desc: feesBalance === 0 ? 'Full Tuition Settlement' : 'Tuition Installment',
+                                method: 'System Sync',
+                                amount: `UGX ${amountPaid.toLocaleString()}`,
+                                status: 'Completed'
                               },
-                              ...(amountPaid > 1000000 ? [{ 
-                                date: 'Aug 20, 2023', 
-                                desc: 'Registration Fee', 
-                                method: 'Visa Card', 
-                                amount: 'UGX 150,000', 
-                                status: 'Completed' 
+                              ...(amountPaid > 1000000 ? [{
+                                date: 'Aug 20, 2023',
+                                desc: 'Registration Fee',
+                                method: 'Visa Card',
+                                amount: 'UGX 150,000',
+                                status: 'Completed'
                               }] : [])
                             ] : []).map((txn, idx) => (
                               <tr key={idx} className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50">
@@ -2119,24 +2124,24 @@ export default function Dashboard() {
                   <div className="space-y-6">
                     {/* Permit Courses Overview Header */}
                     <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-gradient-to-r from-blue-600 to-indigo-700 p-8 shadow-xl shadow-blue-200/50 dark:border-slate-800 dark:from-slate-900 dark:to-indigo-950 dark:shadow-none mb-6">
-                       <div className="absolute right-0 top-0 opacity-10">
-                         <GraduationCap className="h-48 w-48 -mt-8 -mr-8" />
-                       </div>
-                       <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                         <div className="text-white">
-                           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 mb-4 text-xs font-semibold backdrop-blur-sm">
-                             <TrendingUp className="h-3.5 w-3.5" /> Permit Active Session
-                           </span>
-                           <h1 className="text-3xl font-bold">{currentSession}</h1>
-                           <p className="mt-2 text-blue-100 max-w-md">You are cleared for {studentData.courseUnits?.length || 0} courses on your digital permit. Ensure your details match the university register.</p>
-                         </div>
-                       </div>
+                      <div className="absolute right-0 top-0 opacity-10">
+                        <GraduationCap className="h-48 w-48 -mt-8 -mr-8" />
+                      </div>
+                      <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                        <div className="text-white">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 mb-4 text-xs font-semibold backdrop-blur-sm">
+                            <TrendingUp className="h-3.5 w-3.5" /> Permit Active Session
+                          </span>
+                          <h1 className="text-3xl font-bold">{currentSession}</h1>
+                          <p className="mt-2 text-blue-100 max-w-md">You are cleared for {studentData.courseUnits?.length || 0} courses on your digital permit. Ensure your details match the university register.</p>
+                        </div>
+                      </div>
                     </section>
-                    
+
                     {/* Courses Grid */}
                     <div className="flex items-center justify-between mb-2">
-                       <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Permit Courses</h2>
-                       <button className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition" onClick={() => setActiveSection('overview')}>Digital Permit &rarr;</button>
+                      <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Permit Courses</h2>
+                      <button className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition" onClick={() => setActiveSection('overview')}>Digital Permit &rarr;</button>
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -2149,18 +2154,18 @@ export default function Dashboard() {
                         return (
                           <div key={idx} className="group relative rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:shadow-lg hover:shadow-blue-100/50 hover:-translate-y-1 dark:border-slate-800 dark:bg-slate-950/70 hover:dark:shadow-none">
                             <div className="flex justify-between items-start mb-4">
-                               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                                  <BookOpen className="h-5 w-5" />
-                               </div>
-                               <span className="text-xs font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{code}</span>
+                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                                <BookOpen className="h-5 w-5" />
+                              </div>
+                              <span className="text-xs font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{code}</span>
                             </div>
                             <h3 className="text-base font-semibold text-slate-900 dark:text-white leading-snug line-clamp-2 min-h-[2.5rem]">{title}</h3>
                             <div className="mt-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                               <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" /> Scheduled Session</span>
-                               <span>Permit Unit</span>
-                             </div>
-                           </div>
-                         )
+                              <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" /> Scheduled Session</span>
+                              <span>Permit Unit</span>
+                            </div>
+                          </div>
+                        )
                       })}
                       {(!studentData.courseUnits || studentData.courseUnits.length === 0) && (
                         <div className="col-span-full rounded-3xl border border-dashed border-slate-300 p-10 text-center dark:border-slate-700">

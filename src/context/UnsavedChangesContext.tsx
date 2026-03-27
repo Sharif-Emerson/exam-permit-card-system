@@ -1,23 +1,14 @@
-import { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useState, useCallback, ReactNode, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
+import { UnsavedChangesContext } from './UnsavedChangesContextInstance'
 
-interface UnsavedChangesContextType {
-  hasUnsavedChanges: boolean
-  setHasUnsavedChanges: (hasChanges: boolean) => void
-  savePendingChanges: () => Promise<void>
-  registerSaveHandler: (handler: () => Promise<boolean>) => void
-  unregisterSaveHandler: () => void
-  forceShowDialog: () => void
-}
-
-const UnsavedChangesContext = createContext<UnsavedChangesContextType | undefined>(undefined)
 
 export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   const [hasUnsavedChanges, setHasUnsavedChangesState] = useState(false)
   const [saveHandler, setSaveHandler] = useState<(() => Promise<boolean>) | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [forceDialog, setForceDialog] = useState(false)
-  const navigate = useNavigate()
+
   const location = useLocation()
   const previousLocationRef = useRef(location.pathname)
 
@@ -90,10 +81,3 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export function useUnsavedChanges() {
-  const context = useContext(UnsavedChangesContext)
-  if (context === undefined) {
-    throw new Error('useUnsavedChanges must be used within an UnsavedChangesProvider')
-  }
-  return context
-}

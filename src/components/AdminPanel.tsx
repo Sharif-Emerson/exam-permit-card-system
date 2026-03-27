@@ -1,16 +1,17 @@
 import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
   // Ref to preserve search input focus
 import {
   BarChart2, Bell, CheckCircle2, CreditCard, Download, FileCheck,
   FileSpreadsheet, FileUp, LayoutDashboard, LogOut, Menu,
   Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Sun, Trash2, Upload, Users, X,
 } from 'lucide-react'
-import { KIU_COLLEGES, KIU_COURSES, KIU_CURRICULUM, KIU_DEPARTMENTS, KIU_SEMESTERS } from '../config/universityData'
+import { KIU_COLLEGES, KIU_COURSES, KIU_CURRICULUM, KIU_DEPARTMENTS, KIU_SEMESTERS, KiuCourseUnit } from '../config/universityData'
 import BrandMark from './BrandMark'
 import PermitCard from './PermitCard'
-import { SaveConfirmationDialog, useNavigationWithConfirmation } from './SaveConfirmationDialog'
-import { useUnsavedChanges } from '../context/UnsavedChangesContext'
-import { apiBaseUrl, publicApiBaseUrl } from '../config/provider'
+// Removed unused SaveConfirmationDialog imports
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges'
+import { publicApiBaseUrl } from '../config/provider'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
@@ -18,7 +19,7 @@ import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashb
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
 import { adminUpdateStudentProfile, clearStudentBalance, createStudentProfile, deleteStudentProfile, fetchAdminActivityLogsPage, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, restoreStudentProfile, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById } from '../services/profileService'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
-import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile } from '../types'
+import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline } from '../types'
 import SignOutDialog from './SignOutDialog'
 
 type PaymentDrafts = Record<string, string>
@@ -331,6 +332,8 @@ export default function AdminPanel() {
   const { user, signOut, refreshUser } = useAuth()
   const { darkMode, toggleTheme } = useTheme()
   const { hasUnsavedChanges, setHasUnsavedChanges, registerSaveHandler } = useUnsavedChanges()
+  const navigate = useNavigate()
+  // Removed unused variable 'location'
   const adminCapability = getAdminCapabilityProfile(user)
   const canViewStudents = adminCapability.sections.includes('students')
   const canViewPermitActivity = adminCapability.sections.includes('permits')
@@ -593,27 +596,199 @@ export default function AdminPanel() {
     void loadTrashedStudents()
   }, [loadTrashedStudents])
 
+  const handleSavePayment = useCallback(async (event: { preventDefault: () => void }, student: StudentProfile) => {
+    event.preventDefault()
+    if (!user) return
+
+
+    if (!canManageFinancials) {
+      setError('Your admin view does not allow financial updates.')
+      return
+    }
+
+    const draftValue = parseCurrencyDraft(paymentDrafts[student.id] ?? '')
+
+    if (Number.isNaN(draftValue) || draftValue < 0) {
+      setError('Amount paid must be a valid positive number.')
+      return
+    }
+
+    try {
+      setSavingId(student.id)
+      setError('')
+      setSuccessMessage('')
+      await updateStudentFinancials(student.id, { amountPaid: draftValue }, user.id)
+      await loadStudents()
+      // Fetch and update the individual student profile to ensure permit status is up-to-date
+      const updatedProfile = await fetchStudentProfileById(student.id)
+      setStudents((prev) => prev.map((s) => (s.id === student.id ? updatedProfile : s)))
+      setSuccessMessage(`Saved received payment for ${student.name}.`)
+    } catch (saveError) {
+      const nextError = saveError instanceof Error ? saveError.message : 'Unable to save payment changes'
+      setError(nextError)
+    } finally {
+      setSavingId(null)
+    }
+  }, [user, canManageFinancials, paymentDrafts, loadStudents])
+
+  const handleSaveEdit = useCallback(async (event: { preventDefault: () => void }) => {
+    event.preventDefault()
+
+    if (!editingStudent || !user) {
+      return
+    }
+
+    if (!canManageStudentProfiles) {
+      setError('Your admin view does not allow student profile edits.')
+      return
+    }
+
+    const totalFeesNum = parseCurrencyDraft(editDraft.totalFees)
+    const courseUnits = parseCourseUnitsText(editDraft.courseUnitsText)
+
+    if (Number.isNaN(totalFeesNum) || totalFeesNum < 0) {
+      setError('Expected total fees must be a valid positive number.')
+      return
+    }
+
+    try {
+      setSavingEdit(true)
+      setError('')
+      setSuccessMessage('')
+      await adminUpdateStudentProfile(
+        editingStudent.id,
+        {
+          name: editDraft.name,
+          email: editDraft.email,
+          studentId: editDraft.studentId,
+          studentCategory: editDraft.studentCategory,
+          phoneNumber: editDraft.phoneNumber,
+          profileImage: editDraft.profileImage || null,
+          course: editDraft.course,
+          program: editDraft.program,
+          college: editDraft.college,
+          department: editDraft.department,
+          semester: editDraft.semester,
+          courseUnits,
+          totalFees: totalFeesNum,
+          exams: editDraft.exams,
+        },
+        user.id,
+      )
+      await loadStudents()
+      setSuccessMessage(`Student profile updated for ${editDraft.name}.`)
+      setEditingStudent(null)
+    } catch (saveError) {
+      const nextError = saveError instanceof Error ? saveError.message : 'Unable to update student profile'
+      setError(nextError)
+    } finally {
+      setSavingEdit(false)
+    }
+  }, [user, editingStudent, canManageStudentProfiles, editDraft, loadStudents])
+
+  const handleCreateStudent = useCallback(async (event: { preventDefault: () => void }) => {
+    event.preventDefault()
+    if (!user) return
+
+
+    if (!canManageStudentProfiles) {
+      setError('Your admin view does not allow student profile edits.')
+      return
+    }
+
+    const totalFeesNum = parseCurrencyDraft(createDraft.totalFees)
+    const amountPaidNum = parseCurrencyDraft(createDraft.amountPaid)
+    const courseUnits = parseCourseUnitsText(createDraft.courseUnitsText)
+
+    if (Number.isNaN(totalFeesNum) || totalFeesNum < 0) {
+      setError('Expected total fees must be a valid positive number.')
+      return
+    }
+
+    if (Number.isNaN(amountPaidNum) || amountPaidNum < 0) {
+      setError('Amount paid must be a valid positive number.')
+      return
+    }
+
+    try {
+      setSavingCreate(true)
+      setError('')
+      setSuccessMessage('')
+      setCreatedStudentWelcome(null)
+      const assignedPassword = createDraft.password
+      const createdProfile = await createStudentProfile({
+        name: createDraft.name,
+        email: createDraft.email,
+        password: assignedPassword,
+        studentId: createDraft.studentId,
+        studentCategory: createDraft.studentCategory,
+        phoneNumber: createDraft.phoneNumber,
+        course: createDraft.course,
+        program: createDraft.program,
+        college: createDraft.college,
+        department: createDraft.department,
+        semester: createDraft.semester,
+        courseUnits,
+        profileImage: createDraft.profileImage || null,
+        totalFees: totalFeesNum,
+        amountPaid: amountPaidNum,
+        instructions: createDraft.instructions,
+        examDate: createDraft.examDate,
+        examTime: createDraft.examTime,
+        venue: createDraft.venue,
+        seatNumber: createDraft.seatNumber,
+        exams: createDraft.exams,
+      }, user.id)
+      const createdStudentMatcher = createdProfile.studentId || createdProfile.email || createdProfile.name
+      setActiveSection('students')
+      setFilterStatus('all')
+      setSearchQuery(createdStudentMatcher)
+      setPage(1)
+      await loadStudents({
+        page: 1,
+        search: createdStudentMatcher,
+        status: 'all',
+      })
+      setSuccessMessage(`Student profile created for ${createDraft.name}.`)
+      setCreatedStudentWelcome({
+        name: createDraft.name,
+        email: createDraft.email,
+        studentId: createDraft.studentId,
+        password: assignedPassword,
+        generatedPassword: createPasswordGenerated,
+      })
+      setShowCreateStudent(false)
+      setCreateDraft(createEmptyStudentDraft(systemFeeSettings))
+      setCreatePasswordGenerated(false)
+    } catch (createError) {
+      const nextError = createError instanceof Error ? createError.message : 'Unable to create student profile'
+      setError(nextError)
+    } finally {
+      setSavingCreate(false)
+    }
+  }, [user, canManageStudentProfiles, createDraft, systemFeeSettings, loadStudents, createPasswordGenerated])
+
   // Auto-save handler registration
   useEffect(() => {
     // Register save handler for unsaved changes
     registerSaveHandler(async () => {
       // Auto-save any pending changes
       if (editingStudent) {
-        await handleSaveEdit({ preventDefault: () => {} } as FormEvent)
+        await handleSaveEdit({ preventDefault: () => {} } as FormEvent<HTMLFormElement>)
         return true
       }
       if (showCreateStudent) {
-        await handleCreateStudent({ preventDefault: () => {} } as FormEvent)
+        await handleCreateStudent({ preventDefault: () => {} } as FormEvent<HTMLFormElement>)
         return true
       }
       // Save any pending payment drafts
       const pendingPayments = Object.entries(paymentDrafts).filter(([_, value]) => value !== '')
       if (pendingPayments.length > 0) {
         // Trigger save for all pending payments
-        for (const [studentId, amount] of pendingPayments) {
+        for (const [studentId] of pendingPayments) {
           const student = students.find(s => s.id === studentId)
           if (student) {
-            await handleSavePayment({ preventDefault: () => {} } as FormEvent, student)
+            await handleSavePayment({ preventDefault: () => {} } as FormEvent<HTMLFormElement>, student)
           }
         }
         return true
@@ -642,7 +817,7 @@ export default function AdminPanel() {
     const autoSaveTimer = setTimeout(async () => {
       // Auto-save logic here
       if (editingStudent) {
-        await handleSaveEdit({ preventDefault: () => {} } as FormEvent)
+        await handleSaveEdit({ preventDefault: () => {} } as FormEvent<HTMLFormElement>)
       }
     }, 2000)
 
@@ -1073,42 +1248,7 @@ export default function AdminPanel() {
     }
   }
 
-  async function handleSavePayment(event: FormEvent<HTMLFormElement>, student: StudentProfile) {
-    event.preventDefault()
 
-    if (!user) {
-      return
-    }
-
-    if (!canManageFinancials) {
-      setError('Your admin view does not allow financial updates.')
-      return
-    }
-
-    const draftValue = parseCurrencyDraft(paymentDrafts[student.id] ?? '')
-
-    if (Number.isNaN(draftValue) || draftValue < 0) {
-      setError('Amount paid must be a valid positive number.')
-      return
-    }
-
-    try {
-      setSavingId(student.id)
-      setError('')
-      setSuccessMessage('')
-      await updateStudentFinancials(student.id, { amountPaid: draftValue }, user.id)
-      await loadStudents()
-      // Fetch and update the individual student profile to ensure permit status is up-to-date
-      const updatedProfile = await fetchStudentProfileById(student.id)
-      setStudents((prev) => prev.map((s) => (s.id === student.id ? updatedProfile : s)))
-      setSuccessMessage(`Saved received payment for ${student.name}.`)
-    } catch (saveError) {
-      const nextError = saveError instanceof Error ? saveError.message : 'Unable to save payment changes'
-      setError(nextError)
-    } finally {
-      setSavingId(null)
-    }
-  }
 
   async function handleClear(student: StudentProfile) {
     if (!user) {
@@ -1180,144 +1320,9 @@ export default function AdminPanel() {
     setCreatePasswordGenerated(true)
   }
 
-  async function handleSaveEdit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
 
-    if (!editingStudent || !user) {
-      return
-    }
 
-    if (!canManageStudentProfiles) {
-      setError('Your admin view does not allow student profile edits.')
-      return
-    }
 
-    const totalFeesNum = parseCurrencyDraft(editDraft.totalFees)
-    const courseUnits = parseCourseUnitsText(editDraft.courseUnitsText)
-
-    if (Number.isNaN(totalFeesNum) || totalFeesNum < 0) {
-      setError('Expected total fees must be a valid positive number.')
-      return
-    }
-
-    try {
-      setSavingEdit(true)
-      setError('')
-      setSuccessMessage('')
-      await adminUpdateStudentProfile(
-        editingStudent.id,
-        {
-          name: editDraft.name,
-          email: editDraft.email,
-          studentId: editDraft.studentId,
-          studentCategory: editDraft.studentCategory,
-          phoneNumber: editDraft.phoneNumber,
-          profileImage: editDraft.profileImage || null,
-          course: editDraft.course,
-          program: editDraft.program,
-          college: editDraft.college,
-          department: editDraft.department,
-          semester: editDraft.semester,
-          courseUnits,
-          totalFees: totalFeesNum,
-          exams: editDraft.exams,
-        },
-        user.id,
-      )
-      await loadStudents()
-      setSuccessMessage(`Student profile updated for ${editDraft.name}.`)
-      setEditingStudent(null)
-    } catch (saveError) {
-      const nextError = saveError instanceof Error ? saveError.message : 'Unable to update student profile'
-      setError(nextError)
-    } finally {
-      setSavingEdit(false)
-    }
-  }
-
-  async function handleCreateStudent(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!user) {
-      return
-    }
-
-    if (!canManageStudentProfiles) {
-      setError('Your admin view does not allow student profile edits.')
-      return
-    }
-
-    const totalFeesNum = parseCurrencyDraft(createDraft.totalFees)
-    const amountPaidNum = parseCurrencyDraft(createDraft.amountPaid)
-    const courseUnits = parseCourseUnitsText(createDraft.courseUnitsText)
-
-    if (Number.isNaN(totalFeesNum) || totalFeesNum < 0) {
-      setError('Expected total fees must be a valid positive number.')
-      return
-    }
-
-    if (Number.isNaN(amountPaidNum) || amountPaidNum < 0) {
-      setError('Amount paid must be a valid positive number.')
-      return
-    }
-
-    try {
-      setSavingCreate(true)
-      setError('')
-      setSuccessMessage('')
-      setCreatedStudentWelcome(null)
-      const assignedPassword = createDraft.password
-      const createdProfile = await createStudentProfile({
-        name: createDraft.name,
-        email: createDraft.email,
-        password: assignedPassword,
-        studentId: createDraft.studentId,
-        studentCategory: createDraft.studentCategory,
-        phoneNumber: createDraft.phoneNumber,
-        course: createDraft.course,
-        program: createDraft.program,
-        college: createDraft.college,
-        department: createDraft.department,
-        semester: createDraft.semester,
-        courseUnits,
-        profileImage: createDraft.profileImage || null,
-        totalFees: totalFeesNum,
-        amountPaid: amountPaidNum,
-        instructions: createDraft.instructions,
-        examDate: createDraft.examDate,
-        examTime: createDraft.examTime,
-        venue: createDraft.venue,
-        seatNumber: createDraft.seatNumber,
-        exams: createDraft.exams,
-      }, user.id)
-      const createdStudentMatcher = createdProfile.studentId || createdProfile.email || createdProfile.name
-      setActiveSection('students')
-      setFilterStatus('all')
-      setSearchQuery(createdStudentMatcher)
-      setPage(1)
-      await loadStudents({
-        page: 1,
-        search: createdStudentMatcher,
-        status: 'all',
-      })
-      setSuccessMessage(`Student profile created for ${createDraft.name}.`)
-      setCreatedStudentWelcome({
-        name: createDraft.name,
-        email: createDraft.email,
-        studentId: createDraft.studentId,
-        password: assignedPassword,
-        generatedPassword: createPasswordGenerated,
-      })
-      setShowCreateStudent(false)
-      setCreateDraft(createEmptyStudentDraft(systemFeeSettings))
-      setCreatePasswordGenerated(false)
-    } catch (createError) {
-      const nextError = createError instanceof Error ? createError.message : 'Unable to create student profile'
-      setError(nextError)
-    } finally {
-      setSavingCreate(false)
-    }
-  }
 
   async function moveStudentToTrash(student: StudentProfile) {
     if (!user) {
@@ -1599,7 +1604,7 @@ export default function AdminPanel() {
     setPendingImportUpdates([])
   }
 
-  async function handleSaveAdminSettings(event: FormEvent<HTMLFormElement>) {
+  const handleSaveAdminSettings = useCallback(async (event: { preventDefault: () => void }) => {
     event.preventDefault()
 
     if (!user) {
@@ -1641,7 +1646,7 @@ export default function AdminPanel() {
     } finally {
       setSavingSettings(false)
     }
-  }
+  }, [user, settingsDraft, refreshUser])
 
   async function handleSaveFeeStructure(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -1781,16 +1786,8 @@ export default function AdminPanel() {
     },
   ]
 
-  function navigate(section: NavSection) {
-    if (!adminCapability.sections.includes(section)) {
-      setError(`The ${adminCapability.label} view does not include the ${section.replace(/-/g, ' ')} section.`)
-      return
-    }
+  // Renamed to avoid duplicate function name
 
-    setActiveSection(section)
-    setShowNotificationCenter(false)
-    setSidebarOpen(false)
-  }
 
   async function handleSaveSupportRequest(requestId: string) {
     if (!canManageSupportRequests) {
@@ -2215,7 +2212,7 @@ export default function AdminPanel() {
             onChange={(e) => void handleImportFile(e)}
           />
 
-          <div key={activeSection} style={{ animation: 'kiu-page-in 0.3s ease-out both' }}> {/* 4. Wrap activeSection renders */}
+          <div key={activeSection} className="kiu-page-in-animate"> {/* 4. Wrap activeSection renders */}
             {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ DASHBOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {activeSection === 'dashboard' && (
               <div className="space-y-6">
@@ -3818,6 +3815,8 @@ export default function AdminPanel() {
                                     setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
                                   }}
                                   className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                                  aria-label="Deadline type"
+                                  title="Deadline type"
                                 >
                                   <option value="info">Info (Blue)</option>
                                   <option value="danger">Danger (Red)</option>
@@ -3831,6 +3830,8 @@ export default function AdminPanel() {
                                   setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
                                 }}
                                 className="rounded p-1 text-red-400 hover:bg-red-50"
+                                aria-label="Remove deadline"
+                                title="Remove deadline"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -4098,7 +4099,7 @@ export default function AdminPanel() {
                   >
                     <option value="">Select Course</option>
                     {KIU_COURSES.map(c => <option key={c} value={c}>{c}</option>)}
-                    {!KIU_COURSES.includes(editDraft.course) && editDraft.course && (
+                    {editDraft.course && !KIU_COURSES.includes(editDraft.course) && (
                       <option value={editDraft.course}>{editDraft.course} (Current)</option>
                     )}
                   </select>
@@ -4343,6 +4344,8 @@ export default function AdminPanel() {
                             setEditDraft((d) => ({ ...d, exams: nextExams }))
                           }}
                           className="rounded p-1 text-red-400 hover:bg-red-50"
+                          aria-label="Remove exam"
+                          title="Remove exam"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -4759,6 +4762,8 @@ export default function AdminPanel() {
                             setCreateDraft((d) => ({ ...d, exams: nextExams }))
                           }}
                           className="rounded p-1 text-red-400 hover:bg-red-50"
+                          aria-label="Remove exam"
+                          title="Remove exam"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

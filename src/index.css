@@ -11,6 +11,10 @@
 	animation: kiu-page-in 0.32s ease-out both;
 }
 
+.kiu-page-in-animate {
+	animation: kiu-page-in 0.3s ease-out both;
+}
+
 @keyframes kiu-fade-in {
 	from {
 		opacity: 0;

@@ -1,6 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useUnsavedChanges } from '../context/UnsavedChangesContext'
+
 
 interface SaveConfirmationDialogProps {
   isOpen: boolean
@@ -52,43 +50,3 @@ export function SaveConfirmationDialog({ isOpen, onConfirm, onCancel, onDontSave
   )
 }
 
-// Hook to handle smooth navigation to login on back/close
-export function useNavigationWithConfirmation() {
-  const navigate = useNavigate()
-  const { hasUnsavedChanges, savePendingChanges, setHasUnsavedChanges } = useUnsavedChanges()
-  const [showDialog, setShowDialog] = useState(false)
-
-  const handleConfirmSave = useCallback(async () => {
-    setShowDialog(false)
-    await savePendingChanges()
-    setHasUnsavedChanges(false)
-    navigate('/login', { replace: true })
-  }, [savePendingChanges, navigate, setHasUnsavedChanges])
-
-  const handleDontSave = useCallback(() => {
-    setShowDialog(false)
-    setHasUnsavedChanges(false)
-    navigate('/login', { replace: true })
-  }, [navigate, setHasUnsavedChanges])
-
-  const handleCancel = useCallback(() => {
-    setShowDialog(false)
-  }, [])
-
-  // Smooth back to login on back button
-  useEffect(() => {
-    const handlePopState = () => {
-      navigate('/login', { replace: true })
-    }
-
-    window.addEventListener('popstate', handlePopState)
-    return () => window.removeEventListener('popstate', handlePopState)
-  }, [navigate])
-
-  return {
-    showDialog,
-    handleConfirmSave,
-    handleDontSave,
-    handleCancel,
-  }
-}

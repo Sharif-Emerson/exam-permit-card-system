@@ -8,7 +8,7 @@ vi.mock('qrcode', () => ({
   },
 }))
 
-const { signOut, refreshUser, fetchStudentProfileById, updateStudentAccount, fetchSupportRequests, fetchSupportContacts, fetchPermitActivityHistory, createSupportRequest, recordPermitActivity } = vi.hoisted(() => ({
+const { signOut, refreshUser, fetchStudentProfileById, updateStudentAccount, fetchSupportRequests, fetchSupportContacts, fetchPermitActivityHistory, createSupportRequest, recordPermitActivity, fetchSystemFeeSettings } = vi.hoisted(() => ({
   signOut: vi.fn(),
   refreshUser: vi.fn().mockResolvedValue(undefined),
   fetchStudentProfileById: vi.fn().mockResolvedValue({
@@ -52,6 +52,10 @@ const { signOut, refreshUser, fetchStudentProfileById, updateStudentAccount, fet
   fetchPermitActivityHistory: vi.fn().mockResolvedValue([]),
   createSupportRequest: vi.fn(),
   recordPermitActivity: vi.fn(),
+  fetchSystemFeeSettings: vi.fn().mockResolvedValue({
+    localStudentFee: 3000,
+    internationalStudentFee: 5000,
+  }),
 }))
 
 describe('Dashboard', () => {
@@ -107,6 +111,7 @@ describe('Dashboard', () => {
     vi.spyOn(profileServiceModule, 'fetchPermitActivityHistory').mockImplementation(fetchPermitActivityHistory)
     vi.spyOn(profileServiceModule, 'createSupportRequest').mockImplementation(createSupportRequest)
     vi.spyOn(profileServiceModule, 'recordPermitActivity').mockImplementation(recordPermitActivity)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
 
     updateStudentAccount.mockResolvedValue({
       id: 'student-id',
@@ -150,6 +155,10 @@ describe('Dashboard', () => {
 
     await waitFor(() => {
       expect(fetchStudentProfileById).toHaveBeenCalledWith('student-id')
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByText(/loading your student dashboard/i)).toBeNull()
     })
 
     await user.click(screen.getByRole('button', { name: /profile settings/i }))
