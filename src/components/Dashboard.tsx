@@ -4,7 +4,6 @@ import {
   BookOpen,
   CalendarDays,
   CreditCard,
-  DollarSign,
   Download,
   FileBadge2,
   FileText,
