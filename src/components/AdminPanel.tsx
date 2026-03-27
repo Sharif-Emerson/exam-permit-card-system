@@ -1784,6 +1784,26 @@ export default function AdminPanel() {
       disabled: !adminCapability.sections.includes('settings'),
       action: () => navigate('settings'),
     },
+    {
+      key: 'bulk-sync-curriculum',
+      label: 'Sync All Students with Curriculum',
+      description: 'Align all students\' course units and exams with the official curriculum.',
+      icon: <RefreshCcw className="h-5 w-5" />,
+      disabled: !adminCapability.canGenerateBulkPermits,
+      action: async () => {
+        setError('')
+        setSuccessMessage('')
+        try {
+          const res = await fetch('/admin/bulk-sync-curriculum', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+          if (!res.ok) throw new Error('Bulk sync failed');
+          const data = await res.json();
+          setSuccessMessage(`Bulk curriculum sync complete. Updated: ${data.updated}, Failed: ${data.failed.length}`);
+          await loadStudents();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Bulk curriculum sync failed');
+        }
+      },
+    },
   ]
 
   // Renamed to avoid duplicate function name
@@ -2089,7 +2109,7 @@ export default function AdminPanel() {
                             <button
                               type="button"
                               onClick={() => handleNotificationAlertAction(alert.onAction)}
-                              className="mt-3 rounded-lg border border-white/80 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                              className="mt-3 rounded-lg border border-white/80 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                             >
                               {alert.actionLabel}
                             </button>
@@ -2240,6 +2260,7 @@ export default function AdminPanel() {
                               ? 'border-amber-200 bg-amber-50'
                               : 'border-blue-200 bg-blue-50'
                         }`}
+                        title={alert.message}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -3200,7 +3221,7 @@ export default function AdminPanel() {
                                   {typeof row.totalFees === 'number' ? `$${row.totalFees.toFixed(2)}` : '-'}
                                 </td>
                                 <td className="px-3 py-2">
-                                  <span className={`rounded px-2 py-1 text-xs font-medium ${
+                                  <span className={`rounded px-2.5 py-1 text-xs font-medium ${
                                     row.status === 'ready'
                                       ? 'bg-green-100 text-green-700'
                                       : row.status === 'create'
@@ -3524,7 +3545,7 @@ export default function AdminPanel() {
                             />
                             <div className="min-w-0">
                             <p className="truncate font-semibold text-gray-900">{student.name}</p>
-                            <p className="text-xs text-gray-400">{student.studentId} - {student.course || 'No course'}</p>
+                            <p className="text-xs text-gray-400">{student.studentId} - {student.email}</p>
                             <p className="text-xs text-gray-400">{student.program ?? 'No program'} - {student.semester ?? 'No semester'}</p>
                             </div>
                           </div>
@@ -3970,7 +3991,7 @@ export default function AdminPanel() {
       </div>
 
       {pendingConfirmation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 py-6">
           <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-base font-semibold text-gray-900">{pendingConfirmation.title}</h2>
@@ -4174,8 +4195,8 @@ export default function AdminPanel() {
                           ...d,
                           program: nextProgram,
                           course: curriculum ? curriculum.defaultCourse : d.course,
-                          courseUnitsText: units ? units.map(u => u.unitName).join('\n') : d.courseUnitsText,
-                          exams: units ? createExamsFromCurriculum(units) : d.exams
+                          courseUnitsText: units ? units.map(u => u.unitName).join('\n') : (nextProgram ? '' : d.courseUnitsText),
+                          exams: units ? createExamsFromCurriculum(units) : (nextProgram ? [] : d.exams)
                         }
                       })
                     }}
@@ -4261,26 +4282,7 @@ export default function AdminPanel() {
               {/* Examination Schedule Editor (Automated Units & Venues) */}
               <div className="rounded-xl border border-blue-100 bg-blue-50/30 p-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-blue-800">Assigned Exams (Automated)</h3>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const curriculum = editDraft.program ? KIU_CURRICULUM[editDraft.program] : null
-                        const units = (curriculum && editDraft.semester) ? curriculum.semesters[editDraft.semester] : null
-                        if (units) {
-                          setEditDraft(d => ({
-                            ...d,
-                            courseUnitsText: units.map(u => u.unitName).join('\n'),
-                            exams: createExamsFromCurriculum(units)
-                          }))
-                        }
-                      }}
-                      className="rounded bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-700 hover:bg-blue-200"
-                    >
-                      Sync with Curriculum
-                    </button>
-                  </div>
+                  <h3 className="text-sm font-semibold text-blue-800">Assigned Exams (Automated)</h3>
                   <button
                     type="button"
                     onClick={() => setEditDraft((d) => ({ ...d, exams: [...(d.exams ?? []), { id: `exam-${Date.now()}`, title: '', venue: '', examTime: '', examDate: '', seatNumber: '' }] }))}

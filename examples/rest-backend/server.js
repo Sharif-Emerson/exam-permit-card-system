@@ -45,8 +45,54 @@ import { sendEmail, sendSms } from './lib/notification.js'
 // Default session TTL for login tokens (in hours)
 const sessionTtlHours = 24
 
+// --- Bulk Curriculum Sync Helper and Endpoint ---
+import { KIU_CURRICULUM } from '../../src/config/universityData.js'
 
+function getCurriculumForStudent(student) {
+  if (!student.program || !student.semester) return null;
+  const curriculum = KIU_CURRICULUM[student.program];
+  if (!curriculum) return null;
+  const units = curriculum.semesters[student.semester];
+  if (!units) return null;
+  return units;
+}
 
+// Bulk sync endpoint: aligns all students' course_units and exams with curriculum
+app.post('/admin/bulk-sync-curriculum', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to sync curriculum.'), async (request, response) => {
+  try {
+    const allStudents = listProfiles('student');
+    let updated = 0;
+    const failed = [];
+    for (const student of allStudents) {
+      const units = getCurriculumForStudent(student);
+      if (!units) {
+        failed.push({ id: student.id, reason: 'No curriculum for program/semester' });
+        continue;
+      }
+      try {
+        // Update course_units and exams fields
+        adminUpdateStudentProfile(student.id, {
+          course_units: units.units || [],
+          exams: units.exams || [],
+        });
+        updated++;
+      } catch (err) {
+        failed.push({ id: student.id, reason: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    }
+    insertActivityLog({
+      adminId: request.userId,
+      targetProfileId: request.userId,
+      action: 'bulk_sync_curriculum',
+      details: { updated, failedCount: failed.length },
+      campusId: request.user?.campusId,
+      campusName: request.user?.campusName,
+    });
+    response.json({ updated, failed });
+  } catch (error) {
+    response.status(500).json({ message: error instanceof Error ? error.message : 'Bulk sync failed.' });
+  }
+});
 
 // Initialize multer for file uploads
 const upload = multer();
