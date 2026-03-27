@@ -4441,6 +4441,18 @@ export default function AdminPanel() {
           </div>
         </div>
       )}
+
+      {showSignOut && (
+        <SignOutDialog
+          signingOut={signingOut}
+          onConfirm={async () => {
+            setSigningOut(true)
+            await signOut()
+            setSigningOut(false)
+          }}
+          onCancel={() => setShowSignOut(false)}
+        />
+      )}
       </div>
     </>
   )
