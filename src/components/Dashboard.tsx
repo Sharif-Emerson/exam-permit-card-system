@@ -1,6 +1,7 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell,
+  CheckCircle2,
   BookOpen,
   CalendarDays,
   CreditCard,
@@ -988,7 +989,7 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        setActiveSection(item.key)
+                        setActiveSection(item.key as any)
                         setSidebarOpen(false)
                       }}
                       className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all ${activeSection === item.key
