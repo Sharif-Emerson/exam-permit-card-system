@@ -1,4 +1,4 @@
-import { Calendar, Clock, Download, LogOut, MapPin, Printer, RefreshCcw, Ticket, User } from 'lucide-react'
+import { Calendar, Clock, Download, LogOut, MapPin, Printer, RefreshCcw, User } from 'lucide-react'
 import { generalExamRules } from '../config/examRules'
 import { institutionLogo, institutionName } from '../config/branding'
 import type { StudentProfile } from '../types'
@@ -194,11 +194,6 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                           <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden" />
                           <span className="font-medium text-sm sm:text-base print:text-[9px]">Venue:</span>
                           <span className="text-sm sm:text-base print:text-[9px]">{exam.venue}</span>
-                        </div>
-                        <div className="flex items-center space-x-2 print:space-x-1">
-                          <Ticket className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden" />
-                          <span className="font-medium text-sm sm:text-base print:text-[9px]">Seat:</span>
-                          <span className="text-sm sm:text-base print:text-[9px] font-bold">{exam.seatNumber}</span>
                         </div>
                       </div>
                     </div>

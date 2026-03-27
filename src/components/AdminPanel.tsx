@@ -5,7 +5,7 @@ import {
   FileSpreadsheet, FileUp, LayoutDashboard, LogOut, Menu,
   Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Sun, Trash2, Upload, Users, X,
 } from 'lucide-react'
-import { KIU_COLLEGES, KIU_COURSES, KIU_DEPARTMENTS, KIU_SEMESTERS } from '../config/universityData'
+import { KIU_COLLEGES, KIU_COURSES, KIU_CURRICULUM, KIU_DEPARTMENTS, KIU_SEMESTERS } from '../config/universityData'
 import BrandMark from './BrandMark'
 import PermitCard from './PermitCard'
 import { SaveConfirmationDialog, useNavigationWithConfirmation } from './SaveConfirmationDialog'
@@ -4049,7 +4049,18 @@ export default function AdminPanel() {
                   <select
                     id="edit-student-program"
                     value={editDraft.program ?? ''}
-                    onChange={(e) => setEditDraft((d) => ({ ...d, program: e.target.value }))}
+                    onChange={(e) => {
+                      const nextProgram = e.target.value
+                      const curriculum = KIU_CURRICULUM[nextProgram]
+                      setEditDraft((d) => ({
+                        ...d,
+                        program: nextProgram,
+                        course: curriculum ? curriculum.defaultCourse : d.course,
+                        courseUnitsText: (curriculum && d.semester && curriculum.semesters[d.semester])
+                          ? curriculum.semesters[d.semester].join('\n')
+                          : d.courseUnitsText
+                      }))
+                    }}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
                     <option value="">Select Program</option>
@@ -4094,7 +4105,17 @@ export default function AdminPanel() {
                   <select
                     id="edit-student-semester"
                     value={editDraft.semester ?? ''}
-                    onChange={(e) => setEditDraft((d) => ({ ...d, semester: e.target.value }))}
+                    onChange={(e) => {
+                      const nextSemester = e.target.value
+                      const curriculum = editDraft.program ? KIU_CURRICULUM[editDraft.program] : null
+                      setEditDraft((d) => ({
+                        ...d,
+                        semester: nextSemester,
+                        courseUnitsText: (curriculum && curriculum.semesters[nextSemester])
+                          ? curriculum.semesters[nextSemester].join('\n')
+                          : d.courseUnitsText
+                      }))
+                    }}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
                     <option value="">Select Semester</option>
@@ -4275,7 +4296,18 @@ export default function AdminPanel() {
                   <select
                     id="create-student-program"
                     value={createDraft.program ?? ''}
-                    onChange={(event) => setCreateDraft((current) => ({ ...current, program: event.target.value }))}
+                    onChange={(event) => {
+                      const nextProgram = event.target.value
+                      const curriculum = KIU_CURRICULUM[nextProgram]
+                      setCreateDraft((current) => ({
+                        ...current,
+                        program: nextProgram,
+                        course: curriculum ? curriculum.defaultCourse : current.course,
+                        courseUnitsText: (curriculum && current.semester && curriculum.semesters[current.semester])
+                          ? curriculum.semesters[current.semester].join('\n')
+                          : current.courseUnitsText
+                      }))
+                    }}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
                     <option value="">Select Program</option>
@@ -4311,7 +4343,17 @@ export default function AdminPanel() {
                   <select
                     id="create-student-semester"
                     value={createDraft.semester ?? ''}
-                    onChange={(event) => setCreateDraft((current) => ({ ...current, semester: event.target.value }))}
+                    onChange={(event) => {
+                      const nextSemester = event.target.value
+                      const curriculum = createDraft.program ? KIU_CURRICULUM[createDraft.program] : null
+                      setCreateDraft((current) => ({
+                        ...current,
+                        semester: nextSemester,
+                        courseUnitsText: (curriculum && curriculum.semesters[nextSemester])
+                          ? curriculum.semesters[nextSemester].join('\n')
+                          : current.courseUnitsText
+                      }))
+                    }}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
                     <option value="">Select Semester</option>
@@ -4416,16 +4458,6 @@ export default function AdminPanel() {
                     type="text"
                     value={createDraft.venue ?? ''}
                     onChange={(event) => setCreateDraft((current) => ({ ...current, venue: event.target.value }))}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="create-student-seat" className="mb-1 block text-xs font-medium text-gray-700">Seat Number</label>
-                  <input
-                    id="create-student-seat"
-                    type="text"
-                    value={createDraft.seatNumber ?? ''}
-                    onChange={(event) => setCreateDraft((current) => ({ ...current, seatNumber: event.target.value }))}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   />
                 </div>
