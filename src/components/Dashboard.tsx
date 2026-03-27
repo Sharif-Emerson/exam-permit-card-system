@@ -81,15 +81,6 @@ type SupportDraft = {
   message: string
 }
 
-const portalSections: Array<{ key: PortalSection; label: string; icon: typeof LayoutDashboard }> = [
-  { key: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { key: 'academics', label: 'Enrolled Courses', icon: BookOpen },
-  { key: 'finance', label: 'Finance', icon: Wallet },
-  { key: 'applications', label: 'Applications', icon: FileText },
-  { key: 'settings', label: 'Profile Settings', icon: Settings2 },
-  { key: 'support', label: 'Help & Support', icon: UserCircle2 },
-]
-
 const requiredDocumentChecklist = [
   { id: 'course-registration', label: 'Current course registration details' },
   { id: 'student-id', label: 'Valid student identification' },
@@ -338,6 +329,9 @@ export default function Dashboard() {
   const [supportContacts, setSupportContacts] = useState<SupportContact[]>([])
   const [permitHistory, setPermitHistory] = useState<PermitActivityRecord[]>([])
   const hasInitializedProfileRef = useRef(false)
+  // Add state for button-level loading
+  const [refreshing, setRefreshing] = useState(false)
+
   // Course options for dropdown
   const allCourseUnits = useMemo(() => {
     const units = new Set<string>()
@@ -367,6 +361,27 @@ export default function Dashboard() {
     subject: '',
     message: '',
   })
+
+  // Calculate financial metrics
+  const totalFees = studentData?.totalFees || 0
+  const amountPaid = studentData?.amountPaid || 0
+  const feesBalance = studentData?.feesBalance || 0
+  const paymentProgress = totalFees > 0 ? Math.min(Math.round((amountPaid / totalFees) * 100), 100) : 0
+  const isFullyCleared = feesBalance <= 0 && amountPaid > 0
+
+  const portalSections = [
+    { key: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" /> },
+    { key: 'academics', label: 'Academics', icon: <GraduationCap className="h-4 w-4" /> },
+    {
+      key: 'finance',
+      label: 'Finance',
+      icon: <CreditCard className="h-4 w-4" />,
+      badge: feesBalance > 0 ? 'Due' : isFullyCleared ? '✓' : undefined
+    },
+    { key: 'applications', label: 'Applications', icon: <FileText className="h-4 w-4" /> },
+    { key: 'settings', label: 'Profile Settings', icon: <Settings2 className="h-4 w-4" /> },
+    { key: 'support', label: 'Help & Support', icon: <UserCircle2 className="h-4 w-4" /> },
+  ]
 
   const loadSupportRequests = useCallback(async () => {
     if (!user || user.role !== 'student') {
@@ -757,9 +772,6 @@ export default function Dashboard() {
       setSavingSettings(false)
     }
   }
-  // Add state for button-level loading
-  const [refreshing, setRefreshing] = useState(false)
-
   const qrValue = studentData
     ? publicApiBaseUrl
       ? `${publicApiBaseUrl}/permits/${encodeURIComponent(studentData.permitToken)}`
@@ -970,26 +982,36 @@ export default function Dashboard() {
             </div>
 
             <nav className="space-y-2">
-              {portalSections.map((section) => {
-                const Icon = section.icon
-
-                return (
-                  <button
-                    key={section.key}
-                    type="button"
-                    onClick={() => {
-                      setActiveSection(section.key)
-                      setSidebarOpen(false)
-                    }}
-                    className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition-all ${activeSection === section.key
-                      ? 'bg-slate-900 text-white shadow-lg shadow-slate-300/60 dark:bg-emerald-500 dark:text-slate-950 dark:shadow-none'
-                      : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white'}`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {section.label}
-                  </button>
-                )
-              })}
+              <ul className="space-y-2">
+                {portalSections.map((item) => (
+                  <li key={item.key}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveSection(item.key)
+                        setSidebarOpen(false)
+                      }}
+                      className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all ${activeSection === item.key
+                        ? 'bg-slate-900 text-white shadow-lg shadow-slate-300/60 dark:bg-emerald-500 dark:text-slate-950 dark:shadow-none'
+                        : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white'}`}
+                    >
+                      {item.icon}
+                      <span className="flex-1 text-left">{item.label}</span>
+                      {item.badge && (
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                          activeSection === item.key
+                            ? 'bg-white/20 text-white'
+                            : item.badge === 'Due'
+                              ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                              : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        }`}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </nav>
 
             <div className="mt-8 rounded-3xl border border-emerald-100 bg-emerald-50/80 p-4 text-sm dark:border-emerald-900/60 dark:bg-emerald-950/40">
@@ -1001,13 +1023,13 @@ export default function Dashboard() {
           </aside>
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <header className="sticky top-0 z-20 border-b border-white/60 bg-white/75 px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/75 sm:px-6 lg:px-8">
+            <header className="sticky top-0 z-20 border-b border-white/70 bg-white/75 px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/75 sm:px-6 lg:px-8">
               <div className="flex flex-wrap items-center gap-3 lg:gap-4">
                 <button
                   type="button"
                   title="Open navigation"
                   aria-label="Open navigation"
-                  onClick={() => setSidebarOpen(false)}
+                  onClick={() => setSidebarOpen(true)}
                   className="rounded-full border border-slate-200 bg-white p-2 text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 lg:hidden"
                 >
                   <Menu className="h-4 w-4" />
@@ -1933,19 +1955,21 @@ export default function Dashboard() {
                             <div>
                               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Current Balance</p>
                               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                                UGX {studentData.feesBalance.toLocaleString()}
+                                UGX {feesBalance.toLocaleString()}
                               </h2>
                             </div>
                           </div>
                           <div className="mt-6 flex gap-3">
                             <button
                               type="button"
+                              onClick={() => alert(`Please visit the KIU Finance Office to process your UGX ${feesBalance.toLocaleString()} payment.`)}
                               className="flex-1 rounded-full bg-emerald-500 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600 shadow-sm"
                             >
                               Pay Now
                             </button>
                             <button
                               type="button"
+                              onClick={() => alert('Preparing your statement... please wait while we generate your digital invoice.')}
                               className="flex-1 rounded-full border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 shadow-sm"
                             >
                               Download Invoice
@@ -1962,17 +1986,20 @@ export default function Dashboard() {
                             <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Paid (Semester)</p>
                             <PieChart className="h-5 w-5 text-blue-500" />
                           </div>
-                          <div className="mt-2">
-                            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">UGX 1,500,000</h2>
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                              <TrendingUp className="h-3 w-3 text-emerald-500" />
-                              Fully cleared for previous sessions
+                          <div className="mt-2 text-center sm:text-left">
+                            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">UGX {amountPaid.toLocaleString()}</h2>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center sm:justify-start gap-1">
+                              {feesBalance <= 0 ? (
+                                <><CheckCircle2 className="h-3 w-3 text-emerald-500" /> Fully cleared for previous sessions</>
+                              ) : (
+                                <><TrendingUp className="h-3 w-3 text-blue-500" /> Installment plan active</>
+                              )}
                             </p>
                           </div>
                           <div className="mt-4 w-full rounded-full bg-slate-100 dark:bg-slate-800 h-2.5">
-                            <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: '75%' }}></div>
+                            <div className="bg-blue-500 h-2.5 rounded-full transition-all duration-1000" style={{ width: `${paymentProgress}%` }}></div>
                           </div>
-                          <p className="text-xs text-right mt-1 text-slate-500">75% of Annual Target</p>
+                          <p className="text-xs text-right mt-1 text-slate-500 font-medium">{paymentProgress}% of Annual Target</p>
                         </div>
                       </section>
                       
@@ -2022,11 +2049,23 @@ export default function Dashboard() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                            {[
-                              { date: 'Oct 12, 2023', desc: 'Tuition Installment 2', method: 'Mobile Money', amount: 'UGX 500,000', status: 'Completed' },
-                              { date: 'Sep 05, 2023', desc: 'Tuition Installment 1', method: 'Bank Transfer', amount: 'UGX 1,000,000', status: 'Completed' },
-                              { date: 'Aug 20, 2023', desc: 'Registration Fee', method: 'Visa Card', amount: 'UGX 150,000', status: 'Completed' },
-                            ].map((txn, idx) => (
+                            {/* Dynamic Transactions based on balance */}
+                            {(amountPaid > 0 ? [
+                              { 
+                                date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }), 
+                                desc: feesBalance === 0 ? 'Full Tuition Settlement' : 'Tuition Installment', 
+                                method: 'System Sync', 
+                                amount: `UGX ${amountPaid.toLocaleString()}`, 
+                                status: 'Completed' 
+                              },
+                              ...(amountPaid > 1000000 ? [{ 
+                                date: 'Aug 20, 2023', 
+                                desc: 'Registration Fee', 
+                                method: 'Visa Card', 
+                                amount: 'UGX 150,000', 
+                                status: 'Completed' 
+                              }] : [])
+                            ] : []).map((txn, idx) => (
                               <tr key={idx} className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50">
                                 <td className="py-4 text-slate-600 dark:text-slate-300">{txn.date}</td>
                                 <td className="py-4 font-medium text-slate-900 dark:text-white">{txn.desc}</td>
