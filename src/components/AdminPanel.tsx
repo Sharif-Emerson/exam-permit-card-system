@@ -62,6 +62,7 @@ type CreatedStudentWelcome = {
 type FeeSettingsDraft = {
   localStudentFee: string
   internationalStudentFee: string
+  deadlines: UniversityDeadline[]
 }
 
 type AdminCapabilityProfile = {
@@ -259,7 +260,19 @@ function createFeeSettingsDraft(feeSettings: SystemFeeSettings): FeeSettingsDraf
   return {
     localStudentFee: formatFeeDraftValue(feeSettings.localStudentFee),
     internationalStudentFee: formatFeeDraftValue(feeSettings.internationalStudentFee),
+    deadlines: [...(feeSettings.deadlines ?? [])],
   }
+}
+
+function createExamsFromCurriculum(units: KiuCourseUnit[]): StudentExam[] {
+  return units.map((u, index) => ({
+    id: `exam-${Date.now()}-${index}`,
+    title: u.unitName,
+    examDate: '', // Admin sets this manually or it defaults to empty
+    examTime: u.time,
+    venue: u.venue,
+    seatNumber: '', // Seat number removal confirmed
+  }))
 }
 
 function createEmptyStudentDraft(feeSettings: SystemFeeSettings = DEFAULT_SYSTEM_FEE_SETTINGS, studentCategory: StudentCategory = 'local'): CreateStudentDraft {
@@ -284,6 +297,7 @@ function createEmptyStudentDraft(feeSettings: SystemFeeSettings = DEFAULT_SYSTEM
     examTime: '',
     venue: '',
     seatNumber: '',
+    exams: [],
   }
 }
 
@@ -1145,6 +1159,7 @@ export default function AdminPanel() {
       semester: student.semester ?? '',
       courseUnitsText: student.courseUnits?.join('\n') ?? '',
       totalFees: student.totalFees.toFixed(2),
+      exams: student.exams ?? [],
     })
   }
 
@@ -1205,6 +1220,7 @@ export default function AdminPanel() {
           semester: editDraft.semester,
           courseUnits,
           totalFees: totalFeesNum,
+          exams: editDraft.exams,
         },
         user.id,
       )
@@ -1272,6 +1288,7 @@ export default function AdminPanel() {
         examTime: createDraft.examTime,
         venue: createDraft.venue,
         seatNumber: createDraft.seatNumber,
+        exams: createDraft.exams,
       }, user.id)
       const createdStudentMatcher = createdProfile.studentId || createdProfile.email || createdProfile.name
       setActiveSection('students')
@@ -1649,6 +1666,7 @@ export default function AdminPanel() {
       const nextFeeSettings = await updateSystemFeeSettings({
         localStudentFee,
         internationalStudentFee,
+        deadlines: feeSettingsDraft.deadlines,
       })
       setSystemFeeSettings(nextFeeSettings)
       setFeeSettingsDraft(createFeeSettingsDraft(nextFeeSettings))
@@ -3700,7 +3718,7 @@ export default function AdminPanel() {
                       <h2 className="font-semibold text-gray-800">Fee Structure</h2>
                       <p className="mt-1 text-xs text-gray-400">Set the default exam clearance fees used for new local and international student accounts.</p>
                     </div>
-                    <form className="space-y-4 px-6 py-5" onSubmit={(event) => void handleSaveFeeStructure(event)}>
+                    <form className="space-y-6 px-6 py-5" onSubmit={(event) => void handleSaveFeeStructure(event)}>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
                           <label htmlFor="fee-settings-local" className="mb-2 block text-sm font-medium text-gray-700">Local student fee</label>
@@ -3727,13 +3745,110 @@ export default function AdminPanel() {
                           />
                         </div>
                       </div>
+
+                      <div className="border-t border-gray-100 pt-5">
+                        <div className="mb-4 flex items-center justify-between">
+                          <div>
+                            <h3 className="text-sm font-semibold text-gray-800">Important Deadlines</h3>
+                            <p className="text-[10px] text-gray-400 uppercase tracking-tight">Shown on all student dashboards</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setFeeSettingsDraft(prev => ({
+                              ...prev,
+                              deadlines: [...prev.deadlines, { id: `dl-${Date.now()}`, title: '', subtitle: '', dateLabel: '', type: 'info' }]
+                            }))}
+                            className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                          >
+                            + Add Deadline
+                          </button>
+                        </div>
+                        <div className="space-y-3">
+                          {feeSettingsDraft.deadlines.map((deadline, idx) => (
+                            <div key={deadline.id} className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1.5fr_1.2fr_1fr_auto] items-end rounded-xl border border-gray-100 bg-gray-50/50 p-3">
+                              <div>
+                                <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Title</label>
+                                <input
+                                  type="text"
+                                  value={deadline.title}
+                                  onChange={(e) => {
+                                    const next = [...feeSettingsDraft.deadlines]
+                                    next[idx] = { ...deadline, title: e.target.value }
+                                    setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
+                                  }}
+                                  className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                                  placeholder="e.g. Final Exam Clearance"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Subtitle</label>
+                                <input
+                                  type="text"
+                                  value={deadline.subtitle}
+                                  onChange={(e) => {
+                                    const next = [...feeSettingsDraft.deadlines]
+                                    next[idx] = { ...deadline, subtitle: e.target.value }
+                                    setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
+                                  }}
+                                  className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                                  placeholder="e.g. Clear all balances"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Date/Label</label>
+                                <input
+                                  type="text"
+                                  value={deadline.dateLabel}
+                                  onChange={(e) => {
+                                    const next = [...feeSettingsDraft.deadlines]
+                                    next[idx] = { ...deadline, dateLabel: e.target.value }
+                                    setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
+                                  }}
+                                  className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                                  placeholder="e.g. In 14 Days"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Type</label>
+                                <select
+                                  value={deadline.type}
+                                  onChange={(e) => {
+                                    const next = [...feeSettingsDraft.deadlines]
+                                    next[idx] = { ...deadline, type: e.target.value as any }
+                                    setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
+                                  }}
+                                  className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                                >
+                                  <option value="info">Info (Blue)</option>
+                                  <option value="danger">Danger (Red)</option>
+                                  <option value="warning">Warning (Amber)</option>
+                                </select>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = feeSettingsDraft.deadlines.filter((_, i) => i !== idx)
+                                  setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
+                                }}
+                                className="rounded p-1 text-red-400 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                          {feeSettingsDraft.deadlines.length === 0 && (
+                            <p className="text-center py-4 text-xs text-gray-400 font-medium border-2 border-dashed border-gray-100 rounded-xl">No global deadlines set. Add one to show on student dashboards.</p>
+                          )}
+                        </div>
+                      </div>
+
                       <button
                         type="submit"
                         disabled={savingFeeSettings}
                         className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         <Save className="h-4 w-4" />
-                        {savingFeeSettings ? 'Saving...' : 'Save fee structure'}
+                        {savingFeeSettings ? 'Saving...' : 'Save fee & deadline settings'}
                       </button>
                     </form>
                   </div>
@@ -4049,17 +4164,19 @@ export default function AdminPanel() {
                   <select
                     id="edit-student-program"
                     value={editDraft.program ?? ''}
-                    onChange={(e) => {
-                      const nextProgram = e.target.value
+                    onChange={(event) => {
+                      const nextProgram = event.target.value
                       const curriculum = KIU_CURRICULUM[nextProgram]
-                      setEditDraft((d) => ({
-                        ...d,
-                        program: nextProgram,
-                        course: curriculum ? curriculum.defaultCourse : d.course,
-                        courseUnitsText: (curriculum && d.semester && curriculum.semesters[d.semester])
-                          ? curriculum.semesters[d.semester].join('\n')
-                          : d.courseUnitsText
-                      }))
+                      setEditDraft((d) => {
+                        const units = (curriculum && d.semester) ? curriculum.semesters[d.semester] : null
+                        return {
+                          ...d,
+                          program: nextProgram,
+                          course: curriculum ? curriculum.defaultCourse : d.course,
+                          courseUnitsText: units ? units.map(u => u.unitName).join('\n') : d.courseUnitsText,
+                          exams: units ? createExamsFromCurriculum(units) : d.exams
+                        }
+                      })
                     }}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
@@ -4108,13 +4225,15 @@ export default function AdminPanel() {
                     onChange={(e) => {
                       const nextSemester = e.target.value
                       const curriculum = editDraft.program ? KIU_CURRICULUM[editDraft.program] : null
-                      setEditDraft((d) => ({
-                        ...d,
-                        semester: nextSemester,
-                        courseUnitsText: (curriculum && curriculum.semesters[nextSemester])
-                          ? curriculum.semesters[nextSemester].join('\n')
-                          : d.courseUnitsText
-                      }))
+                      setEditDraft((d) => {
+                        const units = (curriculum && nextSemester) ? curriculum.semesters[nextSemester] : null
+                        return {
+                          ...d,
+                          semester: nextSemester,
+                          courseUnitsText: units ? units.map(u => u.unitName).join('\n') : (nextSemester ? '' : d.courseUnitsText),
+                          exams: units ? createExamsFromCurriculum(units) : (nextSemester ? [] : d.exams)
+                        }
+                      })
                     }}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
@@ -4136,6 +4255,101 @@ export default function AdminPanel() {
                   placeholder="Enter one course unit per line"
                 />
                 <p className="mt-1 text-xs text-gray-400">One course unit per line. Comma-separated values also work.</p>
+              </div>
+
+              {/* Examination Schedule Editor (Automated Units & Venues) */}
+              <div className="rounded-xl border border-blue-100 bg-blue-50/30 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-blue-800">Assigned Exams (Automated)</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const curriculum = editDraft.program ? KIU_CURRICULUM[editDraft.program] : null
+                        const units = (curriculum && editDraft.semester) ? curriculum.semesters[editDraft.semester] : null
+                        if (units) {
+                          setEditDraft(d => ({
+                            ...d,
+                            courseUnitsText: units.map(u => u.unitName).join('\n'),
+                            exams: createExamsFromCurriculum(units)
+                          }))
+                        }
+                      }}
+                      className="rounded bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-700 hover:bg-blue-200"
+                    >
+                      Sync with Curriculum
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditDraft((d) => ({ ...d, exams: [...(d.exams ?? []), { id: `exam-${Date.now()}`, title: '', venue: '', examTime: '', examDate: '', seatNumber: '' }] }))}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                  >
+                    + Add Custom Exam
+                  </button>
+                </div>
+                {(!editDraft.exams || editDraft.exams.length === 0) ? (
+                  <p className="py-4 text-center text-xs text-blue-400 font-medium">No exams assigned. Select a program and semester above to auto-populate the university schedule.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {editDraft.exams.map((exam, idx) => (
+                      <div key={exam.id} className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1.5fr_1fr_auto] items-end rounded-lg border border-blue-100 bg-white p-3 shadow-sm">
+                        <div className="flex-1">
+                          <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Exam Title</label>
+                          <input
+                            type="text"
+                            value={exam.title}
+                            onChange={(e) => {
+                              const nextExams = [...(editDraft.exams ?? [])]
+                              nextExams[idx] = { ...exam, title: e.target.value }
+                              setEditDraft((d) => ({ ...d, exams: nextExams }))
+                            }}
+                            className="w-full border-b border-gray-100 py-1 text-xs focus:border-blue-400 focus:outline-none"
+                            placeholder="Unit Title"
+                          />
+                        </div>
+                        <div className="w-full sm:w-auto">
+                          <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Venue</label>
+                          <input
+                            type="text"
+                            value={exam.venue}
+                            onChange={(e) => {
+                              const nextExams = [...(editDraft.exams ?? [])]
+                              nextExams[idx] = { ...exam, venue: e.target.value }
+                              setEditDraft((d) => ({ ...d, exams: nextExams }))
+                            }}
+                            className="w-full border-b border-gray-100 py-1 text-xs focus:border-blue-400 focus:outline-none"
+                            placeholder="Venue"
+                          />
+                        </div>
+                        <div className="w-full sm:w-24">
+                          <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Time</label>
+                          <input
+                            type="text"
+                            value={exam.examTime}
+                            onChange={(e) => {
+                              const nextExams = [...(editDraft.exams ?? [])]
+                              nextExams[idx] = { ...exam, examTime: e.target.value }
+                              setEditDraft((d) => ({ ...d, exams: nextExams }))
+                            }}
+                            className="w-full border-b border-gray-100 py-1 text-xs focus:border-blue-400 focus:outline-none"
+                            placeholder="09:00 AM"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextExams = (editDraft.exams ?? []).filter((_, i) => i !== idx)
+                            setEditDraft((d) => ({ ...d, exams: nextExams }))
+                          }}
+                          className="rounded p-1 text-red-400 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex items-center justify-between gap-3 pt-2">
                 <button
@@ -4299,14 +4513,16 @@ export default function AdminPanel() {
                     onChange={(event) => {
                       const nextProgram = event.target.value
                       const curriculum = KIU_CURRICULUM[nextProgram]
-                      setCreateDraft((current) => ({
-                        ...current,
-                        program: nextProgram,
-                        course: curriculum ? curriculum.defaultCourse : current.course,
-                        courseUnitsText: (curriculum && current.semester && curriculum.semesters[current.semester])
-                          ? curriculum.semesters[current.semester].join('\n')
-                          : current.courseUnitsText
-                      }))
+                      setCreateDraft((current) => {
+                        const units = (curriculum && current.semester) ? curriculum.semesters[current.semester] : null
+                        return {
+                          ...current,
+                          program: nextProgram,
+                          course: curriculum ? curriculum.defaultCourse : current.course,
+                          courseUnitsText: units ? units.map(u => u.unitName).join('\n') : (curriculum ? '' : current.courseUnitsText),
+                          exams: units ? createExamsFromCurriculum(units) : (curriculum ? [] : current.exams)
+                        }
+                      })
                     }}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
@@ -4346,13 +4562,15 @@ export default function AdminPanel() {
                     onChange={(event) => {
                       const nextSemester = event.target.value
                       const curriculum = createDraft.program ? KIU_CURRICULUM[createDraft.program] : null
-                      setCreateDraft((current) => ({
-                        ...current,
-                        semester: nextSemester,
-                        courseUnitsText: (curriculum && curriculum.semesters[nextSemester])
-                          ? curriculum.semesters[nextSemester].join('\n')
-                          : current.courseUnitsText
-                      }))
+                      setCreateDraft((current) => {
+                        const units = (curriculum && nextSemester) ? curriculum.semesters[nextSemester] : null
+                        return {
+                          ...current,
+                          semester: nextSemester,
+                          courseUnitsText: units ? units.map(u => u.unitName).join('\n') : (nextSemester ? '' : current.courseUnitsText),
+                          exams: units ? createExamsFromCurriculum(units) : (nextSemester ? [] : current.exams)
+                        }
+                      })
                     }}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
@@ -4472,6 +4690,82 @@ export default function AdminPanel() {
                   placeholder="Enter one course unit per line"
                 />
                 <p className="mt-1 text-xs text-gray-400">One course unit per line. Comma-separated values also work.</p>
+              </div>
+
+              {/* Examination Schedule Editor (Automated Units & Venues) */}
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-emerald-800">Assigned Exams (Automated)</h3>
+                  <button
+                    type="button"
+                    onClick={() => setCreateDraft((d) => ({ ...d, exams: [...(d.exams ?? []), { id: `exam-${Date.now()}`, title: '', venue: '', examTime: '', examDate: '', seatNumber: '' }] }))}
+                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                  >
+                    + Add Custom Exam
+                  </button>
+                </div>
+                {(!createDraft.exams || createDraft.exams.length === 0) ? (
+                  <p className="py-4 text-center text-xs text-emerald-400 font-medium">No exams assigned. Select a program and semester above to auto-populate the university schedule.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {createDraft.exams.map((exam, idx) => (
+                      <div key={exam.id} className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1.5fr_1fr_auto] items-end rounded-lg border border-emerald-100 bg-white p-3 shadow-sm">
+                        <div className="flex-1">
+                          <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Exam Title</label>
+                          <input
+                            type="text"
+                            value={exam.title}
+                            onChange={(e) => {
+                              const nextExams = [...(createDraft.exams ?? [])]
+                              nextExams[idx] = { ...exam, title: e.target.value }
+                              setCreateDraft((d) => ({ ...d, exams: nextExams }))
+                            }}
+                            className="w-full border-b border-gray-100 py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                            placeholder="Unit Title"
+                          />
+                        </div>
+                        <div className="w-full sm:w-auto">
+                          <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Venue</label>
+                          <input
+                            type="text"
+                            value={exam.venue}
+                            onChange={(e) => {
+                              const nextExams = [...(createDraft.exams ?? [])]
+                              nextExams[idx] = { ...exam, venue: e.target.value }
+                              setCreateDraft((d) => ({ ...d, exams: nextExams }))
+                            }}
+                            className="w-full border-b border-gray-100 py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                            placeholder="Venue"
+                          />
+                        </div>
+                        <div className="w-full sm:w-24">
+                          <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Time</label>
+                          <input
+                            type="text"
+                            value={exam.examTime}
+                            onChange={(e) => {
+                              const nextExams = [...(createDraft.exams ?? [])]
+                              nextExams[idx] = { ...exam, examTime: e.target.value }
+                              setCreateDraft((d) => ({ ...d, exams: nextExams }))
+                            }}
+                            className="w-full border-b border-gray-100 py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                            placeholder="09:00 AM"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextExams = (createDraft.exams ?? []).filter((_, i) => i !== idx)
+                            setCreateDraft((d) => ({ ...d, exams: nextExams }))
+                          }}
+                          className="rounded p-1 text-red-400 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label htmlFor="create-student-instructions" className="mb-1 block text-xs font-medium text-gray-700">Permit Instructions</label>

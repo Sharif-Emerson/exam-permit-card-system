@@ -32,14 +32,14 @@ import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { publicApiBaseUrl } from '../config/provider'
 import PermitCard from './PermitCard'
-import { createSupportRequest, fetchPermitActivityHistory, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, recordPermitActivity, updateStudentAccount } from '../services/profileService'
+import { createSupportRequest, fetchPermitActivityHistory, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, fetchSystemFeeSettings, recordPermitActivity, updateStudentAccount } from '../services/profileService'
 import type { PermitActivityRecord, StudentProfile, SupportContact, SupportRequest } from '../types'
 import { FALLBACK_PROFILE_IMAGE } from './PermitCard'
 import SignOutDialog from './SignOutDialog'
 import Select from 'react-select'
 
 type PermitStatus = 'approved' | 'pending' | 'rejected'
-type PortalSection = 'overview' | 'academics' | 'finance' | 'applications' | 'settings' | 'support'
+type PortalSection = 'overview' | 'permit_courses' | 'finance' | 'applications' | 'settings' | 'support'
 type HistoryStatusFilter = PermitStatus | 'all'
 
 type PermitApplicationRecord = {
@@ -318,6 +318,7 @@ export default function Dashboard() {
   const [activeSection, setActiveSection] = useState<PortalSection>('overview')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [deadlines, setDeadlines] = useState<any[]>([]) // Dynamic deadlines
   const [applicationHistory, setApplicationHistory] = useState<PermitApplicationRecord[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>('all')
@@ -372,7 +373,7 @@ export default function Dashboard() {
 
   const portalSections = [
     { key: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" /> },
-    { key: 'academics', label: 'Academics', icon: <GraduationCap className="h-4 w-4" /> },
+    { key: 'permit_courses', label: 'Permit Courses', icon: <GraduationCap className="h-4 w-4" /> },
     {
       key: 'finance',
       label: 'Finance',
@@ -441,8 +442,15 @@ export default function Dashboard() {
         setError('')
       }
 
-      const profile = await fetchStudentProfileById(user.id)
+      const [profile, settings] = await Promise.all([
+        fetchStudentProfileById(user.id),
+        fetchSystemFeeSettings(),
+      ])
+
       setStudentData(profile)
+      if (settings.deadlines) {
+        setDeadlines(settings.deadlines)
+      }
 
       if (syncDrafts) {
         setSettingsDraft((current) => ({
@@ -2005,26 +2013,42 @@ export default function Dashboard() {
                       </section>
                       
                       {/* Upcoming Deadlines */}
-                      <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none xl:col-span-1 md:col-span-2">
+                       <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none xl:col-span-1 md:col-span-2">
                          <div className="flex items-center gap-3 mb-4">
                             <CalendarDays className="h-5 w-5 text-orange-500" />
                             <h3 className="font-semibold text-slate-900 dark:text-white">Important Deadlines</h3>
                          </div>
                          <div className="space-y-4">
-                           <div className="flex items-center justify-between border-l-2 border-orange-500 pl-3">
-                              <div>
-                                <p className="text-sm font-medium text-slate-900 dark:text-white">Final Exam Clearance</p>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">Clear all balances to generate permit</p>
-                              </div>
-                              <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/40 dark:text-orange-300">In 14 Days</span>
-                           </div>
-                           <div className="flex items-center justify-between border-l-2 border-slate-300 dark:border-slate-600 pl-3">
-                              <div>
-                                <p className="text-sm font-medium text-slate-900 dark:text-white">Next Semester Reg.</p>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">Early bird registration fee</p>
-                              </div>
-                              <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded-full dark:bg-slate-800 dark:text-slate-300">August 1st</span>
-                           </div>
+                           {deadlines && deadlines.length > 0 ? (
+                             deadlines.map((dl: any, idx: number) => (
+                               <div key={idx} className="flex items-center justify-between border-l-2 border-orange-500 pl-3">
+                                  <div>
+                                    <p className="text-sm font-medium text-slate-900 dark:text-white">{dl.title}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">{dl.description}</p>
+                                  </div>
+                                  <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/40 dark:text-orange-300">
+                                    {dl.dateLabel}
+                                  </span>
+                               </div>
+                             ))
+                           ) : (
+                             <>
+                               <div className="flex items-center justify-between border-l-2 border-orange-500 pl-3">
+                                  <div>
+                                    <p className="text-sm font-medium text-slate-900 dark:text-white">Final Exam Clearance</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Clear all balances to generate permit</p>
+                                  </div>
+                                  <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/40 dark:text-orange-300">In 14 Days</span>
+                               </div>
+                               <div className="flex items-center justify-between border-l-2 border-slate-300 dark:border-slate-600 pl-3">
+                                  <div>
+                                    <p className="text-sm font-medium text-slate-900 dark:text-white">Next Semester Reg.</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Early bird registration fee</p>
+                                  </div>
+                                  <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded-full dark:bg-slate-800 dark:text-slate-300">August 1st</span>
+                               </div>
+                             </>
+                           )}
                          </div>
                       </section>
                     </div>
@@ -2091,9 +2115,9 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {activeSection === 'academics' && (
+                {activeSection === 'permit_courses' && (
                   <div className="space-y-6">
-                    {/* Academics Overview Header */}
+                    {/* Permit Courses Overview Header */}
                     <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-gradient-to-r from-blue-600 to-indigo-700 p-8 shadow-xl shadow-blue-200/50 dark:border-slate-800 dark:from-slate-900 dark:to-indigo-950 dark:shadow-none mb-6">
                        <div className="absolute right-0 top-0 opacity-10">
                          <GraduationCap className="h-48 w-48 -mt-8 -mr-8" />
@@ -2101,36 +2125,26 @@ export default function Dashboard() {
                        <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
                          <div className="text-white">
                            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 mb-4 text-xs font-semibold backdrop-blur-sm">
-                             <TrendingUp className="h-3.5 w-3.5" /> Present Semester
+                             <TrendingUp className="h-3.5 w-3.5" /> Permit Active Session
                            </span>
                            <h1 className="text-3xl font-bold">{currentSession}</h1>
-                           <p className="mt-2 text-blue-100 max-w-md">You are currently enrolled in {studentData.courseUnits?.length || 0} active course units. Keep up the good work!</p>
-                         </div>
-                         <div className="flex gap-4">
-                           <div className="rounded-2xl bg-white/10 px-6 py-4 backdrop-blur-md border border-white/20 text-center">
-                             <p className="text-blue-100 text-xs uppercase tracking-wider font-semibold">Current GPA</p>
-                             <p className="text-3xl font-bold text-white mt-1">3.8<span className="text-lg text-blue-200 font-medium">/4.0</span></p>
-                           </div>
-                           <div className="rounded-2xl bg-white/10 px-6 py-4 backdrop-blur-md border border-white/20 text-center">
-                             <p className="text-blue-100 text-xs uppercase tracking-wider font-semibold">Credits</p>
-                             <p className="text-3xl font-bold text-white mt-1">{(studentData.courseUnits?.length || 0) * 3}</p>
-                           </div>
+                           <p className="mt-2 text-blue-100 max-w-md">You are cleared for {studentData.courseUnits?.length || 0} courses on your digital permit. Ensure your details match the university register.</p>
                          </div>
                        </div>
                     </section>
                     
                     {/* Courses Grid */}
                     <div className="flex items-center justify-between mb-2">
-                       <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Enrolled Courses</h2>
-                       <button className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition">View full transcript &rarr;</button>
+                       <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Permit Courses</h2>
+                       <button className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition" onClick={() => setActiveSection('overview')}>Digital Permit &rarr;</button>
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {studentData.courseUnits?.map((unit, idx) => {
-                        // Mock data for visual richness based on the unit string
-                        const [code, ...nameParts] = unit.split(' ')
-                        const title = nameParts.join(' ') || unit
-                        const progress = Math.floor(Math.random() * 40) + 60 // Random progress between 60-100%
+                        // Extract code and title
+                        const parts = unit.split(' ')
+                        const code = parts[0]
+                        const title = parts.slice(1).join(' ') || code
 
                         return (
                           <div key={idx} className="group relative rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:shadow-lg hover:shadow-blue-100/50 hover:-translate-y-1 dark:border-slate-800 dark:bg-slate-950/70 hover:dark:shadow-none">
@@ -2140,28 +2154,19 @@ export default function Dashboard() {
                                </div>
                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{code}</span>
                             </div>
-                            <h3 className="text-base font-semibold text-slate-900 dark:text-white leading-snug lined-clamp-2 min-h-[2.5rem]">{title}</h3>
+                            <h3 className="text-base font-semibold text-slate-900 dark:text-white leading-snug line-clamp-2 min-h-[2.5rem]">{title}</h3>
                             <div className="mt-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                               <span className="flex items-center gap-1.5"><UserCircle2 className="h-3.5 w-3.5" /> Dr. Assignment Mock</span>
-                               <span>3 Credits</span>
-                            </div>
-                            <div className="mt-5 border-t border-slate-100 pt-4 dark:border-slate-800/50">
-                               <div className="flex justify-between items-center mb-1.5">
-                                 <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Course Progress</span>
-                                 <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{progress}%</span>
-                               </div>
-                               <div className="w-full bg-slate-100 rounded-full h-1.5 dark:bg-slate-800">
-                                  <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-1000" style={{ width: `${progress}%` }}></div>
-                               </div>
-                            </div>
-                          </div>
-                        )
+                               <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" /> Scheduled Session</span>
+                               <span>Permit Unit</span>
+                             </div>
+                           </div>
+                         )
                       })}
                       {(!studentData.courseUnits || studentData.courseUnits.length === 0) && (
                         <div className="col-span-full rounded-3xl border border-dashed border-slate-300 p-10 text-center dark:border-slate-700">
                           <BookOpen className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
-                          <h3 className="text-lg font-medium text-slate-900 dark:text-white">No courses loaded</h3>
-                          <p className="mt-1 text-sm text-slate-500">You are not currently enrolled in any course units.</p>
+                          <h3 className="text-lg font-medium text-slate-900 dark:text-white">No courses assigned</h3>
+                          <p className="mt-1 text-sm text-slate-500">You are not currently enrolled in any course units on your permit.</p>
                         </div>
                       )}
                     </div>

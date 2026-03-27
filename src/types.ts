@@ -205,6 +205,7 @@ export interface AdminProfileUpdateInput {
   courseUnits?: string[]
   profileImage?: string | null
   totalFees?: number
+  exams?: StudentExam[]
 }
 
 export interface CreateStudentInput {
@@ -228,6 +229,7 @@ export interface CreateStudentInput {
   examTime?: string
   venue?: string
   seatNumber?: string
+  exams?: StudentExam[]
 }
 
 export interface FinancialImportRow {
@@ -255,9 +257,18 @@ export interface FinancialImportResult {
   skippedRows: Array<{ rowNumber: number; reason: string }>;
 }
 
+export interface UniversityDeadline {
+  id: string
+  title: string
+  subtitle: string
+  dateLabel: string // e.g., "In 14 Days" or "August 1st"
+  type: 'danger' | 'info' | 'warning'
+}
+
 export interface SystemFeeSettings {
   localStudentFee: number
   internationalStudentFee: number
+  deadlines?: UniversityDeadline[]
 }
 
 export type PermitActivityAction = 'print_permit' | 'download_permit' | 'create_permit' | 'view_permit'

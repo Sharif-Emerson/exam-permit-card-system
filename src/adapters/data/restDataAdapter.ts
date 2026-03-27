@@ -114,6 +114,7 @@ function toSystemFeeSettings(payload: unknown): SystemFeeSettings {
   return {
     localStudentFee: Number(record.local_student_fee ?? record.localStudentFee ?? 0),
     internationalStudentFee: Number(record.international_student_fee ?? record.internationalStudentFee ?? 0),
+    deadlines: Array.isArray(record.deadlines) ? record.deadlines : undefined,
   }
 }
 
@@ -355,6 +356,7 @@ export const restDataAdapter: DataAdapter = {
       body: JSON.stringify({
         local_student_fee: Number(values.localStudentFee.toFixed(2)),
         international_student_fee: Number(values.internationalStudentFee.toFixed(2)),
+        deadlines: values.deadlines,
       }),
     })
 
