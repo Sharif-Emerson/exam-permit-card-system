@@ -43,7 +43,7 @@ export default function Login() {
     setLoading(true)
     try {
       const user = await signIn(identifier, password)
-      navigate(user.role === 'admin' ? '/admin' : '/student')
+      navigate(user.role === 'admin' ? '/admin' : '/student', { replace: true })
     } catch (signInError) {
       const nextError = signInError instanceof Error ? signInError.message : 'Unable to sign in'
       setError(nextError)

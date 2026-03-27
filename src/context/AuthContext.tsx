@@ -127,13 +127,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    setLoading(true)
     if (!activeAuthAdapter.isConfigured) {
       setUser(null)
+      setLoading(false)
       return
     }
 
     await activeAuthAdapter.signOut()
     setUser(null)
+    setLoading(false)
   }
 
   async function refreshUser() {

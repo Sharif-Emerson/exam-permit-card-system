@@ -18,6 +18,7 @@ import { downloadPermitActivityCsv } from '../services/permitActivityExport'
 import { adminUpdateStudentProfile, clearStudentBalance, createStudentProfile, deleteStudentProfile, fetchAdminActivityLogsPage, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, restoreStudentProfile, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById } from '../services/profileService'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
 import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile } from '../types'
+import SignOutDialog from './SignOutDialog'
 
 type PaymentDrafts = Record<string, string>
 type ImportPreviewRow = {
@@ -348,6 +349,8 @@ export default function AdminPanel() {
   const [activeSection, setActiveSection] = useState<NavSection>('students')
   const [searchInputValue, setSearchInputValue] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [showSignOut, setShowSignOut] = useState(false) // 2. Add showSignOut state
+  const [signingOut, setSigningOut] = useState(false) // 2. Add signingOut state
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'outstanding'>('all')
   const [filterDepartment, setFilterDepartment] = useState<string>('')
   const [filterProgram, setFilterProgram] = useState<string>('')
@@ -1939,7 +1942,7 @@ export default function AdminPanel() {
           </div>
           <button
             type="button"
-            onClick={() => void signOut()}
+            onClick={() => setShowSignOut(true)} // 3. Replace signOut with setShowSignOut(true)
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
           >
             <LogOut className="h-4 w-4" />
@@ -2193,616 +2196,1472 @@ export default function AdminPanel() {
             onChange={(e) => void handleImportFile(e)}
           />
 
-          {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ DASHBOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          {activeSection === 'dashboard' && (
-            <div className="space-y-6">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-                  <p className="text-sm text-gray-500">Operational overview for {adminCapability.label.toLowerCase()}.</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                  <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Real-time refresh every 30s</span>
-                  <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Session timeout after 15 min inactivity</span>
-                  <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Last sync: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : 'Waiting'}</span>
-                </div>
-              </div>
-
-              {dashboardAlerts.length > 0 && (
-                <div className="grid gap-3 lg:grid-cols-3">
-                  {dashboardAlerts.map((alert) => (
-                    <div
-                      key={alert.id}
-                      className={`rounded-2xl border p-4 shadow-sm ${
-                        alert.tone === 'critical'
-                          ? 'border-red-200 bg-red-50'
-                          : alert.tone === 'warning'
-                            ? 'border-amber-200 bg-amber-50'
-                            : 'border-blue-200 bg-blue-50'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{alert.title}</p>
-                          <p className="mt-1 text-xs leading-5 text-gray-600">{alert.message}</p>
-                        </div>
-                        <Bell className="h-4 w-4 text-gray-400" />
-                      </div>
-                      {alert.actionLabel && alert.onAction && (
-                        <button
-                          type="button"
-                          onClick={alert.onAction}
-                          className="mt-3 rounded-lg border border-white/80 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                        >
-                          {alert.actionLabel}
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center justify-between mb-6">
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200"
-                      onClick={async () => {
-                        setRefreshing(true)
-                        await loadStudents()
-                        setRefreshing(false)
-                      }}
-                      aria-label="Refresh student list"
-                      disabled={refreshing}
-                    >
-                      {refreshing ? (
-                        <span className="flex items-center gap-2"><RefreshCcw className="w-4 h-4 animate-spin" />Refreshing...</span>
-                      ) : (
-                        <><RefreshCcw className="w-4 h-4" />Refresh</>
-                      )}
-                    </button>
-                  </div>
+          <div key={activeSection} style={{ animation: 'kiu-page-in 0.3s ease-out both' }}> {/* 4. Wrap activeSection renders */}
+            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ DASHBOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {activeSection === 'dashboard' && (
+              <div className="space-y-6">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                   <div>
-                    <h2 className="font-semibold text-gray-900">Quick Actions</h2>
-                    <p className="text-sm text-gray-500">High-frequency actions for permit operations, reporting, and alerts.</p>
+                    <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+                    <p className="text-sm text-gray-500">Operational overview for {adminCapability.label.toLowerCase()}.</p>
                   </div>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">Access scope: {adminCapability.label}</span>
-                </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {quickActions.map((action) => (
-                    <button
-                      key={action.key}
-                      type="button"
-                      disabled={action.disabled}
-                      onClick={action.action}
-                      className="rounded-2xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="text-emerald-600">{action.icon}</span>
-                        {action.disabled && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Restricted</span>}
-                      </div>
-                      <p className="mt-3 text-sm font-semibold text-gray-900">{action.label}</p>
-                      <p className="mt-1 text-xs leading-5 text-gray-500">{action.description}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Analytics cards */}
-              <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
-                <div className="rounded-xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Total Students</p>
-                    <Users className="h-5 w-5 text-blue-400" />
-                  </div>
-                  <p className="mt-2 text-3xl font-bold text-blue-700">{totalStudents}</p>
-                  <p className="mt-1 text-xs text-blue-400">enrolled accounts</p>
-                </div>
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Cleared</p>
-                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                  </div>
-                  <p className="mt-2 text-3xl font-bold text-emerald-700">{clearedStudents}</p>
-                  <p className="mt-1 text-xs text-emerald-400">fees fully paid</p>
-                </div>
-                <div className="rounded-xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-500">Outstanding</p>
-                    <FileSpreadsheet className="h-5 w-5 text-amber-400" />
-                  </div>
-                  <p className="mt-2 text-3xl font-bold text-amber-700">{outstandingStudents}</p>
-                  <p className="mt-1 text-xs text-amber-400">balance remaining</p>
-                </div>
-                <div className="rounded-xl border border-purple-100 bg-purple-50 p-5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-purple-500">Permit Events</p>
-                    <FileCheck className="h-5 w-5 text-purple-400" />
-                  </div>
-                  <p className="mt-2 text-3xl font-bold text-purple-700">{permitEventCount}</p>
-                  <p className="mt-1 text-xs text-purple-400">prints &amp; downloads</p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issued</p>
-                    <CreditCard className="h-5 w-5 text-slate-400" />
-                  </div>
-                  <p className="mt-2 text-3xl font-bold text-slate-800">{permitStatusCounts.issued}</p>
-                  <p className="mt-1 text-xs text-slate-500">active permits</p>
-                </div>
-                <div className="rounded-xl border border-rose-100 bg-rose-50 p-5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">Expired</p>
-                    <Shield className="h-5 w-5 text-rose-400" />
-                  </div>
-                  <p className="mt-2 text-3xl font-bold text-rose-700">{permitStatusCounts.expired}</p>
-                  <p className="mt-1 text-xs text-rose-400">past exam dates</p>
-                </div>
-              </div>
-
-              <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                  <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-                    <div>
-                      <h2 className="font-semibold text-gray-800">Pending Approvals</h2>
-                      <p className="text-xs text-gray-400">Students who still need clearance before permit issuance</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => navigate('students')}
-                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                    >
-                      Review list
-                    </button>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {students.filter((student) => student.feesBalance > 0).slice(0, 5).map((student) => (
-                      <div key={student.id} className="flex items-center justify-between gap-4 px-5 py-4">
-                        <div>
-                          <p className="font-medium text-gray-900">{student.name}</p>
-                          <p className="text-xs text-gray-400">{student.studentId} • {student.department ?? student.course}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-semibold text-red-600">${student.feesBalance.toFixed(2)}</p>
-                          <p className="text-xs text-gray-400">Remaining balance</p>
-                        </div>
-                      </div>
-                    ))}
-                    {students.filter((student) => student.feesBalance > 0).length === 0 && (
-                      <div className="px-5 py-8 text-center text-sm text-gray-400">No pending approvals at the moment.</div>
-                    )}
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Real-time refresh every 30s</span>
+                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Session timeout after 15 min inactivity</span>
+                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Last sync: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : 'Waiting'}</span>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                  <div className="border-b border-gray-100 px-5 py-4">
-                    <h2 className="font-semibold text-gray-800">Upcoming Exam Schedule</h2>
-                    <p className="text-xs text-gray-400">Next scheduled exams pulled from current permit assignments</p>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {upcomingExamEntries.slice(0, 5).map((item) => (
-                      <div key={`${item.student.id}-${item.exam.id}`} className="px-5 py-4">
+                {dashboardAlerts.length > 0 && (
+                  <div className="grid gap-3 lg:grid-cols-3">
+                    {dashboardAlerts.map((alert) => (
+                      <div
+                        key={alert.id}
+                        className={`rounded-2xl border p-4 shadow-sm ${
+                          alert.tone === 'critical'
+                            ? 'border-red-200 bg-red-50'
+                            : alert.tone === 'warning'
+                              ? 'border-amber-200 bg-amber-50'
+                              : 'border-blue-200 bg-blue-50'
+                        }`}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="font-medium text-gray-900">{item.exam.title}</p>
-                            <p className="text-xs text-gray-400">{item.student.name} • {item.student.studentId}</p>
+                            <p className="text-sm font-semibold text-gray-900">{alert.title}</p>
+                            <p className="mt-1 text-xs leading-5 text-gray-600">{alert.message}</p>
                           </div>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                            {new Date(item.exam.examDate).toLocaleDateString()}
-                          </span>
+                          <Bell className="h-4 w-4 text-gray-400" />
                         </div>
-                        <p className="mt-2 text-xs text-gray-500">{item.exam.examTime} • {item.exam.venue} • Seat {item.exam.seatNumber}</p>
+                        {alert.actionLabel && alert.onAction && (
+                          <button
+                            type="button"
+                            onClick={alert.onAction}
+                            className="mt-3 rounded-lg border border-white/80 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            {alert.actionLabel}
+                          </button>
+                        )}
                       </div>
                     ))}
-                    {upcomingExamEntries.length === 0 && (
-                      <div className="px-5 py-8 text-center text-sm text-gray-400">No scheduled exams are available yet.</div>
-                    )}
                   </div>
-                </div>
-              </div>
+                )}
 
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <h2 className="font-semibold text-gray-800">Permit Status Breakdown</h2>
-                    <FileCheck className="h-4 w-4 text-gray-400" />
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center justify-between mb-6">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200"
+                        onClick={async () => {
+                          setRefreshing(true)
+                          await loadStudents()
+                          setRefreshing(false)
+                        }}
+                        aria-label="Refresh student list"
+                        disabled={refreshing}
+                      >
+                        {refreshing ? (
+                          <span className="flex items-center gap-2"><RefreshCcw className="w-4 h-4 animate-spin" />Refreshing...</span>
+                        ) : (
+                          <><RefreshCcw className="w-4 h-4" />Refresh</>
+                        )}
+                      </button>
+                    </div>
+                    <div>
+                      <h2 className="font-semibold text-gray-900">Quick Actions</h2>
+                      <p className="text-sm text-gray-500">High-frequency actions for permit operations, reporting, and alerts.</p>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">Access scope: {adminCapability.label}</span>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-emerald-50 p-4 text-center">
-                      <p className="text-2xl font-bold text-emerald-700">{permitStatusCounts.issued}</p>
-                      <p className="mt-1 text-xs text-emerald-500">Issued</p>
-                    </div>
-                    <div className="rounded-xl bg-amber-50 p-4 text-center">
-                      <p className="text-2xl font-bold text-amber-700">{permitStatusCounts.pending}</p>
-                      <p className="mt-1 text-xs text-amber-500">Pending</p>
-                    </div>
-                    <div className="rounded-xl bg-rose-50 p-4 text-center">
-                      <p className="text-2xl font-bold text-rose-700">{permitStatusCounts.rejected}</p>
-                      <p className="mt-1 text-xs text-rose-500">Rejected</p>
-                    </div>
-                    <div className="rounded-xl bg-slate-100 p-4 text-center">
-                      <p className="text-2xl font-bold text-slate-700">{permitStatusCounts.expired}</p>
-                      <p className="mt-1 text-xs text-slate-500">Expired</p>
-                    </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {quickActions.map((action) => (
+                      <button
+                        key={action.key}
+                        type="button"
+                        disabled={action.disabled}
+                        onClick={action.action}
+                        className="rounded-2xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="text-emerald-600">{action.icon}</span>
+                          {action.disabled && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Restricted</span>}
+                        </div>
+                        <p className="mt-3 text-sm font-semibold text-gray-900">{action.label}</p>
+                        <p className="mt-1 text-xs leading-5 text-gray-500">{action.description}</p>
+                      </button>
+                    ))}
                   </div>
-                  <p className="mt-4 text-xs text-gray-400">Rejected permits are not currently tracked by the backend workflow, so this value remains informational until that state is added.</p>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <h2 className="font-semibold text-gray-800">Analytics &amp; Insights</h2>
-                    <BarChart2 className="h-4 w-4 text-gray-400" />
+                {/* Analytics cards */}
+                <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Total Students</p>
+                      <Users className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <p className="mt-2 text-3xl font-bold text-blue-700">{totalStudents}</p>
+                    <p className="mt-1 text-xs text-blue-400">enrolled accounts</p>
                   </div>
-                  <div className="mt-4 space-y-4">
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                      <p className="text-xs uppercase tracking-wide text-gray-400">Most At-Risk Department</p>
-                      <p className="mt-1 text-lg font-semibold text-gray-900">{busiestOutstandingDepartment?.[0] ?? 'No outstanding balances'}</p>
-                      <p className="text-xs text-gray-500">{busiestOutstandingDepartment ? `${busiestOutstandingDepartment[1]} student(s) still pending financial clearance.` : 'All currently loaded students are financially cleared.'}</p>
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Cleared</p>
+                      <CheckCircle2 className="h-5 w-5 text-emerald-400" />
                     </div>
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                      <p className="text-xs uppercase tracking-wide text-gray-400">Reminder Queue</p>
-                      <p className="mt-1 text-lg font-semibold text-gray-900">{outstandingStudents}</p>
-                      <p className="text-xs text-gray-500">Students who would receive fee reminders from the current in-app notification workflow.</p>
+                    <p className="mt-2 text-3xl font-bold text-emerald-700">{clearedStudents}</p>
+                    <p className="mt-1 text-xs text-emerald-400">fees fully paid</p>
+                  </div>
+                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-500">Outstanding</p>
+                      <FileSpreadsheet className="h-5 w-5 text-amber-400" />
                     </div>
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                      <p className="text-xs uppercase tracking-wide text-gray-400">Recent Reminder Activity</p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">{lastReminderAt ? new Date(lastReminderAt).toLocaleString() : 'No reminders queued in this session'}</p>
-                      <p className="text-xs text-gray-500">External email, SMS, and biometric integrations are not yet connected in this environment.</p>
+                    <p className="mt-2 text-3xl font-bold text-amber-700">{outstandingStudents}</p>
+                    <p className="mt-1 text-xs text-amber-400">balance remaining</p>
+                  </div>
+                  <div className="rounded-xl border border-purple-100 bg-purple-50 p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-purple-500">Permit Events</p>
+                      <FileCheck className="h-5 w-5 text-purple-400" />
                     </div>
+                    <p className="mt-2 text-3xl font-bold text-purple-700">{permitEventCount}</p>
+                    <p className="mt-1 text-xs text-purple-400">prints &amp; downloads</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issued</p>
+                      <CreditCard className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <p className="mt-2 text-3xl font-bold text-slate-800">{permitStatusCounts.issued}</p>
+                    <p className="mt-1 text-xs text-slate-500">active permits</p>
+                  </div>
+                  <div className="rounded-xl border border-rose-100 bg-rose-50 p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">Expired</p>
+                      <Shield className="h-5 w-5 text-rose-400" />
+                    </div>
+                    <p className="mt-2 text-3xl font-bold text-rose-700">{permitStatusCounts.expired}</p>
+                    <p className="mt-1 text-xs text-rose-400">past exam dates</p>
                   </div>
                 </div>
-              </div>
 
-              {/* Recent permit activity table */}
-              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-                  <h2 className="font-semibold text-gray-800">Recent Permit Activity</h2>
-                  <p className="text-xs text-gray-400">Showing {activityPageStart}-{activityPageEnd} of {activityTotalItems}</p>
-                  <button
-                    type="button"
-                    onClick={handleExportPermitActivity}
-                    disabled={!adminCapability.canExportReports || permitActivityLogs.length === 0}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Export CSV
-                  </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      <tr>
-                        <th className="px-5 py-3 text-left">Student</th>
-                        <th className="px-5 py-3 text-left">Action</th>
-                        <th className="px-5 py-3 text-left">Time</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {permitActivityLogs.slice(0, 8).map((log) => {
-                        const student = students.find((s) => s.id === log.targetProfileId)
-                        return (
-                          <tr key={log.id} className="hover:bg-gray-50">
-                            <td className="px-5 py-3 font-medium text-gray-800">{student?.name ?? log.targetProfileId}</td>
-                            <td className="px-5 py-3">
-                              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.action === 'print_permit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                                {log.action === 'print_permit' ? 'Printed' : 'Downloaded'}
-                              </span>
-                            </td>
-                            <td className="px-5 py-3 text-gray-500">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</td>
-                          </tr>
-                        )
-                      })}
-                      {permitActivityLogs.length === 0 && (
-                        <tr>
-                          <td className="px-5 py-6 text-center text-gray-400" colSpan={3}>No permit activity recorded yet.</td>
-                        </tr>
+                <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                      <div>
+                        <h2 className="font-semibold text-gray-800">Pending Approvals</h2>
+                        <p className="text-xs text-gray-400">Students who still need clearance before permit issuance</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate('students')}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                      >
+                        Review list
+                      </button>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {students.filter((student) => student.feesBalance > 0).slice(0, 5).map((student) => (
+                        <div key={student.id} className="flex items-center justify-between gap-4 px-5 py-4">
+                          <div>
+                            <p className="font-medium text-gray-900">{student.name}</p>
+                            <p className="text-xs text-gray-400">{student.studentId} • {student.department ?? student.course}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-red-600">${student.feesBalance.toFixed(2)}</p>
+                            <p className="text-xs text-gray-400">Remaining balance</p>
+                          </div>
+                        </div>
+                      ))}
+                      {students.filter((student) => student.feesBalance > 0).length === 0 && (
+                        <div className="px-5 py-8 text-center text-sm text-gray-400">No pending approvals at the moment.</div>
                       )}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3 text-xs text-gray-500">
-                  <span>Page {activityPage} of {activityTotalPages}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={activityPage <= 1}
-                      onClick={() => setActivityPage((current) => Math.max(current - 1, 1))}
-                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      type="button"
-                      disabled={activityPage >= activityTotalPages}
-                      onClick={() => setActivityPage((current) => Math.min(current + 1, activityTotalPages))}
-                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Next
-                    </button>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                  <div className="border-b border-gray-100 px-5 py-4">
-                    <h2 className="font-semibold text-gray-800">Audit Trail</h2>
-                    <p className="text-xs text-gray-400">Recent administrative actions captured by the backend</p>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {recentSystemActivity.map((log) => (
-                      <div key={log.id} className="flex items-start justify-between gap-3 px-5 py-4">
-                        <div>
-                          <p className="font-medium text-gray-900">{formatAdminActionLabel(log.action)}</p>
-                          <p className="text-xs text-gray-400">Actor: {log.adminId} • Target: {log.targetProfileId}</p>
+                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <div className="border-b border-gray-100 px-5 py-4">
+                      <h2 className="font-semibold text-gray-800">Upcoming Exam Schedule</h2>
+                      <p className="text-xs text-gray-400">Next scheduled exams pulled from current permit assignments</p>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {upcomingExamEntries.slice(0, 5).map((item) => (
+                        <div key={`${item.student.id}-${item.exam.id}`} className="px-5 py-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-medium text-gray-900">{item.exam.title}</p>
+                              <p className="text-xs text-gray-400">{item.student.name} • {item.student.studentId}</p>
+                            </div>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                              {new Date(item.exam.examDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-xs text-gray-500">{item.exam.examTime} • {item.exam.venue} • Seat {item.exam.seatNumber}</p>
                         </div>
-                        <span className="text-xs text-gray-400">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</span>
+                      ))}
+                      {upcomingExamEntries.length === 0 && (
+                        <div className="px-5 py-8 text-center text-sm text-gray-400">No scheduled exams are available yet.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <h2 className="font-semibold text-gray-800">Permit Status Breakdown</h2>
+                      <FileCheck className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div className="rounded-xl bg-emerald-50 p-4 text-center">
+                        <p className="text-2xl font-bold text-emerald-700">{permitStatusCounts.issued}</p>
+                        <p className="mt-1 text-xs text-emerald-500">Issued</p>
                       </div>
-                    ))}
-                    {recentSystemActivity.length === 0 && (
-                      <div className="px-5 py-8 text-center text-sm text-gray-400">No admin activity logs are available yet.</div>
-                    )}
+                      <div className="rounded-xl bg-amber-50 p-4 text-center">
+                        <p className="text-2xl font-bold text-amber-700">{permitStatusCounts.pending}</p>
+                        <p className="mt-1 text-xs text-amber-500">Pending</p>
+                      </div>
+                      <div className="rounded-xl bg-rose-50 p-4 text-center">
+                        <p className="text-2xl font-bold text-rose-700">{permitStatusCounts.rejected}</p>
+                        <p className="mt-1 text-xs text-rose-500">Rejected</p>
+                      </div>
+                      <div className="rounded-xl bg-slate-100 p-4 text-center">
+                        <p className="text-2xl font-bold text-slate-800">{permitStatusCounts.expired}</p>
+                        <p className="mt-1 text-xs text-slate-500">Expired</p>
+                      </div>
+                    </div>
+                    <p className="mt-4 text-xs text-gray-400">Rejected permits are not currently tracked by the backend workflow, so this value remains informational until that state is added.</p>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <h2 className="font-semibold text-gray-800">Analytics &amp; Insights</h2>
+                      <BarChart2 className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <div className="mt-4 space-y-4">
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <p className="text-xs uppercase tracking-wide text-gray-400">Most At-Risk Department</p>
+                        <p className="mt-1 text-lg font-semibold text-gray-900">{busiestOutstandingDepartment?.[0] ?? 'No outstanding balances'}</p>
+                        <p className="text-xs text-gray-500">{busiestOutstandingDepartment ? `${busiestOutstandingDepartment[1]} student(s) still pending financial clearance.` : 'All currently loaded students are financially cleared.'}</p>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <p className="text-xs uppercase tracking-wide text-gray-400">Reminder Queue</p>
+                        <p className="mt-1 text-lg font-semibold text-gray-900">{outstandingStudents}</p>
+                        <p className="text-xs text-gray-500">Students who would receive fee reminders from the current in-app notification workflow.</p>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <p className="text-xs uppercase tracking-wide text-gray-400">Recent Reminder Activity</p>
+                        <p className="mt-1 text-sm font-semibold text-gray-900">{lastReminderAt ? new Date(lastReminderAt).toLocaleString() : 'No reminders queued in this session'}</p>
+                        <p className="text-xs text-gray-500">External email, SMS, and biometric integrations are not yet connected in this environment.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
+                {/* Recent permit activity table */}
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                  <div className="border-b border-gray-100 px-5 py-4">
-                    <h2 className="font-semibold text-gray-800">Section Shortcuts</h2>
-                    <p className="text-xs text-gray-400">Jump into the areas available for this admin scope</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-3">
-                    {visibleNavItems
-                  .filter((n) => n.key !== 'dashboard')
-                  .map((item) => (
+                  <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                    <h2 className="font-semibold text-gray-800">Recent Permit Activity</h2>
+                    <p className="text-xs text-gray-400">Showing {activityPageStart}-{activityPageEnd} of {activityTotalItems}</p>
                     <button
-                      key={item.key}
                       type="button"
-                      onClick={() => navigate(item.key)}
-                      className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-emerald-300 hover:bg-emerald-50"
+                      onClick={handleExportPermitActivity}
+                      disabled={!adminCapability.canExportReports || permitActivityLogs.length === 0}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                     >
-                      <span className="text-emerald-600">{item.icon}</span>
-                      <span className="text-xs font-medium text-gray-700">{item.label}</span>
+                      <Download className="h-3.5 w-3.5" />
+                      Export CSV
                     </button>
-                  ))}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <tr>
+                          <th className="px-5 py-3 text-left">Student</th>
+                          <th className="px-5 py-3 text-left">Action</th>
+                          <th className="px-5 py-3 text-left">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {permitActivityLogs.slice(0, 8).map((log) => {
+                          const student = students.find((s) => s.id === log.targetProfileId)
+                          return (
+                            <tr key={log.id} className="hover:bg-gray-50">
+                              <td className="px-5 py-3 font-medium text-gray-800">{student?.name ?? log.targetProfileId}</td>
+                              <td className="px-5 py-3">
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.action === 'print_permit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                  {log.action === 'print_permit' ? 'Printed' : 'Downloaded'}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 text-gray-500">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</td>
+                            </tr>
+                          )
+                        })}
+                        {permitActivityLogs.length === 0 && (
+                          <tr>
+                            <td className="px-5 py-6 text-center text-gray-400" colSpan={3}>No permit activity recorded yet.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3 text-xs text-gray-500">
+                    <span>Page {activityPage} of {activityTotalPages}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={activityPage <= 1}
+                        onClick={() => setActivityPage((current) => Math.max(current - 1, 1))}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        type="button"
+                        disabled={activityPage >= activityTotalPages}
+                        onClick={() => setActivityPage((current) => Math.min(current + 1, activityTotalPages))}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <div className="border-b border-gray-100 px-5 py-4">
+                      <h2 className="font-semibold text-gray-800">Audit Trail</h2>
+                      <p className="text-xs text-gray-400">Recent administrative actions captured by the backend</p>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {recentSystemActivity.map((log) => (
+                        <div key={log.id} className="flex items-start justify-between gap-3 px-5 py-4">
+                          <div>
+                            <p className="font-medium text-gray-900">{formatAdminActionLabel(log.action)}</p>
+                            <p className="text-xs text-gray-400">Actor: {log.adminId} • Target: {log.targetProfileId}</p>
+                          </div>
+                          <span className="text-xs text-gray-400">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</span>
+                        </div>
+                      ))}
+                      {recentSystemActivity.length === 0 && (
+                        <div className="px-5 py-8 text-center text-sm text-gray-400">No admin activity logs are available yet.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <div className="border-b border-gray-100 px-5 py-4">
+                      <h2 className="font-semibold text-gray-800">Section Shortcuts</h2>
+                      <p className="text-xs text-gray-400">Jump into the areas available for this admin scope</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-3">
+                      {visibleNavItems
+                    .filter((n) => n.key !== 'dashboard')
+                    .map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => navigate(item.key)}
+                        className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-emerald-300 hover:bg-emerald-50"
+                      >
+                        <span className="text-emerald-600">{item.icon}</span>
+                        <span className="text-xs font-medium text-gray-700">{item.label}</span>
+                      </button>
+                    ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ STUDENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          {activeSection === 'students' && (
-            <div className="space-y-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Students</h1>
-                  <p className="text-sm text-gray-500">
-                    {showPrintedOnly
-                      ? `Showing ${filteredStudents.length} printed student(s) on this page out of ${totalItems} matched student record(s)`
-                      : `Showing ${pageStart}-${pageEnd} of ${totalItems} student(s)`}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 self-start">
-                  {canManageFinancials && (
-                    <button
-                      type="button"
-                      onClick={() => navigate('import')}
-                      className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
-                    >
-                      <FileUp className="h-3.5 w-3.5" />
-                      Open Bulk Import
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleOpenCreateStudent}
-                    disabled={!canManageStudentProfiles}
-                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    <Users className="h-3.5 w-3.5" />
-                    Add Student
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExportPermitActivity}
-                    disabled={!adminCapability.canExportReports || permitActivityLogs.length === 0}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Export CSV
-                  </button>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {(['all', 'paid', 'outstanding'] as const).map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => setFilterStatus(status)}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize ${
-                        filterStatus === status
-                          ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
-                          : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {status === 'all'
-                        ? `All (${totalStudents})`
-                        : status === 'paid'
-                          ? `Cleared (${clearedStudents})`
-                          : `Outstanding (${outstandingStudents})`}
-                    </button>
-                  ))}
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={showPrintedOnly}
-                      onChange={(e) => setShowPrintedOnly(e.target.checked)}
-                      className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600"
-                    />
-                    Show printed students only
-                  </label>
-                </div>
-              </div>
-
-              {hasActiveStudentFilters && (
-                <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ STUDENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {activeSection === 'students' && (
+              <div className="space-y-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-medium">Student filters are active</p>
-                    <p className="text-xs text-amber-800">
-                      {activeStudentFilterLabels.join(' • ')}
+                    <h1 className="text-xl font-bold text-gray-900">Students</h1>
+                    <p className="text-sm text-gray-500">
+                      {showPrintedOnly
+                        ? `Showing ${filteredStudents.length} printed student(s) on this page out of ${totalItems} matched student record(s)`
+                        : `Showing ${pageStart}-${pageEnd} of ${totalItems} student(s)`}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={resetStudentView}
-                    className="inline-flex items-center gap-2 self-start rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    Reset Student View
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2 self-start">
+                    {canManageFinancials && (
+                      <button
+                        type="button"
+                        onClick={() => navigate('import')}
+                        className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                      >
+                        <FileUp className="h-3.5 w-3.5" />
+                        Open Bulk Import
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleOpenCreateStudent}
+                      disabled={!canManageStudentProfiles}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      Add Student
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExportPermitActivity}
+                      disabled={!adminCapability.canExportReports || permitActivityLogs.length === 0}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Export CSV
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(['all', 'paid', 'outstanding'] as const).map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => setFilterStatus(status)}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize ${
+                          filterStatus === status
+                            ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                            : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {status === 'all'
+                          ? `All (${totalStudents})`
+                          : status === 'paid'
+                            ? `Cleared (${clearedStudents})`
+                            : `Outstanding (${outstandingStudents})`}
+                      </button>
+                    ))}
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={showPrintedOnly}
+                        onChange={(e) => setShowPrintedOnly(e.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600"
+                      />
+                      Show printed students only
+                    </label>
+                  </div>
                 </div>
-              )}
 
-              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      <tr>
-                        <th className="px-5 py-3 text-left">Student</th>
-                        <th className="px-5 py-3 text-left">Course</th>
-                        <th className="px-5 py-3 text-left">Expected Fees</th>
-                        <th className="px-5 py-3 text-left">Amount Received</th>
-                        <th className="px-5 py-3 text-left">Remaining Balance</th>
-                        <th className="px-5 py-3 text-left">Status</th>
-                        <th className="px-5 py-3 text-left">Permit Activity</th>
-                        <th className="px-5 py-3 text-left">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {filteredStudents.map((student) => {
-                        const summary = getStudentPrintSummary(student.id)
-                        return (
-                          <tr key={student.id} className="hover:bg-gray-50">
-                            <td className="px-5 py-3">
-                              <div className="font-medium text-gray-900">{student.name}</div>
-                              <div className="text-xs text-gray-400">{student.studentId} Â· {student.email}</div>
-                              <div className="mt-1 text-xs text-gray-400">
-                                {student.program ?? student.course} Â· {student.department ?? 'No department'}
-                              </div>
-                            </td>
-                            <td className="px-5 py-3 text-gray-600">
-                              <div>{student.course || '-'}</div>
-                              <div className="text-xs text-gray-400">{student.semester ?? 'No semester set'}</div>
-                            </td>
-                            <td className="px-5 py-3 text-gray-700">${student.totalFees.toFixed(2)}</td>
-                            <td className="px-5 py-3 font-medium text-green-700">${student.amountPaid.toFixed(2)}</td>
-                            <td className="px-5 py-3">
-                              <span className={`font-semibold ${student.feesBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                ${student.feesBalance.toFixed(2)}
-                              </span>
-                            </td>
-                            <td className="px-5 py-3">
-                              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${student.feesBalance === 0 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                                {student.feesBalance === 0 ? 'Cleared' : 'Outstanding'}
-                              </span>
-                            </td>
-                            <td className="px-5 py-3 text-xs text-gray-500">
-                              {summary.total === 0
-                                ? 'None'
-                                : (
-                                  <>
-                                    {summary.printCount > 0 && <span>Printed {summary.printCount}x</span>}
-                                    {summary.printCount > 0 && summary.downloadCount > 0 && <span>, </span>}
-                                    {summary.downloadCount > 0 && <span>Downloaded {summary.downloadCount}x</span>}
-                                  </>
-                                )}
-                            </td>
-                            <td className="px-5 py-3">
-                              <form
-                                className="flex items-center gap-2"
-                                onSubmit={(e) => void handleSavePayment(e, student)}
-                              >
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={paymentDrafts[student.id] ?? ''}
-                                  onChange={(e) =>
-                                    setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
-                                  }
-                                  aria-label={`Amount received for ${student.name}`}
-                                  title={`Amount received for ${student.name}`}
-                                  placeholder="Received"
-                                  className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
-                                />
-                                <button
-                                  type="submit"
-                                  disabled={!canManageFinancials || savingId === student.id}
-                                  title="Save received amount"
-                                  className="rounded bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
+                {hasActiveStudentFilters && (
+                  <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium">Student filters are active</p>
+                      <p className="text-xs text-amber-800">
+                        {activeStudentFilterLabels.join(' • ')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={resetStudentView}
+                      className="inline-flex items-center gap-2 self-start rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Reset Student View
+                    </button>
+                  </div>
+                )}
+
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <tr>
+                          <th className="px-5 py-3 text-left">Student</th>
+                          <th className="px-5 py-3 text-left">Course</th>
+                          <th className="px-5 py-3 text-left">Expected Fees</th>
+                          <th className="px-5 py-3 text-left">Amount Received</th>
+                          <th className="px-5 py-3 text-left">Remaining Balance</th>
+                          <th className="px-5 py-3 text-left">Status</th>
+                          <th className="px-5 py-3 text-left">Permit Activity</th>
+                          <th className="px-5 py-3 text-left">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {filteredStudents.map((student) => {
+                          const summary = getStudentPrintSummary(student.id)
+                          return (
+                            <tr key={student.id} className="hover:bg-gray-50">
+                              <td className="px-5 py-3">
+                                <div className="font-medium text-gray-900">{student.name}</div>
+                                <div className="text-xs text-gray-400">{student.studentId} Â· {student.email}</div>
+                                <div className="mt-1 text-xs text-gray-400">
+                                  {student.program ?? student.course} Â· {student.department ?? 'No department'}
+                                </div>
+                              </td>
+                              <td className="px-5 py-3 text-gray-600">
+                                <div>{student.course || '-'}</div>
+                                <div className="text-xs text-gray-400">{student.semester ?? 'No semester set'}</div>
+                              </td>
+                              <td className="px-5 py-3 text-gray-700">${student.totalFees.toFixed(2)}</td>
+                              <td className="px-5 py-3 font-medium text-green-700">${student.amountPaid.toFixed(2)}</td>
+                              <td className="px-5 py-3">
+                                <span className={`font-semibold ${student.feesBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                  ${student.feesBalance.toFixed(2)}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3">
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${student.feesBalance === 0 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                  {student.feesBalance === 0 ? 'Cleared' : 'Outstanding'}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 text-xs text-gray-500">
+                                {summary.total === 0
+                                  ? 'None'
+                                  : (
+                                    <>
+                                      {summary.printCount > 0 && <span>Printed {summary.printCount}x</span>}
+                                      {summary.printCount > 0 && summary.downloadCount > 0 && <span>, </span>}
+                                      {summary.downloadCount > 0 && <span>Downloaded {summary.downloadCount}x</span>}
+                                    </>
+                                  )}
+                              </td>
+                              <td className="px-5 py-3">
+                                <form
+                                  className="flex items-center gap-2"
+                                  onSubmit={(e) => void handleSavePayment(e, student)}
                                 >
-                                  <Save className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={!canManageFinancials || savingId === student.id || student.feesBalance === 0}
-                                  onClick={() => void handleClear(student)}
-                                  title="Mark fully paid"
-                                  className="rounded bg-green-500 p-1.5 text-white hover:bg-green-600 disabled:opacity-50"
-                                >
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                </button>
-                              </form>
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <button
-                                  type="button"
-                                  disabled={!canManageStudentProfiles}
-                                  onClick={() => handleEditStudent(student)}
-                                  title="Edit student profile"
-                                  className="rounded bg-blue-500 p-1.5 text-white hover:bg-blue-600 disabled:opacity-50"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={!canManageStudentProfiles || grantingPrintAccessId === student.id}
-                                  onClick={() => void handleGrantPrintAccess(student)}
-                                  title="Grant one extra permit print for this month"
-                                  aria-label={`Grant one extra permit print for ${student.name}`}
-                                  className="rounded bg-indigo-500 p-1.5 text-white hover:bg-indigo-600 disabled:opacity-50"
-                                >
-                                  <Shield className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={!canManageStudentProfiles || deletingStudentId === student.id}
-                                  onClick={() => void handleDeleteStudentProfile(student)}
-                                  title="Remove student profile"
-                                  aria-label={`Remove ${student.name}`}
-                                  className="rounded bg-red-500 p-1.5 text-white hover:bg-red-600 disabled:opacity-50"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={paymentDrafts[student.id] ?? ''}
+                                    onChange={(e) =>
+                                      setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
+                                    }
+                                    aria-label={`Amount received for ${student.name}`}
+                                    title={`Amount received for ${student.name}`}
+                                    placeholder="Received"
+                                    className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                                  />
+                                  <button
+                                    type="submit"
+                                    disabled={!canManageFinancials || savingId === student.id}
+                                    title="Save received amount"
+                                    className="rounded bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
+                                  >
+                                    <Save className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!canManageFinancials || savingId === student.id || student.feesBalance === 0}
+                                    onClick={() => void handleClear(student)}
+                                    title="Mark fully paid"
+                                    className="rounded bg-green-500 p-1.5 text-white hover:bg-green-600 disabled:opacity-50"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </form>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={!canManageStudentProfiles}
+                                    onClick={() => handleEditStudent(student)}
+                                    title="Edit student profile"
+                                    className="rounded bg-blue-500 p-1.5 text-white hover:bg-blue-600 disabled:opacity-50"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!canManageStudentProfiles || grantingPrintAccessId === student.id}
+                                    onClick={() => void handleGrantPrintAccess(student)}
+                                    title="Grant one extra permit print for this month"
+                                    aria-label={`Grant one extra permit print for ${student.name}`}
+                                    className="rounded bg-indigo-500 p-1.5 text-white hover:bg-indigo-600 disabled:opacity-50"
+                                  >
+                                    <Shield className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!canManageStudentProfiles || deletingStudentId === student.id}
+                                    onClick={() => void handleDeleteStudentProfile(student)}
+                                    title="Remove student profile"
+                                    aria-label={`Remove ${student.name}`}
+                                    className="rounded bg-red-500 p-1.5 text-white hover:bg-red-600 disabled:opacity-50"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                        {filteredStudents.length === 0 && (
+                          <tr>
+                            <td className="px-5 py-8 text-center text-gray-400" colSpan={8}>
+                              {searchQuery
+                                ? `No students match "${searchQuery}"`
+                                : showPrintedOnly
+                                  ? 'No students have printed a permit yet.'
+                                  : 'No students found.'}
                             </td>
                           </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3 text-sm text-gray-600">
+                    <span>Page {page} of {totalPages}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={page <= 1 || loading}
+                        onClick={() => setPage((current) => Math.max(current - 1, 1))}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        type="button"
+                        disabled={page >= totalPages || loading}
+                        onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-amber-200 bg-white shadow-sm">
+                  <div className="border-b border-amber-100 px-5 py-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h2 className="font-semibold text-gray-800">Trash</h2>
+                        <p className="text-xs text-gray-400">Deleted student records stay here until the retention period expires.</p>
+                      </div>
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                        {trashedStudents.length} in trash
+                      </span>
+                    </div>
+                  </div>
+                  {trashedStudents.length === 0 ? (
+                    <div className="px-5 py-8 text-sm text-gray-400">No deleted student records are waiting in trash.</div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {trashedStudents.map((student) => (
+                        <div key={student.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="font-medium text-gray-900">{student.name}</p>
+                            <p className="text-xs text-gray-400">{student.studentId ?? 'No registration number'} · {student.email}</p>
+                            {(() => {
+                              const daysUntilPurge = getDaysUntilDate(student.purgeAfterAt)
+
+                              return (
+                            <p className="mt-1 text-xs text-gray-500">
+                              Deleted {new Date(student.deletedAt).toLocaleString()} · auto-purge {new Date(student.purgeAfterAt).toLocaleDateString()}
+                              {daysUntilPurge !== null ? ` • ${daysUntilPurge} day${daysUntilPurge === 1 ? '' : 's'} left` : ''}
+                            </p>
+                              )
+                            })()}
+                          </div>
+                          <button
+                            type="button"
+                            disabled={!canManageStudentProfiles || restoringStudentId === student.id}
+                            onClick={() => handleRestoreStudentProfile(student)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                          >
+                            <RefreshCcw className="h-4 w-4" />
+                            {restoringStudentId === student.id ? 'Restoring…' : 'Restore'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'support' && (
+              <div className="space-y-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h1 className="text-xl font-bold text-gray-900">Support Requests</h1>
+                    <p className="text-sm text-gray-500">Review student help tickets, update statuses, and send replies from the admin desk.</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Open or in progress: {openSupportRequestCount}</span>
+                    <button
+                      type="button"
+                      onClick={() => void loadSupportRequestQueue()}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                      <RefreshCcw className="h-3.5 w-3.5" />
+                      Refresh Queue
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-500">Open</p>
+                    <p className="mt-2 text-3xl font-bold text-amber-700">{supportRequests.filter((request) => request.status === 'open').length}</p>
+                    <p className="mt-1 text-xs text-amber-500">Awaiting the first admin response</p>
+                  </div>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">In Progress</p>
+                    <p className="mt-2 text-3xl font-bold text-blue-700">{supportRequests.filter((request) => request.status === 'in_progress').length}</p>
+                    <p className="mt-1 text-xs text-blue-500">Active cases still being worked</p>
+                  </div>
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Resolved</p>
+                    <p className="mt-2 text-3xl font-bold text-emerald-700">{supportRequests.filter((request) => request.status === 'resolved').length}</p>
+                    <p className="mt-1 text-xs text-emerald-500">Closed with an admin response</p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-gray-100 px-5 py-4">
+                    <h2 className="font-semibold text-gray-800">Support Queue</h2>
+                    <p className="text-xs text-gray-400">Student-submitted requests routed to administrators with support permissions.</p>
+                  </div>
+                  {loadingSupportRequests ? (
+                    <div className="px-5 py-10 text-center text-sm text-gray-400">Loading support requests...</div>
+                  ) : supportRequests.length === 0 ? (
+                    <div className="px-5 py-10 text-center text-sm text-gray-400">No support requests have been submitted yet.</div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {supportRequests.map((request) => {
+                        const isSaving = savingSupportRequestId === request.id
+
+                        return (
+                          <div key={request.id} className="px-5 py-5">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="text-base font-semibold text-gray-900">{request.subject}</h3>
+                                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                    request.status === 'resolved'
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : request.status === 'in_progress'
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'bg-amber-100 text-amber-700'
+                                  }`}>
+                                    {request.status.replace('_', ' ')}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-sm text-gray-500">{request.studentName} • {request.registrationNumber || request.studentEmail}</p>
+                                <p className="mt-1 text-xs text-gray-400">Submitted {new Date(request.createdAt).toLocaleString()} • Updated {new Date(request.updatedAt).toLocaleString()}</p>
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                <p>Email: {request.studentEmail}</p>
+                                <p>Request ID: {request.id}</p>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
+                              {request.message}
+                            </div>
+
+                            <div className="mt-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_auto] lg:items-end">
+                              <div>
+                                <label htmlFor={`support-status-${request.id}`} className="mb-2 block text-sm font-medium text-gray-700">Status</label>
+                                <select
+                                  id={`support-status-${request.id}`}
+                                  value={supportStatusDrafts[request.id] ?? request.status}
+                                  onChange={(event) => setSupportStatusDrafts((current) => ({
+                                    ...current,
+                                    [request.id]: event.target.value as SupportRequestStatus,
+                                  }))}
+                                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                >
+                                  <option value="open">Open</option>
+                                  <option value="in_progress">In progress</option>
+                                  <option value="resolved">Resolved</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label htmlFor={`support-reply-${request.id}`} className="mb-2 block text-sm font-medium text-gray-700">Admin reply</label>
+                                <textarea
+                                  id={`support-reply-${request.id}`}
+                                  rows={3}
+                                  value={supportReplyDrafts[request.id] ?? request.adminReply}
+                                  onChange={(event) => setSupportReplyDrafts((current) => ({
+                                    ...current,
+                                    [request.id]: event.target.value,
+                                  }))}
+                                  placeholder="Explain the resolution or next action for the student."
+                                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => void handleSaveSupportRequest(request.id)}
+                                disabled={isSaving}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                <Save className="h-4 w-4" />
+                                {isSaving ? 'Saving...' : 'Save Update'}
+                              </button>
+                            </div>
+                          </div>
                         )
                       })}
-                      {filteredStudents.length === 0 && (
-                        <tr>
-                          <td className="px-5 py-8 text-center text-gray-400" colSpan={8}>
-                            {searchQuery
-                              ? `No students match "${searchQuery}"`
-                              : showPrintedOnly
-                                ? 'No students have printed a permit yet.'
-                                : 'No students found.'}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3 text-sm text-gray-600">
+              </div>
+            )}
+
+            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ PERMIT ACTIVITY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {activeSection === 'permits' && (
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-xl font-bold text-gray-900">Permit Activity</h1>
+                    <p className="text-sm text-gray-500">Showing {activityPageStart}-{activityPageEnd} of {activityTotalItems} event(s)</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleExportPermitActivity}
+                    disabled={permitActivityLogs.length === 0}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export CSV
+                  </button>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <tr>
+                          <th className="px-5 py-3 text-left">Student</th>
+                          <th className="px-5 py-3 text-left">Student ID</th>
+                          <th className="px-5 py-3 text-left">Action</th>
+                          <th className="px-5 py-3 text-left">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {permitActivityLogs.map((log) => {
+                          const student = students.find((s) => s.id === log.targetProfileId)
+                          return (
+                            <tr key={log.id} className="hover:bg-gray-50">
+                              <td className="px-5 py-3 font-medium text-gray-800">{student?.name ?? log.targetProfileId}</td>
+                              <td className="px-5 py-3 text-gray-500">{student?.studentId ?? '-'}</td>
+                              <td className="px-5 py-3">
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.action === 'print_permit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                  {log.action === 'print_permit' ? 'Printed' : 'Downloaded'}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 text-gray-500">
+                                {log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                        {permitActivityLogs.length === 0 && (
+                          <tr>
+                            <td className="px-5 py-8 text-center text-gray-400" colSpan={4}>No permit activity has been recorded yet.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3 text-sm text-gray-600">
+                    <span>Page {activityPage} of {activityTotalPages}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={activityPage <= 1}
+                        onClick={() => setActivityPage((current) => Math.max(current - 1, 1))}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        type="button"
+                        disabled={activityPage >= activityTotalPages}
+                        onClick={() => setActivityPage((current) => Math.min(current + 1, activityTotalPages))}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ BULK IMPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {activeSection === 'import' && (
+              <div className="space-y-5">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Bulk Financial Import</h1>
+                  <p className="text-sm text-gray-500">Upload a .xlsx or .csv file to update student financial data in bulk.</p>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <p className="max-w-sm text-sm text-gray-600">
+                      Use columns such as{' '}
+                      <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_name</code>,{' '}
+                      <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_id</code> or{' '}
+                      <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">email</code>, plus{' '}
+                      <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">amount_paid</code> and optional{' '}
+                      <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">total_fees</code>.
+                    </p>
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <button
+                        type="button"
+                        disabled={!canManageFinancials}
+                        onClick={downloadFinancialImportTemplate}
+                        className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download Template
+                      </button>
+                      <label
+                        htmlFor="admin-financial-import-input"
+                        className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white ${!canManageFinancials ? 'cursor-not-allowed bg-emerald-300' : importing ? 'cursor-pointer bg-emerald-400' : dragActive ? 'cursor-pointer bg-emerald-700' : 'cursor-pointer bg-emerald-600 hover:bg-emerald-700'}`}
+                        onDragEnter={handleDragEnter}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => void handleDrop(e)}
+                      >
+                        <Upload className="h-4 w-4" />
+                        {importing ? 'Importing...' : dragActive ? 'Drop File Here' : 'Upload Spreadsheet'}
+                      </label>
+                    </div>
+                  </div>
+
+                  {importPreviewRows.length > 0 && (
+                    <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <h3 className="font-semibold text-gray-800">Import Preview</h3>
+                          <p className="text-xs text-gray-500">
+                            {importPreviewRows.length} row(s) from {importFileName}. â€” {pendingImportUpdates.length} row(s) are ready to apply.
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={clearImportPreview}
+                            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                          >
+                            Clear
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!canManageFinancials || importing || pendingImportUpdates.length === 0}
+                            onClick={() => void handleApplyImport()}
+                            className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+                          >
+                            Apply Import
+                          </button>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                          <thead className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            <tr>
+                              <th className="px-3 py-2 text-left">Row</th>
+                              <th className="px-3 py-2 text-left">Key</th>
+                              <th className="px-3 py-2 text-left">Student</th>
+                              <th className="px-3 py-2 text-left">Amount Received</th>
+                              <th className="px-3 py-2 text-left">Expected Fees</th>
+                              <th className="px-3 py-2 text-left">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {importPreviewRows.slice(0, 12).map((row) => (
+                              <tr key={`${row.rowNumber}-${row.matcher}`} className="bg-white">
+                                <td className="px-3 py-2 text-gray-500">{row.rowNumber}</td>
+                                <td className="px-3 py-2 text-gray-700">{row.matcher}</td>
+                                <td className="px-3 py-2 text-gray-700">{row.studentName ?? '-'}</td>
+                                <td className="px-3 py-2 text-gray-700">
+                                  {typeof row.amountPaid === 'number' ? `$${row.amountPaid.toFixed(2)}` : '-'}
+                                </td>
+                                <td className="px-3 py-2 text-gray-700">
+                                  {typeof row.totalFees === 'number' ? `$${row.totalFees.toFixed(2)}` : '-'}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <span className={`rounded px-2 py-1 text-xs font-medium ${
+                                    row.status === 'ready'
+                                      ? 'bg-green-100 text-green-700'
+                                      : row.status === 'create'
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'bg-red-100 text-red-700'
+                                  }`}>
+                                    {row.status === 'ready' ? 'Update' : row.status === 'create' ? 'Create' : (row.reason ?? 'Skipped')}
+                                  </span>
+                                  {row.status !== 'ready' && row.reason ? (
+                                    <p className="mt-1 max-w-xs text-[11px] text-gray-500">{row.reason}</p>
+                                  ) : null}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {importPreviewRows.length > 12 && (
+                          <p className="mt-2 text-xs text-gray-400">Showing the first 12 rows.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ REPORTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {activeSection === 'reports' && (
+              <div className="space-y-6">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h1 className="text-xl font-bold text-gray-900">Reports &amp; Analytics</h1>
+                    <p className="text-sm text-gray-500">Financial clearance breakdown, permit trends, and exportable operational summaries.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={!adminCapability.canExportReports}
+                      onClick={handleExportDashboardCsv}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <Download className="h-4 w-4" />
+                      Export CSV
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!adminCapability.canExportReports}
+                      onClick={handleExportDashboardExcel}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <FileSpreadsheet className="h-4 w-4" />
+                      Export Excel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!adminCapability.canExportReports}
+                      onClick={handlePrintDashboardReport}
+                      className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      Print / Save PDF
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {/* Bar chart: students by course */}
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <h2 className="mb-4 font-semibold text-gray-800">Students by Course</h2>
+                    {courseNames.length === 0 ? (
+                      <p className="text-sm text-gray-400">No course data available.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {courseNames.map((course) => {
+                          const { total, cleared } = courseBreakdown[course]
+                          const barPct = Math.round((total / maxCourseCount) * 100)
+                          return (
+                            <div key={course}>
+                              <div className="mb-1 flex items-center justify-between text-xs text-gray-600">
+                                <span className="truncate font-medium">{course}</span>
+                                <span>{cleared}/{total} cleared</span>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="h-5 rounded-full bg-gray-100 p-1">
+                                  <progress
+                                    className="payment-progress payment-progress-clear h-full"
+                                    max={total || 1}
+                                    value={cleared}
+                                    aria-label={`${course} clearance progress`}
+                                    title={`${cleared} of ${total} students cleared in ${course}`}
+                                  />
+                                </div>
+                                <p className="text-[11px] text-gray-400">Relative class size: {barPct}% of the largest course cohort</p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                        Cleared
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />
+                        Outstanding
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Donut chart: clearance ratio */}
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <h2 className="mb-4 font-semibold text-gray-800">Clearance Status</h2>
+                    {totalStudents === 0 ? (
+                      <p className="text-sm text-gray-400">No student data yet.</p>
+                    ) : (
+                      (() => {
+                        const r = 60
+                        const cx = 80
+                        const cy = 80
+                        const clearedAngle = (clearedStudents / totalStudents) * 360
+                        function toCartesian(angleDeg: number) {
+                          const rad = ((angleDeg - 90) * Math.PI) / 180
+                          return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }
+                        }
+                        const start = toCartesian(0)
+                        const end = toCartesian(clearedAngle)
+                        const largeArc = clearedAngle > 180 ? 1 : 0
+                        const dCleared =
+                          clearedStudents === totalStudents
+                            ? `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`
+                            : `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y} Z`
+                        return (
+                          <div className="flex items-center gap-6">
+                            <svg width="160" height="160" viewBox="0 0 160 160">
+                              <circle cx={cx} cy={cy} r={r} fill="#fef3c7" />
+                              <path d={dCleared} fill="#10b981" />
+                              <circle cx={cx} cy={cy} r={r * 0.55} fill="white" />
+                              <text x={cx} y={cy - 5} textAnchor="middle" fontSize="18" fontWeight="bold" fill="#111827">
+                                {Math.round((clearedStudents / totalStudents) * 100)}%
+                              </text>
+                              <text x={cx} y={cy + 12} textAnchor="middle" fontSize="9" fill="#6b7280">cleared</text>
+                            </svg>
+                            <div className="space-y-3 text-sm">
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-gray-400">Cleared</p>
+                                <p className="text-2xl font-bold text-emerald-600">{clearedStudents}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-gray-400">Outstanding</p>
+                                <p className="text-2xl font-bold text-amber-500">{outstandingStudents}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-gray-400">Total</p>
+                                <p className="text-2xl font-bold text-gray-700">{totalStudents}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })()
+                    )}
+                  </div>
+
+                  {/* Permit issuance summary */}
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
+                    <h2 className="mb-4 font-semibold text-gray-800">Permit Issuance Summary</h2>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                      <div className="rounded-lg bg-blue-50 p-4 text-center">
+                        <p className="text-2xl font-bold text-blue-700">
+                          {permitActivityLogs.filter((l) => l.action === 'print_permit').length}
+                        </p>
+                        <p className="mt-1 text-xs text-blue-500">Total Prints</p>
+                      </div>
+                      <div className="rounded-lg bg-purple-50 p-4 text-center">
+                        <p className="text-2xl font-bold text-purple-700">
+                          {permitActivityLogs.filter((l) => l.action === 'download_permit').length}
+                        </p>
+                        <p className="mt-1 text-xs text-purple-500">Total Downloads</p>
+                      </div>
+                      <div className="rounded-lg bg-emerald-50 p-4 text-center">
+                        <p className="text-2xl font-bold text-emerald-700">
+                          {new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
+                        </p>
+                        <p className="mt-1 text-xs text-emerald-500">Students with Activity</p>
+                      </div>
+                      <div className="rounded-lg bg-gray-50 p-4 text-center">
+                        <p className="text-2xl font-bold text-gray-700">
+                          {totalStudents - new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">No Activity Yet</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
+                    <h2 className="mb-4 font-semibold text-gray-800">Integration Readiness</h2>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                        <p className="text-xs uppercase tracking-wide text-emerald-500">Student Database Sync</p>
+                        <p className="mt-1 text-sm font-semibold text-emerald-800">Available Through REST Profiles</p>
+                      </div>
+                      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                        <p className="text-xs uppercase tracking-wide text-emerald-500">Exam Scheduling</p>
+                        <p className="mt-1 text-sm font-semibold text-emerald-800">Available Through Assigned Exams</p>
+                      </div>
+                      <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">
+                        <p className="text-xs uppercase tracking-wide text-amber-500">Notification Gateway</p>
+                        <p className="mt-1 text-sm font-semibold text-amber-800">In-App Only In This Demo</p>
+                      </div>
+                      <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+                        <p className="text-xs uppercase tracking-wide text-blue-500">Payment Verification</p>
+                        <p className="mt-1 text-sm font-semibold text-blue-800">Supported Through Financial Updates</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── PERMIT CARDS ── */}
+            {activeSection === 'permit-cards' && (
+              <div className="space-y-5">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Permit Card Management</h1>
+                  <p className="text-sm text-gray-500">
+                    {clearedStudents} cleared student(s) eligible to print. {outstandingStudents} still have outstanding balances.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="text-xs font-medium text-gray-700">
+                    Department:
+                    <input
+                      type="text"
+                      value={filterDepartment}
+                      onChange={e => setFilterDepartment(e.target.value)}
+                      placeholder="Filter by department"
+                      className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-gray-700">
+                    Program:
+                    <input
+                      type="text"
+                      value={filterProgram}
+                      onChange={e => setFilterProgram(e.target.value)}
+                      placeholder="Filter by program"
+                      className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!canManageStudentProfiles || bulkPrinting || filteredStudents.every((student) => student.feesBalance > 0)}
+                    onClick={() => void handleBulkPrintCleared()}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    {bulkPrinting ? 'Preparing print...' : 'Print Cleared Permits On This Page'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canManageStudentProfiles}
+                    onClick={handleSelectClearedStudentsOnPage}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {allClearedStudentsOnPageSelected ? 'Clear Page Selection' : 'Select Cleared Students On This Page'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canManageStudentProfiles || bulkPrinting || clearedSelectedPermitStudents.length === 0}
+                    onClick={() => void handlePrintSelectedPermits()}
+                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Print Selected Permits ({clearedSelectedPermitStudents.length})
+                  </button>
+                  <span className="text-xs text-gray-500">Bulk printing uses the currently loaded page and current filters, including department and program.</span>
+                </div>
+
+                {/* Summary strip */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center">
+                    <p className="text-2xl font-bold text-emerald-700">{clearedStudents}</p>
+                    <p className="mt-1 text-xs text-emerald-500">Cleared — Can Print</p>
+                  </div>
+                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-center">
+                    <p className="text-2xl font-bold text-amber-700">{outstandingStudents}</p>
+                    <p className="mt-1 text-xs text-amber-500">Outstanding — Blocked</p>
+                  </div>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-center">
+                    <p className="text-2xl font-bold text-blue-700">
+                      {new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
+                    </p>
+                    <p className="mt-1 text-xs text-blue-500">Have Printed / Downloaded</p>
+                  </div>
+                </div>
+
+                {/* Card grid */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {students.map((student) => {
+                    const summary = getStudentPrintSummary(student.id)
+                    const cleared = student.feesBalance === 0
+
+                    return (
+                      <div
+                        key={student.id}
+                        className={`rounded-xl border bg-white p-5 shadow-sm ${
+                          cleared ? 'border-emerald-200' : 'border-amber-200'
+                        }`}
+                      >
+                        <div className="mb-3 flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedPermitStudentIds.includes(student.id)}
+                              onChange={() => togglePermitSelection(student.id)}
+                              disabled={!canManageStudentProfiles}
+                              className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600"
+                              aria-label={`Select ${student.name} for bulk permit printing`}
+                            />
+                            <div className="min-w-0">
+                            <p className="truncate font-semibold text-gray-900">{student.name}</p>
+                            <p className="text-xs text-gray-400">{student.studentId} - {student.course || 'No course'}</p>
+                            <p className="text-xs text-gray-400">{student.program ?? 'No program'} - {student.semester ?? 'No semester'}</p>
+                            </div>
+                          </div>
+                          <span
+                            className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              cleared ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            {cleared ? 'Cleared' : 'Blocked'}
+                          </span>
+                        </div>
+
+                        <div
+                          className={`mb-3 flex h-24 items-center justify-center rounded-lg ${
+                            cleared ? 'bg-gray-50' : 'bg-amber-50'
+                          }`}
+                        >
+                          {cleared ? (
+                            <div className="flex flex-col items-center gap-1 text-gray-400">
+                              <QrCode className="h-10 w-10" />
+                              <span className="text-[10px]">QR generated on permit</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-1 text-amber-400">
+                              <Shield className="h-10 w-10" />
+                              <span className="text-[10px] font-medium">Remaining: ${student.feesBalance.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mb-3 flex items-center gap-2">
+                          <form
+                            className="flex items-center gap-2"
+                            onSubmit={(e) => void handleSavePayment(e, student)}
+                          >
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={paymentDrafts[student.id] ?? ''}
+                              onChange={(e) =>
+                                setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
+                              }
+                              aria-label={`Amount received for ${student.name}`}
+                              title={`Amount received for ${student.name}`}
+                              placeholder="Received"
+                              className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                            />
+                            <button
+                              type="submit"
+                              disabled={!canManageFinancials || savingId === student.id}
+                              title="Save received amount"
+                              aria-label={`Save received amount for ${student.name}`}
+                              className="rounded bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              <Save className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!canManageFinancials || savingId === student.id || student.feesBalance === 0}
+                              onClick={() => void handleClear(student)}
+                              title="Mark fully paid"
+                              aria-label={`Mark ${student.name} as fully paid`}
+                              className="rounded bg-green-500 p-1.5 text-white hover:bg-green-600 disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            </button>
+                          </form>
+                          <button
+                            type="button"
+                            disabled={!canManageStudentProfiles}
+                            onClick={() => handleEditStudent(student)}
+                            title="Edit student profile"
+                            aria-label={`Edit profile for ${student.name}`}
+                            className="rounded bg-blue-500 p-1.5 text-white hover:bg-blue-600 disabled:opacity-50"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!canManageStudentProfiles || grantingPrintAccessId === student.id}
+                            onClick={() => void handleGrantPrintAccess(student)}
+                            title="Grant one extra permit print for this month"
+                            aria-label={`Grant one extra permit print for ${student.name}`}
+                            className="rounded bg-indigo-500 p-1.5 text-white hover:bg-indigo-600 disabled:opacity-50"
+                          >
+                            <Shield className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!canManageStudentProfiles || deletingStudentId === student.id}
+                            onClick={() => void handleDeleteStudentProfile(student)}
+                            title="Remove student profile"
+                            aria-label={`Remove ${student.name}`}
+                            className="rounded bg-red-500 p-1.5 text-white hover:bg-red-600 disabled:opacity-50"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="mb-3">
+                          <div className="mb-1 flex justify-between text-xs text-gray-500">
+                            <span>Received: ${student.amountPaid.toFixed(2)}</span>
+                            <span>Expected: ${student.totalFees.toFixed(2)}</span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                            <progress
+                              className={`payment-progress h-full ${cleared ? 'payment-progress-clear' : 'payment-progress-warning'}`}
+                              max={student.totalFees > 0 ? student.totalFees : 1}
+                              value={Math.min(student.amountPaid, student.totalFees > 0 ? student.totalFees : 1)}
+                              aria-label={`${student.name} payment completion`}
+                              title={`${Math.round(getPaymentCompletionPercent(student.amountPaid, student.totalFees))}% fees paid`}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5">
+                          {student.courseUnits && student.courseUnits.length > 0 && (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
+                              {student.courseUnits.length} course units
+                            </span>
+                          )}
+                          {summary.printCount > 0 && (
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                              Printed {summary.printCount}x
+                            </span>
+                          )}
+                          {summary.downloadCount > 0 && (
+                            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">
+                              Downloaded {summary.downloadCount}x
+                            </span>
+                          )}
+                          {summary.total === 0 && (
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-400">
+                              No print activity
+                            </span>
+                          )}
+                          {summary.lastAt && (
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-400">
+                              Last: {new Date(summary.lastAt).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {students.length === 0 && (
+                    <div className="col-span-3 rounded-xl border border-dashed border-gray-300 py-12 text-center text-sm text-gray-400">
+                      No students found.
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm text-gray-600 shadow-sm">
                   <span>Page {page} of {totalPages}</span>
                   <div className="flex items-center gap-2">
                     <button
@@ -2824,1109 +3683,163 @@ export default function AdminPanel() {
                   </div>
                 </div>
               </div>
+            )}
 
-              <div className="rounded-xl border border-amber-200 bg-white shadow-sm">
-                <div className="border-b border-amber-100 px-5 py-4">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h2 className="font-semibold text-gray-800">Trash</h2>
-                      <p className="text-xs text-gray-400">Deleted student records stay here until the retention period expires.</p>
-                    </div>
-                    <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-                      {trashedStudents.length} in trash
-                    </span>
-                  </div>
+            {/* ── SETTINGS ── */}
+            {activeSection === 'settings' && (
+              <div className="space-y-6">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Settings</h1>
+                  <p className="text-sm text-gray-500">System configuration and account information.</p>
                 </div>
-                {trashedStudents.length === 0 ? (
-                  <div className="px-5 py-8 text-sm text-gray-400">No deleted student records are waiting in trash.</div>
-                ) : (
-                  <div className="divide-y divide-gray-100">
-                    {trashedStudents.map((student) => (
-                      <div key={student.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+
+                {canManageFinancials && (
+                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <div className="border-b border-gray-100 px-6 py-4">
+                      <h2 className="font-semibold text-gray-800">Fee Structure</h2>
+                      <p className="mt-1 text-xs text-gray-400">Set the default exam clearance fees used for new local and international student accounts.</p>
+                    </div>
+                    <form className="space-y-4 px-6 py-5" onSubmit={(event) => void handleSaveFeeStructure(event)}>
+                      <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                          <p className="font-medium text-gray-900">{student.name}</p>
-                          <p className="text-xs text-gray-400">{student.studentId ?? 'No registration number'} · {student.email}</p>
-                          {(() => {
-                            const daysUntilPurge = getDaysUntilDate(student.purgeAfterAt)
-
-                            return (
-                          <p className="mt-1 text-xs text-gray-500">
-                            Deleted {new Date(student.deletedAt).toLocaleString()} · auto-purge {new Date(student.purgeAfterAt).toLocaleDateString()}
-                            {daysUntilPurge !== null ? ` • ${daysUntilPurge} day${daysUntilPurge === 1 ? '' : 's'} left` : ''}
-                          </p>
-                            )
-                          })()}
-                        </div>
-                        <button
-                          type="button"
-                          disabled={!canManageStudentProfiles || restoringStudentId === student.id}
-                          onClick={() => handleRestoreStudentProfile(student)}
-                          className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
-                        >
-                          <RefreshCcw className="h-4 w-4" />
-                          {restoringStudentId === student.id ? 'Restoring…' : 'Restore'}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'support' && (
-            <div className="space-y-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Support Requests</h1>
-                  <p className="text-sm text-gray-500">Review student help tickets, update statuses, and send replies from the admin desk.</p>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Open or in progress: {openSupportRequestCount}</span>
-                  <button
-                    type="button"
-                    onClick={() => void loadSupportRequestQueue()}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                  >
-                    <RefreshCcw className="h-3.5 w-3.5" />
-                    Refresh Queue
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-3">
-                <div className="rounded-xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-500">Open</p>
-                  <p className="mt-2 text-3xl font-bold text-amber-700">{supportRequests.filter((request) => request.status === 'open').length}</p>
-                  <p className="mt-1 text-xs text-amber-500">Awaiting the first admin response</p>
-                </div>
-                <div className="rounded-xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">In Progress</p>
-                  <p className="mt-2 text-3xl font-bold text-blue-700">{supportRequests.filter((request) => request.status === 'in_progress').length}</p>
-                  <p className="mt-1 text-xs text-blue-500">Active cases still being worked</p>
-                </div>
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Resolved</p>
-                  <p className="mt-2 text-3xl font-bold text-emerald-700">{supportRequests.filter((request) => request.status === 'resolved').length}</p>
-                  <p className="mt-1 text-xs text-emerald-500">Closed with an admin response</p>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="border-b border-gray-100 px-5 py-4">
-                  <h2 className="font-semibold text-gray-800">Support Queue</h2>
-                  <p className="text-xs text-gray-400">Student-submitted requests routed to administrators with support permissions.</p>
-                </div>
-                {loadingSupportRequests ? (
-                  <div className="px-5 py-10 text-center text-sm text-gray-400">Loading support requests...</div>
-                ) : supportRequests.length === 0 ? (
-                  <div className="px-5 py-10 text-center text-sm text-gray-400">No support requests have been submitted yet.</div>
-                ) : (
-                  <div className="divide-y divide-gray-100">
-                    {supportRequests.map((request) => {
-                      const isSaving = savingSupportRequestId === request.id
-
-                      return (
-                        <div key={request.id} className="px-5 py-5">
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="text-base font-semibold text-gray-900">{request.subject}</h3>
-                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                                  request.status === 'resolved'
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : request.status === 'in_progress'
-                                      ? 'bg-blue-100 text-blue-700'
-                                      : 'bg-amber-100 text-amber-700'
-                                }`}>
-                                  {request.status.replace('_', ' ')}
-                                </span>
-                              </div>
-                              <p className="mt-1 text-sm text-gray-500">{request.studentName} • {request.registrationNumber || request.studentEmail}</p>
-                              <p className="mt-1 text-xs text-gray-400">Submitted {new Date(request.createdAt).toLocaleString()} • Updated {new Date(request.updatedAt).toLocaleString()}</p>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              <p>Email: {request.studentEmail}</p>
-                              <p>Request ID: {request.id}</p>
-                            </div>
-                          </div>
-
-                          <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
-                            {request.message}
-                          </div>
-
-                          <div className="mt-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_auto] lg:items-end">
-                            <div>
-                              <label htmlFor={`support-status-${request.id}`} className="mb-2 block text-sm font-medium text-gray-700">Status</label>
-                              <select
-                                id={`support-status-${request.id}`}
-                                value={supportStatusDrafts[request.id] ?? request.status}
-                                onChange={(event) => setSupportStatusDrafts((current) => ({
-                                  ...current,
-                                  [request.id]: event.target.value as SupportRequestStatus,
-                                }))}
-                                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                              >
-                                <option value="open">Open</option>
-                                <option value="in_progress">In progress</option>
-                                <option value="resolved">Resolved</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label htmlFor={`support-reply-${request.id}`} className="mb-2 block text-sm font-medium text-gray-700">Admin reply</label>
-                              <textarea
-                                id={`support-reply-${request.id}`}
-                                rows={3}
-                                value={supportReplyDrafts[request.id] ?? request.adminReply}
-                                onChange={(event) => setSupportReplyDrafts((current) => ({
-                                  ...current,
-                                  [request.id]: event.target.value,
-                                }))}
-                                placeholder="Explain the resolution or next action for the student."
-                                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => void handleSaveSupportRequest(request.id)}
-                              disabled={isSaving}
-                              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                            >
-                              <Save className="h-4 w-4" />
-                              {isSaving ? 'Saving...' : 'Save Update'}
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ PERMIT ACTIVITY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          {activeSection === 'permits' && (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Permit Activity</h1>
-                  <p className="text-sm text-gray-500">Showing {activityPageStart}-{activityPageEnd} of {activityTotalItems} event(s)</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleExportPermitActivity}
-                  disabled={permitActivityLogs.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
-                >
-                  <Download className="h-4 w-4" />
-                  Export CSV
-                </button>
-              </div>
-
-              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      <tr>
-                        <th className="px-5 py-3 text-left">Student</th>
-                        <th className="px-5 py-3 text-left">Student ID</th>
-                        <th className="px-5 py-3 text-left">Action</th>
-                        <th className="px-5 py-3 text-left">Time</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {permitActivityLogs.map((log) => {
-                        const student = students.find((s) => s.id === log.targetProfileId)
-                        return (
-                          <tr key={log.id} className="hover:bg-gray-50">
-                            <td className="px-5 py-3 font-medium text-gray-800">{student?.name ?? log.targetProfileId}</td>
-                            <td className="px-5 py-3 text-gray-500">{student?.studentId ?? '-'}</td>
-                            <td className="px-5 py-3">
-                              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.action === 'print_permit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                                {log.action === 'print_permit' ? 'Printed' : 'Downloaded'}
-                              </span>
-                            </td>
-                            <td className="px-5 py-3 text-gray-500">
-                              {log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                      {permitActivityLogs.length === 0 && (
-                        <tr>
-                          <td className="px-5 py-8 text-center text-gray-400" colSpan={4}>No permit activity has been recorded yet.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3 text-sm text-gray-600">
-                  <span>Page {activityPage} of {activityTotalPages}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={activityPage <= 1}
-                      onClick={() => setActivityPage((current) => Math.max(current - 1, 1))}
-                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      type="button"
-                      disabled={activityPage >= activityTotalPages}
-                      onClick={() => setActivityPage((current) => Math.min(current + 1, activityTotalPages))}
-                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ BULK IMPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          <div className={activeSection !== 'import' ? 'hidden' : 'block'}>
-            <div className="space-y-5">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Bulk Financial Import</h1>
-                <p className="text-sm text-gray-500">Upload a .xlsx or .csv file to update student financial data in bulk.</p>
-              </div>
-
-              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <p className="max-w-sm text-sm text-gray-600">
-                    Use columns such as{' '}
-                    <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_name</code>,{' '}
-                    <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_id</code> or{' '}
-                    <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">email</code>, plus{' '}
-                    <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">amount_paid</code> and optional{' '}
-                    <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">total_fees</code>.
-                  </p>
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <button
-                      type="button"
-                      disabled={!canManageFinancials}
-                      onClick={downloadFinancialImportTemplate}
-                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      <Download className="h-4 w-4" />
-                      Download Template
-                    </button>
-                    <label
-                      htmlFor="admin-financial-import-input"
-                      className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white ${!canManageFinancials ? 'cursor-not-allowed bg-emerald-300' : importing ? 'cursor-pointer bg-emerald-400' : dragActive ? 'cursor-pointer bg-emerald-700' : 'cursor-pointer bg-emerald-600 hover:bg-emerald-700'}`}
-                      onDragEnter={handleDragEnter}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => void handleDrop(e)}
-                    >
-                      <Upload className="h-4 w-4" />
-                      {importing ? 'Importing...' : dragActive ? 'Drop File Here' : 'Upload Spreadsheet'}
-                    </label>
-                  </div>
-                </div>
-
-                {importPreviewRows.length > 0 && (
-                  <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-800">Import Preview</h3>
-                        <p className="text-xs text-gray-500">
-                          {importPreviewRows.length} row(s) from {importFileName}. â€” {pendingImportUpdates.length} row(s) are ready to apply.
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={clearImportPreview}
-                          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                        >
-                          Clear
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!canManageFinancials || importing || pendingImportUpdates.length === 0}
-                          onClick={() => void handleApplyImport()}
-                          className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-                        >
-                          Apply Import
-                        </button>
-                      </div>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm">
-                        <thead className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                          <tr>
-                            <th className="px-3 py-2 text-left">Row</th>
-                            <th className="px-3 py-2 text-left">Key</th>
-                            <th className="px-3 py-2 text-left">Student</th>
-                            <th className="px-3 py-2 text-left">Amount Received</th>
-                            <th className="px-3 py-2 text-left">Expected Fees</th>
-                            <th className="px-3 py-2 text-left">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {importPreviewRows.slice(0, 12).map((row) => (
-                            <tr key={`${row.rowNumber}-${row.matcher}`} className="bg-white">
-                              <td className="px-3 py-2 text-gray-500">{row.rowNumber}</td>
-                              <td className="px-3 py-2 text-gray-700">{row.matcher}</td>
-                              <td className="px-3 py-2 text-gray-700">{row.studentName ?? '-'}</td>
-                              <td className="px-3 py-2 text-gray-700">
-                                {typeof row.amountPaid === 'number' ? `$${row.amountPaid.toFixed(2)}` : '-'}
-                              </td>
-                              <td className="px-3 py-2 text-gray-700">
-                                {typeof row.totalFees === 'number' ? `$${row.totalFees.toFixed(2)}` : '-'}
-                              </td>
-                              <td className="px-3 py-2">
-                                <span className={`rounded px-2 py-1 text-xs font-medium ${
-                                  row.status === 'ready'
-                                    ? 'bg-green-100 text-green-700'
-                                    : row.status === 'create'
-                                      ? 'bg-blue-100 text-blue-700'
-                                      : 'bg-red-100 text-red-700'
-                               }`}>
-                                  {row.status === 'ready' ? 'Update' : row.status === 'create' ? 'Create' : (row.reason ?? 'Skipped')}
-                                </span>
-                                {row.status !== 'ready' && row.reason ? (
-                                  <p className="mt-1 max-w-xs text-[11px] text-gray-500">{row.reason}</p>
-                                ) : null}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {importPreviewRows.length > 12 && (
-                        <p className="mt-2 text-xs text-gray-400">Showing the first 12 rows.</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ REPORTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          {activeSection === 'reports' && (
-            <div className="space-y-6">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Reports &amp; Analytics</h1>
-                  <p className="text-sm text-gray-500">Financial clearance breakdown, permit trends, and exportable operational summaries.</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={!adminCapability.canExportReports}
-                    onClick={handleExportDashboardCsv}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <Download className="h-4 w-4" />
-                    Export CSV
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!adminCapability.canExportReports}
-                    onClick={handleExportDashboardExcel}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <FileSpreadsheet className="h-4 w-4" />
-                    Export Excel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!adminCapability.canExportReports}
-                    onClick={handlePrintDashboardReport}
-                    className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    <CreditCard className="h-4 w-4" />
-                    Print / Save PDF
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid gap-6 lg:grid-cols-2">
-                {/* Bar chart: students by course */}
-                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <h2 className="mb-4 font-semibold text-gray-800">Students by Course</h2>
-                  {courseNames.length === 0 ? (
-                    <p className="text-sm text-gray-400">No course data available.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {courseNames.map((course) => {
-                        const { total, cleared } = courseBreakdown[course]
-                        const barPct = Math.round((total / maxCourseCount) * 100)
-                        return (
-                          <div key={course}>
-                            <div className="mb-1 flex items-center justify-between text-xs text-gray-600">
-                              <span className="truncate font-medium">{course}</span>
-                              <span>{cleared}/{total} cleared</span>
-                            </div>
-                            <div className="space-y-1">
-                              <div className="h-5 rounded-full bg-gray-100 p-1">
-                                <progress
-                                  className="payment-progress payment-progress-clear h-full"
-                                  max={total || 1}
-                                  value={cleared}
-                                  aria-label={`${course} clearance progress`}
-                                  title={`${cleared} of ${total} students cleared in ${course}`}
-                                />
-                              </div>
-                              <p className="text-[11px] text-gray-400">Relative class size: {barPct}% of the largest course cohort</p>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                  <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                      Cleared
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />
-                      Outstanding
-                    </span>
-                  </div>
-                </div>
-
-                {/* Donut chart: clearance ratio */}
-                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <h2 className="mb-4 font-semibold text-gray-800">Clearance Status</h2>
-                  {totalStudents === 0 ? (
-                    <p className="text-sm text-gray-400">No student data yet.</p>
-                  ) : (
-                    (() => {
-                      const r = 60
-                      const cx = 80
-                      const cy = 80
-                      const clearedAngle = (clearedStudents / totalStudents) * 360
-                      function toCartesian(angleDeg: number) {
-                        const rad = ((angleDeg - 90) * Math.PI) / 180
-                        return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }
-                      }
-                      const start = toCartesian(0)
-                      const end = toCartesian(clearedAngle)
-                      const largeArc = clearedAngle > 180 ? 1 : 0
-                      const dCleared =
-                        clearedStudents === totalStudents
-                          ? `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`
-                          : `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y} Z`
-                      return (
-                        <div className="flex items-center gap-6">
-                          <svg width="160" height="160" viewBox="0 0 160 160">
-                            <circle cx={cx} cy={cy} r={r} fill="#fef3c7" />
-                            <path d={dCleared} fill="#10b981" />
-                            <circle cx={cx} cy={cy} r={r * 0.55} fill="white" />
-                            <text x={cx} y={cy - 5} textAnchor="middle" fontSize="18" fontWeight="bold" fill="#111827">
-                              {Math.round((clearedStudents / totalStudents) * 100)}%
-                            </text>
-                            <text x={cx} y={cy + 12} textAnchor="middle" fontSize="9" fill="#6b7280">cleared</text>
-                          </svg>
-                          <div className="space-y-3 text-sm">
-                            <div>
-                              <p className="text-xs uppercase tracking-wide text-gray-400">Cleared</p>
-                              <p className="text-2xl font-bold text-emerald-600">{clearedStudents}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase tracking-wide text-gray-400">Outstanding</p>
-                              <p className="text-2xl font-bold text-amber-500">{outstandingStudents}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase tracking-wide text-gray-400">Total</p>
-                              <p className="text-2xl font-bold text-gray-700">{totalStudents}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })()
-                  )}
-                </div>
-
-                {/* Permit issuance summary */}
-                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
-                  <h2 className="mb-4 font-semibold text-gray-800">Permit Issuance Summary</h2>
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    <div className="rounded-lg bg-blue-50 p-4 text-center">
-                      <p className="text-2xl font-bold text-blue-700">
-                        {permitActivityLogs.filter((l) => l.action === 'print_permit').length}
-                      </p>
-                      <p className="mt-1 text-xs text-blue-500">Total Prints</p>
-                    </div>
-                    <div className="rounded-lg bg-purple-50 p-4 text-center">
-                      <p className="text-2xl font-bold text-purple-700">
-                        {permitActivityLogs.filter((l) => l.action === 'download_permit').length}
-                      </p>
-                      <p className="mt-1 text-xs text-purple-500">Total Downloads</p>
-                    </div>
-                    <div className="rounded-lg bg-emerald-50 p-4 text-center">
-                      <p className="text-2xl font-bold text-emerald-700">
-                        {new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
-                      </p>
-                      <p className="mt-1 text-xs text-emerald-500">Students with Activity</p>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 p-4 text-center">
-                      <p className="text-2xl font-bold text-gray-700">
-                        {totalStudents - new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">No Activity Yet</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
-                  <h2 className="mb-4 font-semibold text-gray-800">Integration Readiness</h2>
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-                      <p className="text-xs uppercase tracking-wide text-emerald-500">Student Database Sync</p>
-                      <p className="mt-1 text-sm font-semibold text-emerald-800">Available Through REST Profiles</p>
-                    </div>
-                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-                      <p className="text-xs uppercase tracking-wide text-emerald-500">Exam Scheduling</p>
-                      <p className="mt-1 text-sm font-semibold text-emerald-800">Available Through Assigned Exams</p>
-                    </div>
-                    <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">
-                      <p className="text-xs uppercase tracking-wide text-amber-500">Notification Gateway</p>
-                      <p className="mt-1 text-sm font-semibold text-amber-800">In-App Only In This Demo</p>
-                    </div>
-                    <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-                      <p className="text-xs uppercase tracking-wide text-blue-500">Payment Verification</p>
-                      <p className="mt-1 text-sm font-semibold text-blue-800">Supported Through Financial Updates</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── PERMIT CARDS ── */}
-          {activeSection === 'permit-cards' && (
-            <div className="space-y-5">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Permit Card Management</h1>
-                <p className="text-sm text-gray-500">
-                  {clearedStudents} cleared student(s) eligible to print. {outstandingStudents} still have outstanding balances.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="text-xs font-medium text-gray-700">
-                  Department:
-                  <input
-                    type="text"
-                    value={filterDepartment}
-                    onChange={e => setFilterDepartment(e.target.value)}
-                    placeholder="Filter by department"
-                    className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
-                  />
-                </label>
-                <label className="text-xs font-medium text-gray-700">
-                  Program:
-                  <input
-                    type="text"
-                    value={filterProgram}
-                    onChange={e => setFilterProgram(e.target.value)}
-                    placeholder="Filter by program"
-                    className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
-                  />
-                </label>
-                <button
-                  type="button"
-                  disabled={!canManageStudentProfiles || bulkPrinting || filteredStudents.every((student) => student.feesBalance > 0)}
-                  onClick={() => void handleBulkPrintCleared()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <CreditCard className="h-4 w-4" />
-                  {bulkPrinting ? 'Preparing print...' : 'Print Cleared Permits On This Page'}
-                </button>
-                <button
-                  type="button"
-                  disabled={!canManageStudentProfiles}
-                  onClick={handleSelectClearedStudentsOnPage}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {allClearedStudentsOnPageSelected ? 'Clear Page Selection' : 'Select Cleared Students On This Page'}
-                </button>
-                <button
-                  type="button"
-                  disabled={!canManageStudentProfiles || bulkPrinting || clearedSelectedPermitStudents.length === 0}
-                  onClick={() => void handlePrintSelectedPermits()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  <CreditCard className="h-4 w-4" />
-                  Print Selected Permits ({clearedSelectedPermitStudents.length})
-                </button>
-                <span className="text-xs text-gray-500">Bulk printing uses the currently loaded page and current filters, including department and program.</span>
-              </div>
-
-              {/* Summary strip */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center">
-                  <p className="text-2xl font-bold text-emerald-700">{clearedStudents}</p>
-                  <p className="mt-1 text-xs text-emerald-500">Cleared — Can Print</p>
-                </div>
-                <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-center">
-                  <p className="text-2xl font-bold text-amber-700">{outstandingStudents}</p>
-                  <p className="mt-1 text-xs text-amber-500">Outstanding — Blocked</p>
-                </div>
-                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-center">
-                  <p className="text-2xl font-bold text-blue-700">
-                    {new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
-                  </p>
-                  <p className="mt-1 text-xs text-blue-500">Have Printed / Downloaded</p>
-                </div>
-              </div>
-
-              {/* Card grid */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {students.map((student) => {
-                  const summary = getStudentPrintSummary(student.id)
-                  const cleared = student.feesBalance === 0
-
-                  return (
-                    <div
-                      key={student.id}
-                      className={`rounded-xl border bg-white p-5 shadow-sm ${
-                        cleared ? 'border-emerald-200' : 'border-amber-200'
-                      }`}
-                    >
-                      <div className="mb-3 flex items-start justify-between gap-2">
-                        <div className="flex min-w-0 items-start gap-3">
+                          <label htmlFor="fee-settings-local" className="mb-2 block text-sm font-medium text-gray-700">Local student fee</label>
                           <input
-                            type="checkbox"
-                            checked={selectedPermitStudentIds.includes(student.id)}
-                            onChange={() => togglePermitSelection(student.id)}
-                            disabled={!canManageStudentProfiles}
-                            className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600"
-                            aria-label={`Select ${student.name} for bulk permit printing`}
-                          />
-                          <div className="min-w-0">
-                          <p className="truncate font-semibold text-gray-900">{student.name}</p>
-                          <p className="text-xs text-gray-400">{student.studentId} - {student.course || 'No course'}</p>
-                          <p className="text-xs text-gray-400">{student.program ?? 'No program'} - {student.semester ?? 'No semester'}</p>
-                          </div>
-                        </div>
-                        <span
-                          className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            cleared ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                          }`}
-                        >
-                          {cleared ? 'Cleared' : 'Blocked'}
-                        </span>
-                      </div>
-
-                      <div
-                        className={`mb-3 flex h-24 items-center justify-center rounded-lg ${
-                          cleared ? 'bg-gray-50' : 'bg-amber-50'
-                        }`}
-                      >
-                        {cleared ? (
-                          <div className="flex flex-col items-center gap-1 text-gray-400">
-                            <QrCode className="h-10 w-10" />
-                            <span className="text-[10px]">QR generated on permit</span>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center gap-1 text-amber-400">
-                            <Shield className="h-10 w-10" />
-                            <span className="text-[10px] font-medium">Remaining: ${student.feesBalance.toFixed(2)}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="mb-3 flex items-center gap-2">
-                        <form
-                          className="flex items-center gap-2"
-                          onSubmit={(e) => void handleSavePayment(e, student)}
-                        >
-                          <input
+                            id="fee-settings-local"
                             type="number"
                             min="0"
                             step="0.01"
-                            value={paymentDrafts[student.id] ?? ''}
-                            onChange={(e) =>
-                              setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
-                            }
-                            aria-label={`Amount received for ${student.name}`}
-                            title={`Amount received for ${student.name}`}
-                            placeholder="Received"
-                            className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                            value={feeSettingsDraft.localStudentFee}
+                            onChange={(event) => setFeeSettingsDraft((current) => ({ ...current, localStudentFee: event.target.value }))}
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                           />
-                          <button
-                            type="submit"
-                            disabled={!canManageFinancials || savingId === student.id}
-                            title="Save received amount"
-                            aria-label={`Save received amount for ${student.name}`}
-                            className="rounded bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
-                          >
-                            <Save className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!canManageFinancials || savingId === student.id || student.feesBalance === 0}
-                            onClick={() => void handleClear(student)}
-                            title="Mark fully paid"
-                            aria-label={`Mark ${student.name} as fully paid`}
-                            className="rounded bg-green-500 p-1.5 text-white hover:bg-green-600 disabled:opacity-50"
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                          </button>
-                        </form>
-                        <button
-                          type="button"
-                          disabled={!canManageStudentProfiles}
-                          onClick={() => handleEditStudent(student)}
-                          title="Edit student profile"
-                          aria-label={`Edit profile for ${student.name}`}
-                          className="rounded bg-blue-500 p-1.5 text-white hover:bg-blue-600 disabled:opacity-50"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!canManageStudentProfiles || grantingPrintAccessId === student.id}
-                          onClick={() => void handleGrantPrintAccess(student)}
-                          title="Grant one extra permit print for this month"
-                          aria-label={`Grant one extra permit print for ${student.name}`}
-                          className="rounded bg-indigo-500 p-1.5 text-white hover:bg-indigo-600 disabled:opacity-50"
-                        >
-                          <Shield className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!canManageStudentProfiles || deletingStudentId === student.id}
-                          onClick={() => void handleDeleteStudentProfile(student)}
-                          title="Remove student profile"
-                          aria-label={`Remove ${student.name}`}
-                          className="rounded bg-red-500 p-1.5 text-white hover:bg-red-600 disabled:opacity-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-
-                      <div className="mb-3">
-                        <div className="mb-1 flex justify-between text-xs text-gray-500">
-                          <span>Received: ${student.amountPaid.toFixed(2)}</span>
-                          <span>Expected: ${student.totalFees.toFixed(2)}</span>
                         </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                          <progress
-                            className={`payment-progress h-full ${cleared ? 'payment-progress-clear' : 'payment-progress-warning'}`}
-                            max={student.totalFees > 0 ? student.totalFees : 1}
-                            value={Math.min(student.amountPaid, student.totalFees > 0 ? student.totalFees : 1)}
-                            aria-label={`${student.name} payment completion`}
-                            title={`${Math.round(getPaymentCompletionPercent(student.amountPaid, student.totalFees))}% fees paid`}
+                        <div>
+                          <label htmlFor="fee-settings-international" className="mb-2 block text-sm font-medium text-gray-700">International student fee</label>
+                          <input
+                            id="fee-settings-international"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={feeSettingsDraft.internationalStudentFee}
+                            onChange={(event) => setFeeSettingsDraft((current) => ({ ...current, internationalStudentFee: event.target.value }))}
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                           />
                         </div>
                       </div>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        {student.courseUnits && student.courseUnits.length > 0 && (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
-                            {student.courseUnits.length} course units
-                          </span>
-                        )}
-                        {summary.printCount > 0 && (
-                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
-                            Printed {summary.printCount}x
-                          </span>
-                        )}
-                        {summary.downloadCount > 0 && (
-                          <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">
-                            Downloaded {summary.downloadCount}x
-                          </span>
-                        )}
-                        {summary.total === 0 && (
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-400">
-                            No print activity
-                          </span>
-                        )}
-                        {summary.lastAt && (
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-400">
-                            Last: {new Date(summary.lastAt).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-                {students.length === 0 && (
-                  <div className="col-span-3 rounded-xl border border-dashed border-gray-300 py-12 text-center text-sm text-gray-400">
-                    No students found.
+                      <button
+                        type="submit"
+                        disabled={savingFeeSettings}
+                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        <Save className="h-4 w-4" />
+                        {savingFeeSettings ? 'Saving...' : 'Save fee structure'}
+                      </button>
+                    </form>
                   </div>
                 )}
-              </div>
-              <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm text-gray-600 shadow-sm">
-                <span>Page {page} of {totalPages}</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={page <= 1 || loading}
-                    onClick={() => setPage((current) => Math.max(current - 1, 1))}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    disabled={page >= totalPages || loading}
-                    onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* ── SETTINGS ── */}
-          {activeSection === 'settings' && (
-            <div className="space-y-6">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Settings</h1>
-                <p className="text-sm text-gray-500">System configuration and account information.</p>
-              </div>
-
-              {canManageFinancials && (
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-100 px-6 py-4">
-                    <h2 className="font-semibold text-gray-800">Fee Structure</h2>
-                    <p className="mt-1 text-xs text-gray-400">Set the default exam clearance fees used for new local and international student accounts.</p>
+                    <h2 className="font-semibold text-gray-800">Account Settings</h2>
+                    <p className="mt-1 text-xs text-gray-400">Update your admin name, email, phone number, or password.</p>
                   </div>
-                  <form className="space-y-4 px-6 py-5" onSubmit={(event) => void handleSaveFeeStructure(event)}>
+                  <form className="space-y-4 px-6 py-5" onSubmit={(event) => void handleSaveAdminSettings(event)}>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label htmlFor="fee-settings-local" className="mb-2 block text-sm font-medium text-gray-700">Local student fee</label>
+                        <label htmlFor="admin-settings-name" className="mb-2 block text-sm font-medium text-gray-700">Full name</label>
                         <input
-                          id="fee-settings-local"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={feeSettingsDraft.localStudentFee}
-                          onChange={(event) => setFeeSettingsDraft((current) => ({ ...current, localStudentFee: event.target.value }))}
+                          id="admin-settings-name"
+                          type="text"
+                          required
+                          minLength={2}
+                          maxLength={120}
+                          value={settingsDraft.name}
+                          onChange={(event) => setSettingsDraft((current) => ({ ...current, name: event.target.value }))}
                           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                         />
                       </div>
                       <div>
-                        <label htmlFor="fee-settings-international" className="mb-2 block text-sm font-medium text-gray-700">International student fee</label>
+                        <label htmlFor="admin-settings-email" className="mb-2 block text-sm font-medium text-gray-700">Email address</label>
                         <input
-                          id="fee-settings-international"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={feeSettingsDraft.internationalStudentFee}
-                          onChange={(event) => setFeeSettingsDraft((current) => ({ ...current, internationalStudentFee: event.target.value }))}
+                          id="admin-settings-email"
+                          type="email"
+                          required
+                          value={settingsDraft.email}
+                          onChange={(event) => setSettingsDraft((current) => ({ ...current, email: event.target.value }))}
                           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                         />
                       </div>
+                      <div>
+                        <label htmlFor="admin-settings-phone" className="mb-2 block text-sm font-medium text-gray-700">Phone number</label>
+                        <input
+                          id="admin-settings-phone"
+                          type="tel"
+                          value={settingsDraft.phoneNumber}
+                          onChange={(event) => setSettingsDraft((current) => ({ ...current, phoneNumber: event.target.value }))}
+                          placeholder="e.g. +256700123456"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="admin-settings-password" className="mb-2 block text-sm font-medium text-gray-700">New password</label>
+                        <input
+                          id="admin-settings-password"
+                          type="password"
+                          value={settingsDraft.password}
+                          onChange={(event) => setSettingsDraft((current) => ({ ...current, password: event.target.value }))}
+                          placeholder="Leave blank to keep current password"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="admin-settings-current-password" className="mb-2 block text-sm font-medium text-gray-700">Current password</label>
+                        <input
+                          id="admin-settings-current-password"
+                          type="password"
+                          value={settingsDraft.currentPassword}
+                          onChange={(event) => setSettingsDraft((current) => ({ ...current, currentPassword: event.target.value }))}
+                          placeholder="Required to change password"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        />
+                      </div>
+                    </div>
+                    <div className="max-w-md">
+                      <label htmlFor="admin-settings-confirm-password" className="mb-2 block text-sm font-medium text-gray-700">Confirm password</label>
+                      <input
+                        id="admin-settings-confirm-password"
+                        type="password"
+                        value={settingsDraft.confirmPassword}
+                        onChange={(event) => setSettingsDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
+                        placeholder="Repeat new password"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
                     </div>
                     <button
                       type="submit"
-                      disabled={savingFeeSettings}
+                      disabled={savingSettings}
                       className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                     >
                       <Save className="h-4 w-4" />
-                      {savingFeeSettings ? 'Saving...' : 'Save fee structure'}
+                      {savingSettings ? 'Saving...' : 'Save account settings'}
                     </button>
                   </form>
                 </div>
-              )}
 
-              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="border-b border-gray-100 px-6 py-4">
-                  <h2 className="font-semibold text-gray-800">Account Settings</h2>
-                  <p className="mt-1 text-xs text-gray-400">Update your admin name, email, phone number, or password.</p>
-                </div>
-                <form className="space-y-4 px-6 py-5" onSubmit={(event) => void handleSaveAdminSettings(event)}>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label htmlFor="admin-settings-name" className="mb-2 block text-sm font-medium text-gray-700">Full name</label>
-                      <input
-                        id="admin-settings-name"
-                        type="text"
-                        required
-                        minLength={2}
-                        maxLength={120}
-                        value={settingsDraft.name}
-                        onChange={(event) => setSettingsDraft((current) => ({ ...current, name: event.target.value }))}
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="admin-settings-email" className="mb-2 block text-sm font-medium text-gray-700">Email address</label>
-                      <input
-                        id="admin-settings-email"
-                        type="email"
-                        required
-                        value={settingsDraft.email}
-                        onChange={(event) => setSettingsDraft((current) => ({ ...current, email: event.target.value }))}
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="admin-settings-phone" className="mb-2 block text-sm font-medium text-gray-700">Phone number</label>
-                      <input
-                        id="admin-settings-phone"
-                        type="tel"
-                        value={settingsDraft.phoneNumber}
-                        onChange={(event) => setSettingsDraft((current) => ({ ...current, phoneNumber: event.target.value }))}
-                        placeholder="e.g. +256700123456"
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="admin-settings-password" className="mb-2 block text-sm font-medium text-gray-700">New password</label>
-                      <input
-                        id="admin-settings-password"
-                        type="password"
-                        value={settingsDraft.password}
-                        onChange={(event) => setSettingsDraft((current) => ({ ...current, password: event.target.value }))}
-                        placeholder="Leave blank to keep current password"
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="admin-settings-current-password" className="mb-2 block text-sm font-medium text-gray-700">Current password</label>
-                      <input
-                        id="admin-settings-current-password"
-                        type="password"
-                        value={settingsDraft.currentPassword}
-                        onChange={(event) => setSettingsDraft((current) => ({ ...current, currentPassword: event.target.value }))}
-                        placeholder="Required to change password"
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                      />
-                    </div>
-                  </div>
-                  <div className="max-w-md">
-                    <label htmlFor="admin-settings-confirm-password" className="mb-2 block text-sm font-medium text-gray-700">Confirm password</label>
-                    <input
-                      id="admin-settings-confirm-password"
-                      type="password"
-                      value={settingsDraft.confirmPassword}
-                      onChange={(event) => setSettingsDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
-                      placeholder="Repeat new password"
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={savingSettings}
-                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    <Save className="h-4 w-4" />
-                    {savingSettings ? 'Saving...' : 'Save account settings'}
-                  </button>
-                </form>
-              </div>
-
-              {/* Account info */}
-              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="border-b border-gray-100 px-6 py-4">
-                  <h2 className="font-semibold text-gray-800">Account</h2>
-                </div>
-                <div className="divide-y divide-gray-100">
-                  <div className="flex items-center justify-between px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Name</p>
-                      <p className="text-xs text-gray-400">Display name for this session</p>
-                    </div>
-                    <p className="text-sm text-gray-900">{user?.name ?? '—'}</p>
-                  </div>
-                  <div className="flex items-center justify-between px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Email</p>
-                      <p className="text-xs text-gray-400">Registered account email</p>
-                    </div>
-                    <p className="text-sm text-gray-900">{user?.email ?? '—'}</p>
-                  </div>
-                  <div className="flex items-center justify-between px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Access Scope</p>
-                      <p className="text-xs text-gray-400">Frontend workspace restrictions for this admin account</p>
-                    </div>
-                    <p className="text-sm text-gray-900">{adminCapability.label}</p>
-                  </div>
-                  <div className="flex items-center justify-between px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Role</p>
-                      <p className="text-xs text-gray-400">Access level for this account</p>
-                    </div>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        user?.role === 'admin'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-blue-100 text-blue-700'
-                      }`}
-                    >
-                      {user?.role === 'admin' ? 'Administrator' : 'Staff'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* System info */}
-              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="border-b border-gray-100 px-6 py-4">
-                  <h2 className="font-semibold text-gray-800">System</h2>
-                </div>
-                <div className="divide-y divide-gray-100">
-                  <div className="flex items-center justify-between px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Backend</p>
-                      <p className="text-xs text-gray-400">REST API base URL</p>
-                    </div>
-                    <code className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">
-                      {publicApiBaseUrl || apiBaseUrl || 'Not configured'}
-                    </code>
-                  </div>
-                  <div className="flex items-center justify-between px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Total Students</p>
-                      <p className="text-xs text-gray-400">Currently loaded in system</p>
-                    </div>
-                    <p className="text-sm font-semibold text-gray-900">{totalStudents}</p>
-                  </div>
-                  <div className="flex items-center justify-between px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Permit Events Logged</p>
-                      <p className="text-xs text-gray-400">Print and download actions tracked</p>
-                    </div>
-                    <p className="text-sm font-semibold text-gray-900">{permitEventCount}</p>
-                  </div>
-                  <div className="flex items-center justify-between px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Security Controls Active</p>
-                      <p className="text-xs text-gray-400">Implemented directly in this app version</p>
-                    </div>
-                    <p className="text-right text-sm text-gray-900">Inactivity timeout, audit trail, role-scoped views</p>
-                  </div>
-                  <div className="flex items-center justify-between px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Pending Security Integrations</p>
-                      <p className="text-xs text-gray-400">Require backend or infrastructure support</p>
-                    </div>
-                    <p className="text-right text-sm text-gray-900">2FA, IP allow-listing, field encryption, biometric verification</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Danger zone */}
-              <div className="rounded-xl border border-red-200 bg-white shadow-sm">
-                <div className="border-b border-red-100 px-6 py-4">
-                  <h2 className="font-semibold text-red-700">Session</h2>
-                </div>
-                <div className="px-6 py-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Sign out</p>
-                      <p className="text-xs text-gray-400">End your current admin session</p>
+                <div className="mt-8 rounded-[1.5rem] border border-red-100 bg-red-50 p-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
+                        <LogOut className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Sign out</p>
+                        <p className="text-xs text-gray-400">End your current admin session</p>
+                      </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => void signOut()}
-                      className="inline-flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
+                      onClick={() => setShowSignOut(true)}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
                     >
                       <LogOut className="h-4 w-4" />
                       Sign out

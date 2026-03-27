@@ -1,13 +1,19 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell,
+  BookOpen,
+  CalendarDays,
+  CreditCard,
+  DollarSign,
   Download,
   FileBadge2,
   FileText,
+  GraduationCap,
   LayoutDashboard,
   LogOut,
   Menu,
   Moon,
+  PieChart,
   Printer,
   RefreshCcw,
   Search,
@@ -16,8 +22,10 @@ import {
   ShieldCheck,
   ShieldClose,
   Sun,
+  TrendingUp,
   Upload,
   UserCircle2,
+  Wallet,
   X,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -27,10 +35,11 @@ import PermitCard from './PermitCard'
 import { createSupportRequest, fetchPermitActivityHistory, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, recordPermitActivity, updateStudentAccount } from '../services/profileService'
 import type { PermitActivityRecord, StudentProfile, SupportContact, SupportRequest } from '../types'
 import { FALLBACK_PROFILE_IMAGE } from './PermitCard'
+import SignOutDialog from './SignOutDialog'
 import Select from 'react-select'
 
 type PermitStatus = 'approved' | 'pending' | 'rejected'
-type PortalSection = 'overview' | 'applications' | 'settings' | 'support'
+type PortalSection = 'overview' | 'academics' | 'finance' | 'applications' | 'settings' | 'support'
 type HistoryStatusFilter = PermitStatus | 'all'
 
 type PermitApplicationRecord = {
@@ -75,9 +84,11 @@ type SupportDraft = {
 
 const portalSections: Array<{ key: PortalSection; label: string; icon: typeof LayoutDashboard }> = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { key: 'academics', label: 'Enrolled Courses', icon: BookOpen },
+  { key: 'finance', label: 'Finance', icon: Wallet },
   { key: 'applications', label: 'Applications', icon: FileText },
   { key: 'settings', label: 'Profile Settings', icon: Settings2 },
-  { key: 'support', label: 'Help & Support', icon: FileText },
+  { key: 'support', label: 'Help & Support', icon: UserCircle2 },
 ]
 
 const requiredDocumentChecklist = [
@@ -310,6 +321,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [showSignOut, setShowSignOut] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const [qrCodeUrl, setQrCodeUrl] = useState('')
   const [activeSection, setActiveSection] = useState<PortalSection>('overview')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -463,7 +476,7 @@ export default function Dashboard() {
       syncDrafts: true,
       initializeLocalState: true,
     })
-     
+
   }, [syncStudentProfile])
 
   useEffect(() => {
@@ -495,7 +508,7 @@ export default function Dashboard() {
       window.removeEventListener('focus', handleFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-     
+
   }, [user, syncStudentProfile])
 
   useEffect(() => {
@@ -869,7 +882,7 @@ export default function Dashboard() {
             </button>
             <button
               type="button"
-              onClick={() => void signOut()}
+              onClick={() => setShowSignOut(true)}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-200 px-4 py-2 text-slate-900 transition-colors hover:bg-slate-300"
             >
               <LogOut className="h-4 w-4" />
@@ -877,6 +890,17 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+        {showSignOut && (
+          <SignOutDialog
+            signingOut={signingOut}
+            onConfirm={async () => {
+              setSigningOut(true)
+              await signOut()
+              setSigningOut(false)
+            }}
+            onCancel={() => setShowSignOut(false)}
+          />
+        )}
       </div>
     )
   }
@@ -889,9 +913,7 @@ export default function Dashboard() {
             studentData={studentData}
             qrCodeUrl={qrCodeUrl}
             onRefresh={handleRefresh}
-            onSignOut={() => {
-              void signOut()
-            }}
+            onSignOut={() => setShowSignOut(true)}
             onPrint={() => {}}
             onDownload={() => {}}
           />
@@ -986,7 +1008,7 @@ export default function Dashboard() {
                   type="button"
                   title="Open navigation"
                   aria-label="Open navigation"
-                  onClick={() => setSidebarOpen(true)}
+                  onClick={() => setSidebarOpen(false)}
                   className="rounded-full border border-slate-200 bg-white p-2 text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 lg:hidden"
                 >
                   <Menu className="h-4 w-4" />
@@ -1079,7 +1101,7 @@ export default function Dashboard() {
 
                 <button
                   type="button"
-                  onClick={() => void signOut()}
+                  onClick={() => setShowSignOut(true)}
                   className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400"
                 >
                   <LogOut className="h-4 w-4" />
@@ -1187,371 +1209,407 @@ export default function Dashboard() {
                 </div>
               </section>
 
-              {activeSection === 'overview' && (
-                <div className="grid gap-6 xl:grid-cols-[1.55fr_1fr]">
-                  <div className="space-y-6">
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-green-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                      <div className="mb-5 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-green-600 dark:text-green-300">Permit Card Preview</p>
-                          <h2 className="mt-2 text-2xl font-semibold">Digital Exam Permit</h2>
-                        </div>
-                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusView.badgeClass}`}>
-                          {statusView.label}
-                        </span>
-                      </div>
-
-                      <div className="rounded-[2rem] border border-sky-100 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(220,252,231,0.92))] p-5 dark:border-slate-700 dark:bg-[linear-gradient(145deg,_rgba(15,23,42,0.98),_rgba(5,46,22,0.88))]">
-                        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-                          <div className="flex items-center gap-4">
-                            <img
-                              src={profileImage}
-                              alt="Student profile"
-                              className="h-20 w-20 rounded-3xl object-cover shadow-lg"
-                              onError={(event) => {
-                                event.currentTarget.onerror = null
-                                event.currentTarget.src = FALLBACK_PROFILE_IMAGE
-                              }}
-                            />
-                            <div>
-                              <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">Student Name</p>
-                              <h3 className="mt-2 text-xl font-semibold">{studentData.name}</h3>
-                              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Registration No. {studentData.studentId}</p>
-                              <p className="text-sm text-slate-600 dark:text-slate-300">{studentData.course}</p>
-                            </div>
+              <div key={activeSection} style={{ animation: 'kiu-page-in 0.3s ease-out both' }}>
+                {activeSection === 'overview' && (
+                  <div className="grid gap-6 xl:grid-cols-[1.55fr_1fr]">
+                    <div className="space-y-6">
+                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-green-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <div className="mb-5 flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-green-600 dark:text-green-300">Permit Card Preview</p>
+                            <h2 className="mt-2 text-2xl font-semibold">Digital Exam Permit</h2>
                           </div>
-                          <div className="rounded-3xl bg-white/80 p-3 shadow-sm dark:bg-slate-950/70">
-                            {qrCodeUrl ? (
-                              <>
-                                <img src={qrCodeUrl} alt="Verification QR code" className="h-28 w-28" />
-                                <div className="mt-2 break-all text-xs text-green-700 dark:text-green-300 text-center">
-                                  {qrValue}
-                                </div>
-                              </>
-                            ) : (
-                              <div className="flex h-28 w-28 items-center justify-center rounded-2xl bg-slate-100 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                                QR unavailable
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusView.badgeClass}`}>
+                            {statusView.label}
+                          </span>
+                        </div>
+
+                        <div className="rounded-[2rem] border border-sky-100 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(220,252,231,0.92))] p-5 dark:border-slate-700 dark:bg-[linear-gradient(145deg,_rgba(15,23,42,0.98),_rgba(5,46,22,0.88))]">
+                          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                            <div className="flex items-center gap-4">
+                              <img
+                                src={profileImage}
+                                alt="Student profile"
+                                className="h-20 w-20 rounded-3xl object-cover shadow-lg"
+                                onError={(event) => {
+                                  event.currentTarget.onerror = null
+                                  event.currentTarget.src = FALLBACK_PROFILE_IMAGE
+                                }}
+                              />
+                              <div>
+                                <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">Student Name</p>
+                                <h3 className="mt-2 text-xl font-semibold">{studentData.name}</h3>
+                                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Registration No. {studentData.studentId}</p>
+                                <p className="text-sm text-slate-600 dark:text-slate-300">{studentData.course}</p>
                               </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                          <div className="rounded-3xl bg-white/70 p-4 dark:bg-slate-950/70">
-                            <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Exam Details</p>
-                            <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                              <p>Date: {formatDate(studentData.examDate)}</p>
-                              <p>Time: {studentData.examTime || 'To be announced'}</p>
-                              <p>Venue: {studentData.venue || 'To be announced'}</p>
-                              <p>Seat: {studentData.seatNumber || 'To be assigned'}</p>
+                            </div>
+                            <div className="rounded-3xl bg-white/80 p-3 shadow-sm dark:bg-slate-950/70">
+                              {qrCodeUrl ? (
+                                <>
+                                  <img src={qrCodeUrl} alt="Verification QR code" className="h-28 w-28" />
+                                  <div className="mt-2 break-all text-xs text-green-700 dark:text-green-300 text-center">
+                                    {qrValue}
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="flex h-28 w-28 items-center justify-center rounded-2xl bg-slate-100 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                                  QR unavailable
+                                </div>
+                              )}
                             </div>
                           </div>
-                          <div className="rounded-3xl bg-white/70 p-4 dark:bg-slate-950/70">
-                            <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Fee Clearance</p>
-                            <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                              <p>Total Fees: ${studentData.totalFees.toFixed(2)}</p>
-                              <p>Amount Paid: ${studentData.amountPaid.toFixed(2)}</p>
-                              <p>Balance: ${studentData.feesBalance.toFixed(2)}</p>
-                              <p className={permitOutputLocked ? 'text-red-600 dark:text-red-300' : 'text-green-700 dark:text-green-300'}>
-                                {permitOutputLocked ? permitOutputMessage : 'Eligible for printing'}
-                              </p>
-                              <p className="text-slate-500 dark:text-slate-400">
-                                Prints this month: {studentData.monthlyPrintCount ?? 0}/{studentData.monthlyPrintLimit ?? 2}
-                                {(studentData.grantedPrintsRemaining ?? 0) > 0 ? ` • Extra admin prints left: ${studentData.grantedPrintsRemaining}` : ''}
-                              </p>
+
+                          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                            <div className="rounded-3xl bg-white/70 p-4 dark:bg-slate-950/70">
+                              <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Exam Details</p>
+                              <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                                <p>Date: {formatDate(studentData.examDate)}</p>
+                                <p>Time: {studentData.examTime || 'To be announced'}</p>
+                                <p>Venue: {studentData.venue || 'To be announced'}</p>
+                                <p>Seat: {studentData.seatNumber || 'To be assigned'}</p>
+                              </div>
+                            </div>
+                            <div className="rounded-3xl bg-white/70 p-4 dark:bg-slate-950/70">
+                              <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Fee Clearance</p>
+                              <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                                <p>Total Fees: ${studentData.totalFees.toFixed(2)}</p>
+                                <p>Amount Paid: ${studentData.amountPaid.toFixed(2)}</p>
+                                <p>Balance: ${studentData.feesBalance.toFixed(2)}</p>
+                                <p className={permitOutputLocked ? 'text-red-600 dark:text-red-300' : 'text-green-700 dark:text-green-300'}>
+                                  {permitOutputLocked ? permitOutputMessage : 'Eligible for printing'}
+                                </p>
+                                <p className="text-slate-500 dark:text-slate-400">
+                                  Prints this month: {studentData.monthlyPrintCount ?? 0}/{studentData.monthlyPrintLimit ?? 2}
+                                  {(studentData.grantedPrintsRemaining ?? 0) > 0 ? ` • Extra admin prints left: ${studentData.grantedPrintsRemaining}` : ''}
+                                </p>
+                              </div>
                             </div>
                           </div>
+
+                          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                            <button
+                              type="button"
+                              onClick={handleDownload}
+                              disabled={permitOutputLocked}
+                              className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${permitOutputLocked ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-emerald-500 text-white hover:bg-emerald-400'}`}
+                              title={permitOutputLocked ? permitOutputMessage : 'Download permit'}
+                            >
+                              <Download className="h-4 w-4" />
+                              Download PDF
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handlePrint}
+                              disabled={permitOutputLocked}
+                              className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${permitOutputLocked ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-green-600 text-white hover:bg-green-500'}`}
+                              title={permitOutputLocked ? permitOutputMessage : 'Print permit'}
+                            >
+                              <Printer className="h-4 w-4" />
+                              Print Permit
+                            </button>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-green-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Apply for Exam Permit</p>
+                            <h2 className="mt-2 text-2xl font-semibold">Submit a new permit request</h2>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setActiveSection('applications')}
+                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                          >
+                            <FileBadge2 className="h-4 w-4" />
+                            Open full application view
+                          </button>
                         </div>
 
-                        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                          <button
-                            type="button"
-                            onClick={handleDownload}
-                            disabled={permitOutputLocked}
-                            className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${permitOutputLocked ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-emerald-500 text-white hover:bg-emerald-400'}`}
-                            title={permitOutputLocked ? permitOutputMessage : 'Download permit'}
-                          >
-                            <Download className="h-4 w-4" />
-                            Download PDF
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handlePrint}
-                            disabled={permitOutputLocked}
-                            className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${permitOutputLocked ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-green-600 text-white hover:bg-green-500'}`}
-                            title={permitOutputLocked ? permitOutputMessage : 'Print permit'}
-                          >
-                            <Printer className="h-4 w-4" />
-                            Print Permit
-                          </button>
+                        <form className="mt-6 grid gap-4 lg:grid-cols-2" onSubmit={(event) => void handleApplicationSubmit(event)}>
+                          <div>
+                            <label htmlFor="semester" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Exam session / semester</label>
+                            <select
+                              id="semester"
+                              value={applicationDraft.semester}
+                              onChange={(event) => setApplicationDraft((current) => ({ ...current, semester: event.target.value }))}
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-green-300 focus:ring-2 focus:ring-green-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:focus:border-green-400 dark:focus:ring-green-950"
+                            >
+                              <option value="">Select semester</option>
+                              {availableSemesters.map((sem) => (
+                                <option key={sem} value={sem}>{sem}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <p className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Document checklist</p>
+                            <div className="space-y-2 rounded-[1.75rem] border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-900/70">
+                              {requiredDocumentChecklist.map((item) => (
+                                <label key={item.id} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
+                                  <input
+                                    type="checkbox"
+                                    checked={applicationDraft.checklist.includes(item.id)}
+                                    onChange={() => handleChecklistToggle(item.id)}
+                                    className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                  />
+                                  <span>{item.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label htmlFor="documents" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Upload required documents</label>
+                            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-green-300 bg-green-50 px-4 py-3 text-sm text-slate-600 transition hover:border-green-300 hover:bg-green-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-green-500 dark:hover:bg-slate-800">
+                              <Upload className="h-4 w-4" />
+                              <span>{applicationDraft.documents.length > 0 ? applicationDraft.documents.join(', ') : 'Choose files'}</span>
+                              <input id="documents" type="file" multiple className="sr-only" onChange={handleDocumentSelection} />
+                            </label>
+                          </div>
+                          <div className="lg:col-span-2">
+                            <label htmlFor="courseUnits" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Course units</label>
+                            <Select
+                              id="courseUnits"
+                              isMulti
+                              options={allCourseUnits.map((u) => ({ value: u, label: u }))}
+                              value={applicationDraft.courseUnits.map((u) => ({ value: u, label: u }))}
+                              onChange={(selected) => {
+                                const unique = Array.from(new Set(selected.map((s) => s.value)))
+                                setApplicationDraft((current) => ({ ...current, courseUnits: unique }))
+                              }}
+                              classNamePrefix="react-select"
+                              placeholder="Select or type to add course units"
+                              isClearable={false}
+                              isSearchable
+                              noOptionsMessage={() => 'Type to add new course unit'}
+                            />
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {applicationDraft.courseUnits.length === 0 && <span className="text-slate-400">No course units selected</span>}
+                              {applicationDraft.courseUnits.map((u) => (
+                                <span key={u} className="inline-block rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">{u}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="lg:col-span-2 flex justify-end">
+                            <button
+                              type="submit"
+                              disabled={submittingApplication}
+                              className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400"
+                            >
+                              <FileBadge2 className="h-4 w-4" />
+                              {submittingApplication ? 'Submitting...' : 'Apply for Permit'}
+                            </button>
+                          </div>
+                        </form>
+                      </section>
+                    </div>
+
+                    <div className="space-y-6">
+                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Notifications Panel</p>
+                        <h2 className="mt-2 text-2xl font-semibold">Latest updates</h2>
+                        <div className="mt-5 space-y-3">
+                          {notifications.map((notification) => (
+                            <div key={notification.id} className={`rounded-3xl border p-4 ${getNotificationToneClasses(notification.tone)}`}>
+                              <p className="text-sm font-semibold">{notification.title}</p>
+                              <p className="mt-1 text-sm leading-6">{notification.message}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+
+                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Application History</p>
+                        <h2 className="mt-2 text-2xl font-semibold">Recent requests</h2>
+                        <div className="mt-5 space-y-3">
+                          {filteredHistory.slice(0, 3).map((record) => (
+                            <div key={record.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-semibold">{record.semester}</p>
+                                <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusPresentation(record.status).badgeClass}`}>
+                                  {record.status}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{formatDateTime(record.createdAt)}</p>
+                              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{record.remarks}</p>
+                            </div>
+                          ))}
+                          {filteredHistory.length === 0 && (
+                            <div className="rounded-3xl border border-dashed border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-300">
+                              No applications match your filters yet.
+                            </div>
+                          )}
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                )}
+
+                {activeSection === 'applications' && (
+                  <div className="space-y-6">
+                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Search & Filters</p>
+                          <h2 className="mt-2 text-2xl font-semibold">Filter application history</h2>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[28rem]">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Status
+                            <select
+                              value={statusFilter}
+                              onChange={(event) => setStatusFilter(event.target.value as HistoryStatusFilter)}
+                              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            >
+                              <option value="all">All statuses</option>
+                              <option value="approved">Approved</option>
+                              <option value="pending">Pending</option>
+                              <option value="rejected">Rejected</option>
+                            </select>
+                          </label>
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Semester
+                            <select
+                              value={semesterFilter}
+                              onChange={(event) => setSemesterFilter(event.target.value)}
+                              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            >
+                              <option value="all">All semesters</option>
+                              {availableSemesters.map((semester) => (
+                                <option key={semester} value={semester}>{semester}</option>
+                              ))}
+                            </select>
+                          </label>
                         </div>
                       </div>
                     </section>
 
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-green-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Apply for Exam Permit</p>
-                          <h2 className="mt-2 text-2xl font-semibold">Submit a new permit request</h2>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setActiveSection('applications')}
-                          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                        >
-                          <FileBadge2 className="h-4 w-4" />
-                          Open full application view
-                        </button>
-                      </div>
-
-                      <form className="mt-6 grid gap-4 lg:grid-cols-2" onSubmit={(event) => void handleApplicationSubmit(event)}>
-                        <div>
-                          <label htmlFor="semester" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Exam session / semester</label>
-                          <select
-                            id="semester"
-                            value={applicationDraft.semester}
-                            onChange={(event) => setApplicationDraft((current) => ({ ...current, semester: event.target.value }))}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-green-300 focus:ring-2 focus:ring-green-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:focus:border-green-400 dark:focus:ring-green-950"
-                          >
-                            <option value="">Select semester</option>
-                            {availableSemesters.map((sem) => (
-                              <option key={sem} value={sem}>{sem}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <p className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Document checklist</p>
-                          <div className="space-y-2 rounded-[1.75rem] border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-900/70">
-                            {requiredDocumentChecklist.map((item) => (
-                              <label key={item.id} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
-                                <input
-                                  type="checkbox"
-                                  checked={applicationDraft.checklist.includes(item.id)}
-                                  onChange={() => handleChecklistToggle(item.id)}
-                                  className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                                />
-                                <span>{item.label}</span>
-                              </label>
-                            ))}
+                    <div className="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
+                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Apply for Exam Permit</p>
+                        <h2 className="mt-2 text-2xl font-semibold">Application form</h2>
+                        <form className="mt-6 space-y-4" onSubmit={(event) => void handleApplicationSubmit(event)}>
+                          <div>
+                            <label htmlFor="application-semester" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Exam session / semester</label>
+                            <input
+                              id="application-semester"
+                              type="text"
+                              value={applicationDraft.semester}
+                              onChange={(event) => setApplicationDraft((current) => ({ ...current, semester: event.target.value }))}
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            />
                           </div>
-                        </div>
-                        <div>
-                          <label htmlFor="documents" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Upload required documents</label>
-                          <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-green-300 bg-green-50 px-4 py-3 text-sm text-slate-600 transition hover:border-green-300 hover:bg-green-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-green-500 dark:hover:bg-slate-800">
-                            <Upload className="h-4 w-4" />
-                            <span>{applicationDraft.documents.length > 0 ? applicationDraft.documents.join(', ') : 'Choose files'}</span>
-                            <input id="documents" type="file" multiple className="sr-only" onChange={handleDocumentSelection} />
-                          </label>
-                        </div>
-                        <div className="lg:col-span-2">
-                          <label htmlFor="courseUnits" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Course units</label>
-                          <Select
-                            id="courseUnits"
-                            isMulti
-                            options={allCourseUnits.map((u) => ({ value: u, label: u }))}
-                            value={applicationDraft.courseUnits.map((u) => ({ value: u, label: u }))}
-                            onChange={(selected) => {
-                              const unique = Array.from(new Set(selected.map((s) => s.value)))
-                              setApplicationDraft((current) => ({ ...current, courseUnits: unique }))
-                            }}
-                            classNamePrefix="react-select"
-                            placeholder="Select or type to add course units"
-                            isClearable={false}
-                            isSearchable
-                            noOptionsMessage={() => 'Type to add new course unit'}
-                          />
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {applicationDraft.courseUnits.length === 0 && <span className="text-slate-400">No course units selected</span>}
-                            {applicationDraft.courseUnits.map((u) => (
-                              <span key={u} className="inline-block rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">{u}</span>
-                            ))}
+                          <div>
+                            <label htmlFor="application-course-units" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Course units</label>
+                            <textarea
+                              id="application-course-units"
+                              rows={6}
+                              value={applicationDraft.courseUnits.join('\n')}
+                              onChange={(event) => setApplicationDraft((current) => ({ ...current, courseUnits: event.target.value.split('\n').map(v => v.trim()).filter(Boolean) }))}
+                              placeholder="CSC 401 - Compiler Construction"
+                              className="w-full rounded-[1.75rem] border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            />
                           </div>
-                        </div>
-                        <div className="lg:col-span-2 flex justify-end">
+                          <div>
+                            <p className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Document checklist</p>
+                            <div className="space-y-2 rounded-[1.75rem] border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-900/70">
+                              {requiredDocumentChecklist.map((item) => (
+                                <label key={item.id} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
+                                  <input
+                                    type="checkbox"
+                                    checked={applicationDraft.checklist.includes(item.id)}
+                                    onChange={() => handleChecklistToggle(item.id)}
+                                    className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                  />
+                                  <span>{item.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label htmlFor="application-documents" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Required documents</label>
+                            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                              <Upload className="h-4 w-4" />
+                              <span>{applicationDraft.documents.length > 0 ? applicationDraft.documents.join(', ') : 'Attach files if needed'}</span>
+                              <input id="application-documents" type="file" multiple className="sr-only" onChange={handleDocumentSelection} />
+                            </label>
+                          </div>
                           <button
                             type="submit"
                             disabled={submittingApplication}
-                            className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400"
+                            className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <FileBadge2 className="h-4 w-4" />
                             {submittingApplication ? 'Submitting...' : 'Apply for Permit'}
                           </button>
+                        </form>
+                      </section>
+
+                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Application History</p>
+                        <h2 className="mt-2 text-2xl font-semibold">Permit requests</h2>
+                        <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800">
+                          <table className="min-w-full text-left text-sm">
+                            <thead className="bg-slate-50 text-xs uppercase tracking-[0.25em] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                              <tr>
+                                <th className="px-5 py-4">Date applied</th>
+                                <th className="px-5 py-4">Semester</th>
+                                <th className="px-5 py-4">Status</th>
+                                <th className="px-5 py-4">Remarks</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                              {filteredHistory.map((record) => (
+                                <tr key={record.id} className="bg-white/80 dark:bg-slate-950/40">
+                                  <td className="px-5 py-4">{formatDateTime(record.createdAt)}</td>
+                                  <td className="px-5 py-4">{record.semester}</td>
+                                  <td className="px-5 py-4">
+                                    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusPresentation(record.status).badgeClass}`}>
+                                      {record.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-4 text-slate-600 dark:text-slate-300">{record.remarks}</td>
+                                </tr>
+                              ))}
+                              {filteredHistory.length === 0 && (
+                                <tr>
+                                  <td colSpan={4} className="px-5 py-8 text-center text-slate-500 dark:text-slate-300">
+                                    No applications found for the selected filters.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
                         </div>
-                      </form>
-                    </section>
-                  </div>
-
-                  <div className="space-y-6">
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Notifications Panel</p>
-                      <h2 className="mt-2 text-2xl font-semibold">Latest updates</h2>
-                      <div className="mt-5 space-y-3">
-                        {notifications.map((notification) => (
-                          <div key={notification.id} className={`rounded-3xl border p-4 ${getNotificationToneClasses(notification.tone)}`}>
-                            <p className="text-sm font-semibold">{notification.title}</p>
-                            <p className="mt-1 text-sm leading-6">{notification.message}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Application History</p>
-                      <h2 className="mt-2 text-2xl font-semibold">Recent requests</h2>
-                      <div className="mt-5 space-y-3">
-                        {filteredHistory.slice(0, 3).map((record) => (
-                          <div key={record.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-sm font-semibold">{record.semester}</p>
-                              <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusPresentation(record.status).badgeClass}`}>
-                                {record.status}
-                              </span>
-                            </div>
-                            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{formatDateTime(record.createdAt)}</p>
-                            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{record.remarks}</p>
-                          </div>
-                        ))}
-                        {filteredHistory.length === 0 && (
-                          <div className="rounded-3xl border border-dashed border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-300">
-                            No applications match your filters yet.
-                          </div>
-                        )}
-                      </div>
-                    </section>
-                  </div>
-                </div>
-              )}
-
-              {activeSection === 'applications' && (
-                <div className="space-y-6">
-                  <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Search & Filters</p>
-                        <h2 className="mt-2 text-2xl font-semibold">Filter application history</h2>
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[28rem]">
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                          Status
-                          <select
-                            value={statusFilter}
-                            onChange={(event) => setStatusFilter(event.target.value as HistoryStatusFilter)}
-                            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                          >
-                            <option value="all">All statuses</option>
-                            <option value="approved">Approved</option>
-                            <option value="pending">Pending</option>
-                            <option value="rejected">Rejected</option>
-                          </select>
-                        </label>
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                          Semester
-                          <select
-                            value={semesterFilter}
-                            onChange={(event) => setSemesterFilter(event.target.value)}
-                            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                          >
-                            <option value="all">All semesters</option>
-                            {availableSemesters.map((semester) => (
-                              <option key={semester} value={semester}>{semester}</option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
+                      </section>
                     </div>
-                  </section>
-
-                  <div className="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Apply for Exam Permit</p>
-                      <h2 className="mt-2 text-2xl font-semibold">Application form</h2>
-                      <form className="mt-6 space-y-4" onSubmit={(event) => void handleApplicationSubmit(event)}>
-                        <div>
-                          <label htmlFor="application-semester" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Exam session / semester</label>
-                          <input
-                            id="application-semester"
-                            type="text"
-                            value={applicationDraft.semester}
-                            onChange={(event) => setApplicationDraft((current) => ({ ...current, semester: event.target.value }))}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="application-course-units" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Course units</label>
-                          <textarea
-                            id="application-course-units"
-                            rows={6}
-                            value={applicationDraft.courseUnits.join('\n')}
-                            onChange={(event) => setApplicationDraft((current) => ({ ...current, courseUnits: event.target.value.split('\n').map(v => v.trim()).filter(Boolean) }))}
-                            placeholder="CSC 401 - Compiler Construction"
-                            className="w-full rounded-[1.75rem] border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                          />
-                        </div>
-                        <div>
-                          <p className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Document checklist</p>
-                          <div className="space-y-2 rounded-[1.75rem] border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-900/70">
-                            {requiredDocumentChecklist.map((item) => (
-                              <label key={item.id} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
-                                <input
-                                  type="checkbox"
-                                  checked={applicationDraft.checklist.includes(item.id)}
-                                  onChange={() => handleChecklistToggle(item.id)}
-                                  className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                                />
-                                <span>{item.label}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <label htmlFor="application-documents" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Required documents</label>
-                          <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                            <Upload className="h-4 w-4" />
-                            <span>{applicationDraft.documents.length > 0 ? applicationDraft.documents.join(', ') : 'Attach files if needed'}</span>
-                            <input id="application-documents" type="file" multiple className="sr-only" onChange={handleDocumentSelection} />
-                          </label>
-                        </div>
-                        <button
-                          type="submit"
-                          disabled={submittingApplication}
-                          className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <FileBadge2 className="h-4 w-4" />
-                          {submittingApplication ? 'Submitting...' : 'Apply for Permit'}
-                        </button>
-                      </form>
-                    </section>
 
                     <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Application History</p>
-                      <h2 className="mt-2 text-2xl font-semibold">Permit requests</h2>
+                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Printed Permit History</p>
+                      <h2 className="mt-2 text-2xl font-semibold">One record per semester</h2>
                       <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800">
                         <table className="min-w-full text-left text-sm">
                           <thead className="bg-slate-50 text-xs uppercase tracking-[0.25em] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                             <tr>
-                              <th className="px-5 py-4">Date applied</th>
                               <th className="px-5 py-4">Semester</th>
-                              <th className="px-5 py-4">Status</th>
-                              <th className="px-5 py-4">Remarks</th>
+                              <th className="px-5 py-4">Latest action</th>
+                              <th className="px-5 py-4">Source</th>
+                              <th className="px-5 py-4">Last activity</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                            {filteredHistory.map((record) => (
+                            {permitHistoryBySemester.map((record) => (
                               <tr key={record.id} className="bg-white/80 dark:bg-slate-950/40">
-                                <td className="px-5 py-4">{formatDateTime(record.createdAt)}</td>
-                                <td className="px-5 py-4">{record.semester}</td>
-                                <td className="px-5 py-4">
-                                  <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusPresentation(record.status).badgeClass}`}>
-                                    {record.status}
-                                  </span>
-                                </td>
-                                <td className="px-5 py-4 text-slate-600 dark:text-slate-300">{record.remarks}</td>
+                                <td className="px-5 py-4 font-medium text-slate-900 dark:text-white">{record.semester}</td>
+                                <td className="px-5 py-4">{record.action === 'print_permit' ? 'Printed permit' : 'Downloaded permit'}</td>
+                                <td className="px-5 py-4 capitalize">{record.source.replace('-', ' ')}</td>
+                                <td className="px-5 py-4 text-slate-600 dark:text-slate-300">{formatDateTime(record.createdAt)}</td>
                               </tr>
                             ))}
-                            {filteredHistory.length === 0 && (
+                            {permitHistoryBySemester.length === 0 && (
                               <tr>
                                 <td colSpan={4} className="px-5 py-8 text-center text-slate-500 dark:text-slate-300">
-                                  No applications found for the selected filters.
+                                  No printed or downloaded permit history is available yet.
                                 </td>
                               </tr>
                             )}
@@ -1560,346 +1618,533 @@ export default function Dashboard() {
                       </div>
                     </section>
                   </div>
+                )}
 
-                  <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Printed Permit History</p>
-                    <h2 className="mt-2 text-2xl font-semibold">One record per semester</h2>
-                    <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800">
-                      <table className="min-w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-xs uppercase tracking-[0.25em] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                          <tr>
-                            <th className="px-5 py-4">Semester</th>
-                            <th className="px-5 py-4">Latest action</th>
-                            <th className="px-5 py-4">Source</th>
-                            <th className="px-5 py-4">Last activity</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                          {permitHistoryBySemester.map((record) => (
-                            <tr key={record.id} className="bg-white/80 dark:bg-slate-950/40">
-                              <td className="px-5 py-4 font-medium text-slate-900 dark:text-white">{record.semester}</td>
-                              <td className="px-5 py-4">{record.action === 'print_permit' ? 'Printed permit' : 'Downloaded permit'}</td>
-                              <td className="px-5 py-4 capitalize">{record.source.replace('-', ' ')}</td>
-                              <td className="px-5 py-4 text-slate-600 dark:text-slate-300">{formatDateTime(record.createdAt)}</td>
-                            </tr>
-                          ))}
-                          {permitHistoryBySemester.length === 0 && (
-                            <tr>
-                              <td colSpan={4} className="px-5 py-8 text-center text-slate-500 dark:text-slate-300">
-                                No printed or downloaded permit history is available yet.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                </div>
-              )}
-
-              {activeSection === 'settings' && (
-                <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                  <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Profile Settings</p>
-                    <h2 className="mt-2 text-2xl font-semibold">Update your info</h2>
-                    <div className="flex justify-end mb-2">
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200"
-                        onClick={() => void syncStudentProfile({ showLoading: true, clearError: true, syncDrafts: true })}
-                        aria-label="Refresh profile"
-                      >
-                        <RefreshCcw className="w-4 h-4" />
-                        Refresh
-                      </button>
-                    </div>
-                    <form className="mt-6 space-y-4" onSubmit={(event) => void handleSettingsSave(event)}>
-                      <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-                        Identity and contact changes update both your student profile and your login details. Use a valid email address and reachable phone number.
-                      </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <label htmlFor="settings-name" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Full name</label>
-                          <input
-                            id="settings-name"
-                            type="text"
-                            value={settingsDraft.name}
-                            onChange={(event) => setSettingsDraft((current) => ({ ...current, name: event.target.value }))}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                            readOnly={user?.role === 'student'}
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="settings-email" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Email address</label>
-                          <input
-                            id="settings-email"
-                            type="email"
-                            value={settingsDraft.email}
-                            onChange={(event) => setSettingsDraft((current) => ({ ...current, email: event.target.value }))}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                            readOnly={user?.role === 'student'}
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label htmlFor="settings-phone" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Phone number</label>
-                          <input
-                            id="settings-phone"
-                            type="tel"
-                            value={settingsDraft.phoneNumber}
-                            onChange={(event) => setSettingsDraft((current) => ({ ...current, phoneNumber: event.target.value }))}
-                            placeholder="e.g. +256700123456"
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label htmlFor="settings-image" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Profile photo</label>
-                        <div className="flex gap-3 items-center">
-                          <input
-                            id="settings-image-upload"
-                            type="file"
-                            accept="image/*"
-                            title="Upload profile photo"
-                            placeholder="Choose profile photo"
-                            onChange={async (event) => {
-                              const file = event.target.files?.[0]
-                              if (!file) return
-
-                              const reader = new FileReader()
-                              reader.onload = () => {
-                                const result = typeof reader.result === 'string' ? reader.result : ''
-                                if (result) {
-                                  setSettingsDraft((current) => ({ ...current, profileImage: result }))
-                                  setStudentData((current) => current ? { ...current, profileImage: result } : current)
-                                }
-                              }
-                              reader.onerror = () => {
-                                alert('Failed to upload image.')
-                              }
-                              reader.readAsDataURL(file)
-                            }}
-                            className="block w-full text-sm text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
-                          />
-                          {settingsDraft.profileImage && (
-                            <img src={settingsDraft.profileImage} alt="Profile preview" className="h-12 w-12 rounded-full object-cover border" />
-                          )}
-                        </div>
-                        <input
-                          id="settings-image"
-                          type="url"
-                          value={settingsDraft.profileImage}
-                          onChange={(event) => setSettingsDraft((current) => ({ ...current, profileImage: event.target.value }))}
-                          placeholder="https://example.com/profile.jpg"
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900 mt-2"
-                        />
-                      </div>
-                      <div className="grid gap-4 sm:grid-cols-3">
-                        <div>
-                          <label htmlFor="settings-current-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Current password</label>
-                          <input
-                            id="settings-current-password"
-                            type="password"
-                            value={settingsDraft.currentPassword}
-                            onChange={(event) => setSettingsDraft((current) => ({ ...current, currentPassword: event.target.value }))}
-                            placeholder="Required to change password"
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="settings-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">New password</label>
-                          <input
-                            id="settings-password"
-                            type="password"
-                            value={settingsDraft.password}
-                            onChange={(event) => setSettingsDraft((current) => ({ ...current, password: event.target.value }))}
-                            placeholder="Leave blank to keep current password"
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="settings-confirm-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Confirm password</label>
-                          <input
-                            id="settings-confirm-password"
-                            type="password"
-                            value={settingsDraft.confirmPassword}
-                            onChange={(event) => setSettingsDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
-                            placeholder="Repeat new password"
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                          />
-                        </div>
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={savingSettings}
-                        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400"
-                      >
-                        <Settings2 className="h-4 w-4" />
-                        {savingSettings ? 'Saving...' : 'Save profile settings'}
-                      </button>
-                    </form>
-                  </section>
-
-                  <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Preview</p>
-                    <h2 className="mt-2 text-2xl font-semibold">Current profile</h2>
-                    <div className="mt-6 rounded-[2rem] bg-slate-50 p-5 dark:bg-slate-900/70">
-                      <div className="flex items-center gap-4">
-                        <img
-                          src={profileImage}
-                          alt="Current profile"
-                          className="h-20 w-20 rounded-3xl object-cover"
-                          onError={(event) => {
-                            event.currentTarget.onerror = null
-                            event.currentTarget.src = FALLBACK_PROFILE_IMAGE
-                          }}
-                        />
-                        <div>
-                          <p className="text-lg font-semibold">{studentData.name}</p>
-                          <p className="text-sm text-slate-600 dark:text-slate-300">{studentData.email}</p>
-                          <p className="text-sm text-slate-600 dark:text-slate-300">{studentData.studentId}</p>
-                        </div>
-                      </div>
-                      <div className="mt-6 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-                        <p>Phone: {studentData.phoneNumber || 'Not assigned'}</p>
-                        <p>Student category: {studentData.studentCategory === 'international' ? 'International' : 'Local'}</p>
-                        <p>Program: {studentData.program || studentData.course}</p>
-                        <p>College: {studentData.college || 'Not assigned'}</p>
-                        <p>Exam session: {studentData.semester || currentSession}</p>
-                        <p>Department: {studentData.department || 'Not assigned'}</p>
-                        <p>Course units: {studentData.courseUnits?.length ? studentData.courseUnits.join(', ') : 'Not assigned'}</p>
-                        <p>Permit status: {statusView.label}</p>
-                      </div>
-                    </div>
-                  </section>
-                </div>
-              )}
-
-              {activeSection === 'support' && (
-                <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-                  <div className="space-y-6">
+                {activeSection === 'settings' && (
+                  <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
                     <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                      <FileText className="h-9 w-9 text-blue-600 dark:text-blue-300" />
-                      <h2 className="mt-4 text-xl font-semibold">Help & support</h2>
-                      <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                        If your application is pending or rejected, review your remarks, confirm your document checklist, and make sure your fees are fully cleared before contacting the admin desk.
-                      </p>
-                    </section>
-
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                      <FileText className="h-9 w-9 text-emerald-600 dark:text-emerald-300" />
-                      <h2 className="mt-4 text-xl font-semibold">Document checklist</h2>
-                      <div className="mt-4 space-y-3">
-                        {requiredDocumentChecklist.map((item) => {
-                          const checked = applicationDraft.checklist.includes(item.id)
-
-                          return (
-                            <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/70">
-                              <span>{item.label}</span>
-                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${checked ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200'}`}>
-                                {checked ? 'Ready' : 'Pending'}
-                              </span>
-                            </div>
-                          )
-                        })}
+                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Profile Settings</p>
+                      <h2 className="mt-2 text-2xl font-semibold">Update your info</h2>
+                      <div className="flex justify-end mb-2">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200"
+                          onClick={() => void syncStudentProfile({ showLoading: true, clearError: true, syncDrafts: true })}
+                          aria-label="Refresh profile"
+                        >
+                          <RefreshCcw className="w-4 h-4" />
+                          Refresh
+                        </button>
                       </div>
-                    </section>
-
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                      <UserCircle2 className="h-9 w-9 text-sky-600 dark:text-sky-300" />
-                      <h2 className="mt-4 text-xl font-semibold">Contact desk</h2>
-                      <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                        {supportContacts.length > 0 ? supportContacts.map((contact) => (
-                          <div key={contact.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/70">
-                            <p className="font-semibold text-slate-900 dark:text-white">{contact.name}</p>
-                            <p>{contact.scope.replace('-', ' ')}</p>
-                            <p>Email: {contact.email}</p>
-                            <p>Phone: {contact.phoneNumber}</p>
+                      <form className="mt-6 space-y-4" onSubmit={(event) => void handleSettingsSave(event)}>
+                        <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                          Identity and contact changes update both your student profile and your login details. Use a valid email address and reachable phone number.
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <label htmlFor="settings-name" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Full name</label>
+                            <input
+                              id="settings-name"
+                              type="text"
+                              value={settingsDraft.name}
+                              onChange={(event) => setSettingsDraft((current) => ({ ...current, name: event.target.value }))}
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                              readOnly={user?.role === 'student'}
+                            />
                           </div>
-                        )) : (
-                          <p>No admin contacts are available right now.</p>
-                        )}
-                        <p>Office hours: Mon - Fri, 8:00 AM to 4:00 PM</p>
-                      </div>
-                    </section>
-                  </div>
-
-                  <div className="space-y-6">
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Need help</p>
-                      <h2 className="mt-2 text-2xl font-semibold">Send a support request</h2>
-                      <form className="mt-6 space-y-4" onSubmit={(event) => void handleSubmitSupportRequest(event)}>
-                        <div>
-                          <label htmlFor="support-subject" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Subject</label>
-                          <input
-                            id="support-subject"
-                            type="text"
-                            value={supportDraft.subject}
-                            onChange={(event) => setSupportDraft((current) => ({ ...current, subject: event.target.value }))}
-                            placeholder="Permit approval, fees, profile correction"
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                          />
+                          <div>
+                            <label htmlFor="settings-email" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Email address</label>
+                            <input
+                              id="settings-email"
+                              type="email"
+                              value={settingsDraft.email}
+                              onChange={(event) => setSettingsDraft((current) => ({ ...current, email: event.target.value }))}
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                              readOnly={user?.role === 'student'}
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label htmlFor="settings-phone" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Phone number</label>
+                            <input
+                              id="settings-phone"
+                              type="tel"
+                              value={settingsDraft.phoneNumber}
+                              onChange={(event) => setSettingsDraft((current) => ({ ...current, phoneNumber: event.target.value }))}
+                              placeholder="e.g. +256700123456"
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            />
+                          </div>
                         </div>
                         <div>
-                          <label htmlFor="support-message" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Message</label>
-                          <textarea
-                            id="support-message"
-                            rows={6}
-                            value={supportDraft.message}
-                            onChange={(event) => setSupportDraft((current) => ({ ...current, message: event.target.value }))}
-                            placeholder="Explain the issue you want the admin desk to resolve."
-                            className="w-full rounded-[1.75rem] border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                          <label htmlFor="settings-image" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Profile photo</label>
+                          <div className="flex gap-3 items-center">
+                            <input
+                              id="settings-image-upload"
+                              type="file"
+                              accept="image/*"
+                              title="Upload profile photo"
+                              placeholder="Choose profile photo"
+                              onChange={async (event) => {
+                                const file = event.target.files?.[0]
+                                if (!file) return
+
+                                const reader = new FileReader()
+                                reader.onload = () => {
+                                  const result = typeof reader.result === 'string' ? reader.result : ''
+                                  if (result) {
+                                    setSettingsDraft((current) => ({ ...current, profileImage: result }))
+                                    setStudentData((current) => current ? { ...current, profileImage: result } : current)
+                                  }
+                                }
+                                reader.onerror = () => {
+                                  alert('Failed to upload image.')
+                                }
+                                reader.readAsDataURL(file)
+                              }}
+                              className="block w-full text-sm text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                            />
+                            {settingsDraft.profileImage && (
+                              <img src={settingsDraft.profileImage} alt="Profile preview" className="h-12 w-12 rounded-full object-cover border" />
+                            )}
+                          </div>
+                          <input
+                            id="settings-image"
+                            type="url"
+                            value={settingsDraft.profileImage}
+                            onChange={(event) => setSettingsDraft((current) => ({ ...current, profileImage: event.target.value }))}
+                            placeholder="https://example.com/profile.jpg"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900 mt-2"
                           />
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          <div>
+                            <label htmlFor="settings-current-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Current password</label>
+                            <input
+                              id="settings-current-password"
+                              type="password"
+                              value={settingsDraft.currentPassword}
+                              onChange={(event) => setSettingsDraft((current) => ({ ...current, currentPassword: event.target.value }))}
+                              placeholder="Required to change password"
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="settings-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">New password</label>
+                            <input
+                              id="settings-password"
+                              type="password"
+                              value={settingsDraft.password}
+                              onChange={(event) => setSettingsDraft((current) => ({ ...current, password: event.target.value }))}
+                              placeholder="Leave blank to keep current password"
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="settings-confirm-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Confirm password</label>
+                            <input
+                              id="settings-confirm-password"
+                              type="password"
+                              value={settingsDraft.confirmPassword}
+                              onChange={(event) => setSettingsDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
+                              placeholder="Repeat new password"
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            />
+                          </div>
                         </div>
                         <button
                           type="submit"
-                          disabled={submittingSupport}
-                          className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={savingSettings}
+                          className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400"
                         >
-                          <Bell className="h-4 w-4" />
-                          {submittingSupport ? 'Sending...' : 'Send support request'}
+                          <Settings2 className="h-4 w-4" />
+                          {savingSettings ? 'Saving...' : 'Save profile settings'}
                         </button>
                       </form>
                     </section>
 
                     <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Support history</p>
-                          <h2 className="mt-2 text-2xl font-semibold">Your recent requests</h2>
+                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Preview</p>
+                      <h2 className="mt-2 text-2xl font-semibold">Current profile</h2>
+                      <div className="mt-6 rounded-[2rem] bg-slate-50 p-5 dark:bg-slate-900/70">
+                        <div className="flex items-center gap-4">
+                          <img
+                            src={profileImage}
+                            alt="Current profile"
+                            className="h-20 w-20 rounded-3xl object-cover"
+                            onError={(event) => {
+                              event.currentTarget.onerror = null
+                              event.currentTarget.src = FALLBACK_PROFILE_IMAGE
+                            }}
+                          />
+                          <div>
+                            <p className="text-lg font-semibold">{studentData.name}</p>
+                            <p className="text-sm text-slate-600 dark:text-slate-300">{studentData.email}</p>
+                            <p className="text-sm text-slate-600 dark:text-slate-300">{studentData.studentId}</p>
+                          </div>
                         </div>
-                        {loadingSupport && <span className="text-sm text-slate-500 dark:text-slate-300">Loading...</span>}
-                      </div>
-                      <div className="mt-5 space-y-3">
-                        {supportRequests.length > 0 ? supportRequests.map((request) => (
-                          <div key={request.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-sm font-semibold">{request.subject}</p>
-                              <span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white dark:bg-emerald-500 dark:text-slate-950">
-                                {request.status.replace('_', ' ')}
-                              </span>
-                            </div>
-                            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{formatDateTime(request.createdAt)}</p>
-                            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{request.message}</p>
-                            {request.adminReply && (
-                              <p className="mt-3 rounded-2xl bg-white px-3 py-2 text-sm text-slate-700 dark:bg-slate-950 dark:text-slate-200">
-                                Admin reply: {request.adminReply}
-                              </p>
-                            )}
-                          </div>
-                        )) : (
-                          <div className="rounded-3xl border border-dashed border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-300">
-                            No support requests submitted yet.
-                          </div>
-                        )}
+                        <div className="mt-6 space-y-3 text-sm text-slate-600 dark:text-slate-300">
+                          <p>Phone: {studentData.phoneNumber || 'Not assigned'}</p>
+                          <p>Student category: {studentData.studentCategory === 'international' ? 'International' : 'Local'}</p>
+                          <p>Program: {studentData.program || studentData.course}</p>
+                          <p>College: {studentData.college || 'Not assigned'}</p>
+                          <p>Exam session: {studentData.semester || currentSession}</p>
+                          <p>Department: {studentData.department || 'Not assigned'}</p>
+                          <p>Course units: {studentData.courseUnits?.length ? studentData.courseUnits.join(', ') : 'Not assigned'}</p>
+                          <p>Permit status: {statusView.label}</p>
+                        </div>
                       </div>
                     </section>
                   </div>
-                </div>
-              )}
+                )}
+
+                {activeSection === 'support' && (
+                  <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+                    <div className="space-y-6">
+                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <FileText className="h-9 w-9 text-blue-600 dark:text-blue-300" />
+                        <h2 className="mt-4 text-xl font-semibold">Help & support</h2>
+                        <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                          If your application is pending or rejected, review your remarks, confirm your document checklist, and make sure your fees are fully cleared before contacting the admin desk.
+                        </p>
+                      </section>
+
+                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <FileText className="h-9 w-9 text-emerald-600 dark:text-emerald-300" />
+                        <h2 className="mt-4 text-xl font-semibold">Document checklist</h2>
+                        <div className="mt-4 space-y-3">
+                          {requiredDocumentChecklist.map((item) => {
+                            const checked = applicationDraft.checklist.includes(item.id)
+
+                            return (
+                              <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/70">
+                                <span>{item.label}</span>
+                                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${checked ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200'}`}>
+                                  {checked ? 'Ready' : 'Pending'}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </section>
+
+                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <UserCircle2 className="h-9 w-9 text-sky-600 dark:text-sky-300" />
+                        <h2 className="mt-4 text-xl font-semibold">Contact desk</h2>
+                        <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                          {supportContacts.length > 0 ? supportContacts.map((contact) => (
+                            <div key={contact.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/70">
+                              <p className="font-semibold text-slate-900 dark:text-white">{contact.name}</p>
+                              <p>{contact.scope.replace('-', ' ')}</p>
+                              <p>Email: {contact.email}</p>
+                              <p>Phone: {contact.phoneNumber}</p>
+                            </div>
+                          )) : (
+                            <p>No admin contacts are available right now.</p>
+                          )}
+                          <p>Office hours: Mon - Fri, 8:00 AM to 4:00 PM</p>
+                        </div>
+                      </section>
+                    </div>
+
+                    <div className="space-y-6">
+                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Need help</p>
+                        <h2 className="mt-2 text-2xl font-semibold">Send a support request</h2>
+                        <form className="mt-6 space-y-4" onSubmit={(event) => void handleSubmitSupportRequest(event)}>
+                          <div>
+                            <label htmlFor="support-subject" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Subject</label>
+                            <input
+                              id="support-subject"
+                              type="text"
+                              value={supportDraft.subject}
+                              onChange={(event) => setSupportDraft((current) => ({ ...current, subject: event.target.value }))}
+                              placeholder="Permit approval, fees, profile correction"
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="support-message" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Message</label>
+                            <textarea
+                              id="support-message"
+                              rows={6}
+                              value={supportDraft.message}
+                              onChange={(event) => setSupportDraft((current) => ({ ...current, message: event.target.value }))}
+                              placeholder="Explain the issue you want the admin desk to resolve."
+                              className="w-full rounded-[1.75rem] border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={submittingSupport}
+                            className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <Bell className="h-4 w-4" />
+                            {submittingSupport ? 'Sending...' : 'Send support request'}
+                          </button>
+                        </form>
+                      </section>
+
+                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Support history</p>
+                            <h2 className="mt-2 text-2xl font-semibold">Your recent requests</h2>
+                          </div>
+                          {loadingSupport && <span className="text-sm text-slate-500 dark:text-slate-300">Loading...</span>}
+                        </div>
+                        <div className="mt-5 space-y-3">
+                          {supportRequests.length > 0 ? supportRequests.map((request) => (
+                            <div key={request.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-semibold">{request.subject}</p>
+                                <span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white dark:bg-emerald-500 dark:text-slate-950">
+                                  {request.status.replace('_', ' ')}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{formatDateTime(request.createdAt)}</p>
+                              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{request.message}</p>
+                              {request.adminReply && (
+                                <p className="mt-3 rounded-2xl bg-white px-3 py-2 text-sm text-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                                  Admin reply: {request.adminReply}
+                                </p>
+                              )}
+                            </div>
+                          )) : (
+                            <div className="rounded-3xl border border-dashed border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-300">
+                              No support requests submitted yet.
+                            </div>
+                          )}
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                )}
+
+                {activeSection === 'finance' && (
+                  <div className="space-y-6">
+                    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                      {/* Current Balance Card */}
+                      <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-emerald-500/10 blur-2xl"></div>
+                        <div className="relative z-10">
+                          <div className="flex items-center gap-4">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400">
+                              <Wallet className="h-6 w-6" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Current Balance</p>
+                              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                                UGX {studentData.feesBalance.toLocaleString()}
+                              </h2>
+                            </div>
+                          </div>
+                          <div className="mt-6 flex gap-3">
+                            <button
+                              type="button"
+                              className="flex-1 rounded-full bg-emerald-500 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600 shadow-sm"
+                            >
+                              Pay Now
+                            </button>
+                            <button
+                              type="button"
+                              className="flex-1 rounded-full border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 shadow-sm"
+                            >
+                              Download Invoice
+                            </button>
+                          </div>
+                        </div>
+                      </section>
+
+                      {/* Payment Statistics */}
+                      <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                        <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-blue-500/10 blur-2xl"></div>
+                        <div className="relative z-10 h-full flex flex-col justify-between">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Paid (Semester)</p>
+                            <PieChart className="h-5 w-5 text-blue-500" />
+                          </div>
+                          <div className="mt-2">
+                            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">UGX 1,500,000</h2>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                              <TrendingUp className="h-3 w-3 text-emerald-500" />
+                              Fully cleared for previous sessions
+                            </p>
+                          </div>
+                          <div className="mt-4 w-full rounded-full bg-slate-100 dark:bg-slate-800 h-2.5">
+                            <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: '75%' }}></div>
+                          </div>
+                          <p className="text-xs text-right mt-1 text-slate-500">75% of Annual Target</p>
+                        </div>
+                      </section>
+                      
+                      {/* Upcoming Deadlines */}
+                      <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none xl:col-span-1 md:col-span-2">
+                         <div className="flex items-center gap-3 mb-4">
+                            <CalendarDays className="h-5 w-5 text-orange-500" />
+                            <h3 className="font-semibold text-slate-900 dark:text-white">Important Deadlines</h3>
+                         </div>
+                         <div className="space-y-4">
+                           <div className="flex items-center justify-between border-l-2 border-orange-500 pl-3">
+                              <div>
+                                <p className="text-sm font-medium text-slate-900 dark:text-white">Final Exam Clearance</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Clear all balances to generate permit</p>
+                              </div>
+                              <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/40 dark:text-orange-300">In 14 Days</span>
+                           </div>
+                           <div className="flex items-center justify-between border-l-2 border-slate-300 dark:border-slate-600 pl-3">
+                              <div>
+                                <p className="text-sm font-medium text-slate-900 dark:text-white">Next Semester Reg.</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Early bird registration fee</p>
+                              </div>
+                              <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded-full dark:bg-slate-800 dark:text-slate-300">August 1st</span>
+                           </div>
+                         </div>
+                      </section>
+                    </div>
+
+                    {/* Recent Transactions */}
+                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Recent Transactions</h2>
+                        <button className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex text-center gap-1">
+                           <Download className="h-4 w-4" />
+                           Statement
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                          <thead>
+                            <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
+                              <th className="pb-3 font-medium">Date</th>
+                              <th className="pb-3 font-medium">Description</th>
+                              <th className="pb-3 font-medium">Method</th>
+                              <th className="pb-3 font-medium text-right">Amount</th>
+                              <th className="pb-3 font-medium text-center">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                            {[
+                              { date: 'Oct 12, 2023', desc: 'Tuition Installment 2', method: 'Mobile Money', amount: 'UGX 500,000', status: 'Completed' },
+                              { date: 'Sep 05, 2023', desc: 'Tuition Installment 1', method: 'Bank Transfer', amount: 'UGX 1,000,000', status: 'Completed' },
+                              { date: 'Aug 20, 2023', desc: 'Registration Fee', method: 'Visa Card', amount: 'UGX 150,000', status: 'Completed' },
+                            ].map((txn, idx) => (
+                              <tr key={idx} className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50">
+                                <td className="py-4 text-slate-600 dark:text-slate-300">{txn.date}</td>
+                                <td className="py-4 font-medium text-slate-900 dark:text-white">{txn.desc}</td>
+                                <td className="py-4 text-slate-600 dark:text-slate-300">
+                                  <div className="flex items-center gap-2">
+                                    <CreditCard className="h-4 w-4 text-slate-400" />
+                                    {txn.method}
+                                  </div>
+                                </td>
+                                <td className="py-4 text-right font-medium text-slate-900 dark:text-white">{txn.amount}</td>
+                                <td className="py-4 text-center">
+                                  <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                    {txn.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  </div>
+                )}
+
+                {activeSection === 'academics' && (
+                  <div className="space-y-6">
+                    {/* Academics Overview Header */}
+                    <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-gradient-to-r from-blue-600 to-indigo-700 p-8 shadow-xl shadow-blue-200/50 dark:border-slate-800 dark:from-slate-900 dark:to-indigo-950 dark:shadow-none mb-6">
+                       <div className="absolute right-0 top-0 opacity-10">
+                         <GraduationCap className="h-48 w-48 -mt-8 -mr-8" />
+                       </div>
+                       <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                         <div className="text-white">
+                           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 mb-4 text-xs font-semibold backdrop-blur-sm">
+                             <TrendingUp className="h-3.5 w-3.5" /> Present Semester
+                           </span>
+                           <h1 className="text-3xl font-bold">{currentSession}</h1>
+                           <p className="mt-2 text-blue-100 max-w-md">You are currently enrolled in {studentData.courseUnits?.length || 0} active course units. Keep up the good work!</p>
+                         </div>
+                         <div className="flex gap-4">
+                           <div className="rounded-2xl bg-white/10 px-6 py-4 backdrop-blur-md border border-white/20 text-center">
+                             <p className="text-blue-100 text-xs uppercase tracking-wider font-semibold">Current GPA</p>
+                             <p className="text-3xl font-bold text-white mt-1">3.8<span className="text-lg text-blue-200 font-medium">/4.0</span></p>
+                           </div>
+                           <div className="rounded-2xl bg-white/10 px-6 py-4 backdrop-blur-md border border-white/20 text-center">
+                             <p className="text-blue-100 text-xs uppercase tracking-wider font-semibold">Credits</p>
+                             <p className="text-3xl font-bold text-white mt-1">{(studentData.courseUnits?.length || 0) * 3}</p>
+                           </div>
+                         </div>
+                       </div>
+                    </section>
+                    
+                    {/* Courses Grid */}
+                    <div className="flex items-center justify-between mb-2">
+                       <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Enrolled Courses</h2>
+                       <button className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition">View full transcript &rarr;</button>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {studentData.courseUnits?.map((unit, idx) => {
+                        // Mock data for visual richness based on the unit string
+                        const [code, ...nameParts] = unit.split(' ')
+                        const title = nameParts.join(' ') || unit
+                        const progress = Math.floor(Math.random() * 40) + 60 // Random progress between 60-100%
+
+                        return (
+                          <div key={idx} className="group relative rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:shadow-lg hover:shadow-blue-100/50 hover:-translate-y-1 dark:border-slate-800 dark:bg-slate-950/70 hover:dark:shadow-none">
+                            <div className="flex justify-between items-start mb-4">
+                               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                                  <BookOpen className="h-5 w-5" />
+                               </div>
+                               <span className="text-xs font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{code}</span>
+                            </div>
+                            <h3 className="text-base font-semibold text-slate-900 dark:text-white leading-snug lined-clamp-2 min-h-[2.5rem]">{title}</h3>
+                            <div className="mt-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                               <span className="flex items-center gap-1.5"><UserCircle2 className="h-3.5 w-3.5" /> Dr. Assignment Mock</span>
+                               <span>3 Credits</span>
+                            </div>
+                            <div className="mt-5 border-t border-slate-100 pt-4 dark:border-slate-800/50">
+                               <div className="flex justify-between items-center mb-1.5">
+                                 <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Course Progress</span>
+                                 <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{progress}%</span>
+                               </div>
+                               <div className="w-full bg-slate-100 rounded-full h-1.5 dark:bg-slate-800">
+                                  <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-1000" style={{ width: `${progress}%` }}></div>
+                               </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {(!studentData.courseUnits || studentData.courseUnits.length === 0) && (
+                        <div className="col-span-full rounded-3xl border border-dashed border-slate-300 p-10 text-center dark:border-slate-700">
+                          <BookOpen className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
+                          <h3 className="text-lg font-medium text-slate-900 dark:text-white">No courses loaded</h3>
+                          <p className="mt-1 text-sm text-slate-500">You are not currently enrolled in any course units.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </main>
           </div>
         </div>
       </div>
+
+      {showSignOut && (
+        <SignOutDialog
+          signingOut={signingOut}
+          onConfirm={async () => {
+            setSigningOut(true)
+            await signOut()
+            setSigningOut(false)
+          }}
+          onCancel={() => setShowSignOut(false)}
+        />
+      )}
     </div>
   )
 }

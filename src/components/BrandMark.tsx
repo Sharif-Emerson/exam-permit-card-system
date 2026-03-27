@@ -1,23 +1,25 @@
-import { ShieldCheck } from 'lucide-react'
-import { institutionName } from '../config/branding'
+import { institutionName, institutionLogo } from '../config/branding'
 
 type BrandMarkProps = {
   align?: 'left' | 'center'
   titleClassName?: string
   subtitleClassName?: string
-  iconClassName?: string
 }
 
 export default function BrandMark({
   align = 'left',
   titleClassName = 'text-2xl font-bold text-slate-950',
   subtitleClassName = 'text-sm text-slate-600',
-  iconClassName = 'h-6 w-6 text-white',
 }: BrandMarkProps) {
   return (
     <div className={`flex items-center gap-3 ${align === 'center' ? 'justify-center text-center' : 'justify-start text-left'}`}>
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 via-green-600 to-lime-500 shadow-md shadow-emerald-200">
-        <ShieldCheck className={iconClassName} />
+      <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center">
+        <img
+          src={institutionLogo}
+          alt={`${institutionName} logo`}
+          className="h-full w-full object-contain"
+          draggable={false}
+        />
       </div>
       <div>
         <div className={titleClassName}>{institutionName}</div>
