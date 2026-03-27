@@ -5,6 +5,7 @@ import {
   FileSpreadsheet, FileUp, LayoutDashboard, LogOut, Menu,
   Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Sun, Trash2, Upload, Users, X,
 } from 'lucide-react'
+import { KIU_COLLEGES, KIU_COURSES, KIU_DEPARTMENTS, KIU_SEMESTERS } from '../config/universityData'
 import BrandMark from './BrandMark'
 import PermitCard from './PermitCard'
 import { SaveConfirmationDialog, useNavigationWithConfirmation } from './SaveConfirmationDialog'
@@ -3974,14 +3975,18 @@ export default function AdminPanel() {
                 </div>
                 <div>
                   <label htmlFor="edit-student-course" className="mb-1 block text-xs font-medium text-gray-700">Course</label>
-                  <input
+                  <select
                     id="edit-student-course"
-                    type="text"
                     value={editDraft.course}
                     onChange={(e) => setEditDraft((d) => ({ ...d, course: e.target.value }))}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                    placeholder="e.g. BSc Computer Science"
-                  />
+                  >
+                    <option value="">Select Course</option>
+                    {KIU_COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+                    {!KIU_COURSES.includes(editDraft.course) && editDraft.course && (
+                      <option value={editDraft.course}>{editDraft.course} (Current)</option>
+                    )}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="edit-student-profile-image" className="mb-1 block text-xs font-medium text-gray-700">Profile Photo</label>
@@ -4041,45 +4046,63 @@ export default function AdminPanel() {
                 </div>
                 <div>
                   <label htmlFor="edit-student-program" className="mb-1 block text-xs font-medium text-gray-700">Program</label>
-                  <input
+                  <select
                     id="edit-student-program"
-                    type="text"
                     value={editDraft.program ?? ''}
                     onChange={(e) => setEditDraft((d) => ({ ...d, program: e.target.value }))}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                    placeholder="e.g. BSc Computer Science"
-                  />
+                  >
+                    <option value="">Select Program</option>
+                    {KIU_COURSES.map(p => <option key={p} value={p}>{p}</option>)}
+                    {editDraft.program && !KIU_COURSES.includes(editDraft.program) && (
+                      <option value={editDraft.program}>{editDraft.program} (Current)</option>
+                    )}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="edit-student-college" className="mb-1 block text-xs font-medium text-gray-700">College</label>
-                  <input
+                  <select
                     id="edit-student-college"
-                    type="text"
                     value={editDraft.college ?? ''}
                     onChange={(e) => setEditDraft((d) => ({ ...d, college: e.target.value }))}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
+                  >
+                    <option value="">Select College</option>
+                    {KIU_COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
+                    {editDraft.college && !KIU_COLLEGES.includes(editDraft.college) && (
+                      <option value={editDraft.college}>{editDraft.college} (Current)</option>
+                    )}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="edit-student-department" className="mb-1 block text-xs font-medium text-gray-700">Department</label>
-                  <input
+                  <select
                     id="edit-student-department"
-                    type="text"
                     value={editDraft.department ?? ''}
                     onChange={(e) => setEditDraft((d) => ({ ...d, department: e.target.value }))}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
+                  >
+                    <option value="">Select Department</option>
+                    {KIU_DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    {editDraft.department && !KIU_DEPARTMENTS.includes(editDraft.department) && (
+                      <option value={editDraft.department}>{editDraft.department} (Current)</option>
+                    )}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="edit-student-semester" className="mb-1 block text-xs font-medium text-gray-700">Semester</label>
-                  <input
+                  <select
                     id="edit-student-semester"
-                    type="text"
                     value={editDraft.semester ?? ''}
                     onChange={(e) => setEditDraft((d) => ({ ...d, semester: e.target.value }))}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                    placeholder="e.g. Semester 1 2026/2027"
-                  />
+                  >
+                    <option value="">Select Semester</option>
+                    {KIU_SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
+                    {editDraft.semester && !KIU_SEMESTERS.includes(editDraft.semester) && (
+                      <option value={editDraft.semester}>{editDraft.semester} (Current)</option>
+                    )}
+                  </select>
                 </div>
               </div>
               <div>
@@ -4236,57 +4259,64 @@ export default function AdminPanel() {
                 </div>
                 <div>
                   <label htmlFor="create-student-course" className="mb-1 block text-xs font-medium text-gray-700">Course</label>
-                  <input
+                  <select
                     id="create-student-course"
-                    type="text"
                     required
-                    maxLength={120}
                     value={createDraft.course}
                     onChange={(event) => setCreateDraft((current) => ({ ...current, course: event.target.value }))}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                    placeholder="e.g. BSc Computer Science"
-                  />
+                  >
+                    <option value="">Select Course</option>
+                    {KIU_COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="create-student-program" className="mb-1 block text-xs font-medium text-gray-700">Program</label>
-                  <input
+                  <select
                     id="create-student-program"
-                    type="text"
                     value={createDraft.program ?? ''}
                     onChange={(event) => setCreateDraft((current) => ({ ...current, program: event.target.value }))}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
+                  >
+                    <option value="">Select Program</option>
+                    {KIU_COURSES.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="create-student-college" className="mb-1 block text-xs font-medium text-gray-700">College</label>
-                  <input
+                  <select
                     id="create-student-college"
-                    type="text"
                     value={createDraft.college ?? ''}
                     onChange={(event) => setCreateDraft((current) => ({ ...current, college: event.target.value }))}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
+                  >
+                    <option value="">Select College</option>
+                    {KIU_COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="create-student-department" className="mb-1 block text-xs font-medium text-gray-700">Department</label>
-                  <input
+                  <select
                     id="create-student-department"
-                    type="text"
                     value={createDraft.department ?? ''}
                     onChange={(event) => setCreateDraft((current) => ({ ...current, department: event.target.value }))}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
+                  >
+                    <option value="">Select Department</option>
+                    {KIU_DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="create-student-semester" className="mb-1 block text-xs font-medium text-gray-700">Semester</label>
-                  <input
+                  <select
                     id="create-student-semester"
-                    type="text"
                     value={createDraft.semester ?? ''}
                     onChange={(event) => setCreateDraft((current) => ({ ...current, semester: event.target.value }))}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                    placeholder="e.g. Semester 1 2026/2027"
-                  />
+                  >
+                    <option value="">Select Semester</option>
+                    {KIU_SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="create-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">Expected Total Fees ($)</label>
