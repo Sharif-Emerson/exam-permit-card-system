@@ -97,6 +97,8 @@ export interface StudentListQuery {
   status?: StudentListStatusFilter
   department?: string
   program?: string
+  course?: string
+  college?: string
 }
 
 export interface StudentListPage {

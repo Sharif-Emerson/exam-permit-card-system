@@ -1,4 +1,5 @@
 import { Calendar, Clock, Download, LogOut, MapPin, Printer, RefreshCcw, User } from 'lucide-react'
+import { useCallback } from 'react'
 import { generalExamRules } from '../config/examRules'
 import { institutionLogo, institutionName, examPermitConfig } from '../config/branding'
 import type { StudentProfile } from '../types'
@@ -16,6 +17,18 @@ type PermitCardProps = {
 }
 
 export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOut, onPrint, onDownload }: PermitCardProps) {
+  // Notify backend on permit print/download
+  const notifyPermitEvent = useCallback(async (eventType: 'print' | 'download') => {
+    try {
+      await fetch(`/api/profiles/${studentData.id}/permit-event`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventType }),
+      })
+    } catch (err) {
+      // Ignore errors for notification
+    }
+  }, [studentData.id])
   const paymentPercentage = studentData.totalFees > 0
     ? Math.min((studentData.amountPaid / studentData.totalFees) * 100, 100)
     : studentData.amountPaid > 0 ? 100 : 0
@@ -25,6 +38,13 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
     : studentData.printAccessMessage || 'You have reached the monthly permit print limit. Contact administration for access.'
 
   const profileImage = studentData.profileImage?.trim() ? studentData.profileImage : FALLBACK_PROFILE_IMAGE
+
+  // Permit validity: valid from today to exam date or a set period (e.g., 30 days from issue)
+  const issueDate = new Date()
+  // If student has exams, use the latest exam date as expiry; else, 30 days from now
+  const expiryDate = studentData.exams.length > 0
+    ? new Date(Math.max(...studentData.exams.map(e => new Date(e.examDate).getTime())))
+    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
 
   return (
     <div className="min-h-screen bg-slate-100 py-4 sm:py-8 print:bg-white">
@@ -53,7 +73,29 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
           </div>
         </div>
 
-        <div className="permit-sheet bg-amber-50 rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border border-amber-200">
+        <div className="permit-sheet bg-amber-50 rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border border-amber-200 relative">
+                    {/* Watermark for print/download view */}
+                    <div className="hidden print:block pointer-events-none select-none" style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      zIndex: 0,
+                      opacity: 0.08,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '5rem',
+                      fontWeight: 900,
+                      textTransform: 'uppercase',
+                      color: '#0f5132',
+                      letterSpacing: '0.2em',
+                      userSelect: 'none',
+                      pointerEvents: 'none',
+                    }}>
+                      {institutionName}
+                    </div>
           <div className="text-center mb-6 sm:mb-8 border-b border-slate-200 pb-5 print:hidden">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-2">Official Examination Access Card</p>
             <BrandMark
@@ -154,6 +196,10 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
             </div>
           </div>
 
+          {/* Permit validity period (print only) */}
+          <div className="hidden print:block print:mb-2 text-center text-[10px] text-slate-700 font-semibold tracking-wider">
+            Permit Valid: {issueDate.toLocaleDateString()} — {expiryDate.toLocaleDateString()}
+          </div>
           {/* Print grid for booklet layout */}
           <div className="print:grid print:grid-cols-[1.2fr_1fr] print:gap-x-6 print:items-start">
             {/* Column 1: Exams */}
@@ -301,7 +347,10 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
 
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 no-print">
             <button
-              onClick={onPrint}
+              onClick={async () => {
+                await notifyPermitEvent('print')
+                onPrint()
+              }}
               disabled={permitOutputLocked}
               className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2 sm:py-2 rounded-lg transition-colors text-sm sm:text-base ${permitOutputLocked
                 ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
@@ -313,7 +362,10 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
               <span>Print Permit</span>
             </button>
             <button
-              onClick={onDownload}
+              onClick={async () => {
+                await notifyPermitEvent('download')
+                onDownload()
+              }}
               disabled={permitOutputLocked}
               className={`flex items-center justify-center space-x-2 px-4 sm:px-6 py-2 sm:py-2 rounded-lg transition-colors text-sm sm:text-base ${permitOutputLocked
                 ? 'bg-gray-400 text-gray-200 cursor-not-allowed'

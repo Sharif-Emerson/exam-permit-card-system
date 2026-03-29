@@ -16,6 +16,46 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (requestPath) => requestPath.replace(/^\/api/, ''),
         },
+        '/admin': {
+          target: devProxyTarget,
+          changeOrigin: true,
+        },
+        '/uploads': {
+          target: devProxyTarget,
+          changeOrigin: true,
+        },
+        '/auth': {
+          target: devProxyTarget,
+          changeOrigin: true,
+        },
+        '/profiles': {
+          target: devProxyTarget,
+          changeOrigin: true,
+        },
+        '/permit-activity': {
+          target: devProxyTarget,
+          changeOrigin: true,
+        },
+        '/support-contacts': {
+          target: devProxyTarget,
+          changeOrigin: true,
+        },
+        '/support-requests': {
+          target: devProxyTarget,
+          changeOrigin: true,
+        },
+        '/system-settings': {
+          target: devProxyTarget,
+          changeOrigin: true,
+        },
+        '/admin-activity-logs': {
+          target: devProxyTarget,
+          changeOrigin: true,
+        },
+        '/profiles-trash': {
+          target: devProxyTarget,
+          changeOrigin: true,
+        },
       },
     },
     build: {
@@ -50,4 +90,3 @@ export default defineConfig(({ mode }) => {
     },
   }
 })
-  

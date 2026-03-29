@@ -371,6 +371,8 @@ export default function AdminPanel() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'outstanding'>('all')
   const [filterDepartment, setFilterDepartment] = useState<string>('')
   const [filterProgram, setFilterProgram] = useState<string>('')
+  const [filterCourse, setFilterCourse] = useState<string>('')
+  const [filterCollege, setFilterCollege] = useState<string>('')
   const [page, setPage] = useState(1)
   const [pageSize] = useState(STUDENT_PAGE_SIZE)
   const [totalItems, setTotalItems] = useState(0)
@@ -421,6 +423,8 @@ export default function AdminPanel() {
     status?: 'all' | 'paid' | 'outstanding'
     department?: string
     program?: string
+    course?: string
+    college?: string
   }) => {
     const silent = options?.silent ?? false
     const nextPage = options?.page ?? page
@@ -428,6 +432,8 @@ export default function AdminPanel() {
     const nextStatus = options?.status ?? filterStatus
     const nextDepartment = options?.department ?? filterDepartment
     const nextProgram = options?.program ?? filterProgram
+    const nextCourse = options?.course ?? filterCourse
+    const nextCollege = options?.college ?? filterCollege
 
     try {
       if (!silent) {
@@ -442,6 +448,8 @@ export default function AdminPanel() {
         status: nextStatus,
         department: nextDepartment,
         program: nextProgram,
+        course: nextCourse,
+        college: nextCollege,
       })
       const nextStudents = nextStudentPage.items
 
@@ -472,7 +480,7 @@ export default function AdminPanel() {
         setLoading(false)
       }
     }
-  }, [filterStatus, page, pageSize, searchQuery, filterDepartment, filterProgram])
+  }, [filterStatus, page, pageSize, searchQuery, filterDepartment, filterProgram, filterCourse, filterCollege])
 
   const loadTrashedStudents = useCallback(async () => {
     if (!canManageStudentProfiles) {
@@ -975,13 +983,29 @@ export default function AdminPanel() {
     ? students.filter((student) => getStudentPrintSummary(student.id).hasPrinted)
     : students
 
-  const filteredStudents = visibleStudents
-  const hasActiveStudentFilters = Boolean(searchQuery.trim()) || filterStatus !== 'all' || showPrintedOnly
+  let filteredStudents = visibleStudents
+  if (filterDepartment) {
+    filteredStudents = filteredStudents.filter((student) => student.department === filterDepartment)
+  }
+  if (filterProgram) {
+    filteredStudents = filteredStudents.filter((student) => student.program === filterProgram)
+  }
+  if (filterCourse) {
+    filteredStudents = filteredStudents.filter((student) => student.course === filterCourse)
+  }
+  if (filterCollege) {
+    filteredStudents = filteredStudents.filter((student) => student.college === filterCollege)
+  }
+  const hasActiveStudentFilters = Boolean(searchQuery.trim()) || filterStatus !== 'all' || showPrintedOnly || filterDepartment || filterProgram || filterCourse || filterCollege
   const activeStudentFilterLabels = [
     searchQuery.trim() ? `Search: ${searchQuery.trim()}` : null,
     filterStatus === 'paid' ? 'Status: Cleared only' : null,
     filterStatus === 'outstanding' ? 'Status: Outstanding only' : null,
     showPrintedOnly ? 'Permit activity: Printed only' : null,
+    filterDepartment ? `Department: ${filterDepartment}` : null,
+    filterProgram ? `Program: ${filterProgram}` : null,
+    filterCourse ? `Course: ${filterCourse}` : null,
+    filterCollege ? `College: ${filterCollege}` : null,
   ].filter((label): label is string => Boolean(label))
   const openSupportRequestCount = supportRequests.filter((request) => request.status !== 'resolved').length
   const permitEventCount = activityTotalItems
@@ -990,7 +1014,19 @@ export default function AdminPanel() {
   const activityPageStart = activityTotalItems === 0 ? 0 : ((activityPage - 1) * ACTIVITY_PAGE_SIZE) + 1
   const activityPageEnd = activityTotalItems === 0 ? 0 : Math.min(activityPage * ACTIVITY_PAGE_SIZE, activityTotalItems)
   const selectedPermitStudents = students.filter((student) => selectedPermitStudentIds.includes(student.id))
-  const clearedSelectedPermitStudents = selectedPermitStudents.filter((student) => student.feesBalance === 0)
+  let clearedSelectedPermitStudents = selectedPermitStudents.filter((student) => student.feesBalance === 0)
+  if (filterDepartment) {
+    clearedSelectedPermitStudents = clearedSelectedPermitStudents.filter((student) => student.department === filterDepartment)
+  }
+  if (filterProgram) {
+    clearedSelectedPermitStudents = clearedSelectedPermitStudents.filter((student) => student.program === filterProgram)
+  }
+  if (filterCourse) {
+    clearedSelectedPermitStudents = clearedSelectedPermitStudents.filter((student) => student.course === filterCourse)
+  }
+  if (filterCollege) {
+    clearedSelectedPermitStudents = clearedSelectedPermitStudents.filter((student) => student.college === filterCollege)
+  }
 
   const courseBreakdown = students.reduce<Record<string, { total: number; cleared: number }>>((acc, s) => {
     const course = s.course || 'Unknown'
@@ -1078,8 +1114,22 @@ export default function AdminPanel() {
       return
     }
 
+    let printableStudents = students.filter((student) => student.feesBalance === 0)
+    if (filterDepartment) {
+      printableStudents = printableStudents.filter((student) => student.department === filterDepartment)
+    }
+    if (filterProgram) {
+      printableStudents = printableStudents.filter((student) => student.program === filterProgram)
+    }
+    if (filterCourse) {
+      printableStudents = printableStudents.filter((student) => student.course === filterCourse)
+    }
+    if (filterCollege) {
+      printableStudents = printableStudents.filter((student) => student.college === filterCollege)
+    }
+
     await handleBulkPrintStudents(
-      students.filter((student) => student.feesBalance === 0),
+      printableStudents,
       'Bulk_Permits_All_Eligible',
       'No cleared students are currently available for bulk permit generation.',
     )
@@ -1099,6 +1149,10 @@ export default function AdminPanel() {
     setSearchQuery('')
     setFilterStatus('all')
     setShowPrintedOnly(false)
+    setFilterDepartment('')
+    setFilterProgram('')
+    setFilterCourse('')
+    setFilterCollege('')
     setPage(1)
   }
 
@@ -1176,6 +1230,12 @@ export default function AdminPanel() {
     }
     if (filterProgram) {
       printableStudents = printableStudents.filter((student) => student.program === filterProgram);
+    }
+    if (filterCourse) {
+      printableStudents = printableStudents.filter((student) => student.course === filterCourse);
+    }
+    if (filterCollege) {
+      printableStudents = printableStudents.filter((student) => student.college === filterCollege);
     }
     await handleBulkPrintStudents(printableStudents, `Cleared_Permits_Page_${page}`, 'There are no cleared students on this page to print.')
   }
@@ -1695,7 +1755,20 @@ export default function AdminPanel() {
   }
 
   function handleSelectClearedStudentsOnPage() {
-    const clearedIds = students.filter((student) => student.feesBalance === 0).map((student) => student.id)
+    let clearedStudents = students.filter((student) => student.feesBalance === 0)
+    if (filterDepartment) {
+      clearedStudents = clearedStudents.filter((student) => student.department === filterDepartment)
+    }
+    if (filterProgram) {
+      clearedStudents = clearedStudents.filter((student) => student.program === filterProgram)
+    }
+    if (filterCourse) {
+      clearedStudents = clearedStudents.filter((student) => student.course === filterCourse)
+    }
+    if (filterCollege) {
+      clearedStudents = clearedStudents.filter((student) => student.college === filterCollege)
+    }
+    const clearedIds = clearedStudents.map((student) => student.id)
 
     if (clearedIds.length === 0) {
       setSelectedPermitStudentIds([])
@@ -1706,10 +1779,10 @@ export default function AdminPanel() {
     setSelectedPermitStudentIds(allSelected ? [] : clearedIds)
   }
 
-  const allClearedStudentsOnPageSelected = students
+  const allClearedStudentsOnPageSelected = filteredStudents
     .filter((student) => student.feesBalance === 0)
     .every((student) => selectedPermitStudentIds.includes(student.id))
-    && students.some((student) => student.feesBalance === 0)
+    && filteredStudents.some((student) => student.feesBalance === 0)
 
   const navItems: { key: NavSection; label: string; icon: ReactNode; badge?: number }[] = [
     { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -3469,6 +3542,26 @@ export default function AdminPanel() {
                       value={filterProgram}
                       onChange={e => setFilterProgram(e.target.value)}
                       placeholder="Filter by program"
+                      className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-gray-700">
+                    Course:
+                    <input
+                      type="text"
+                      value={filterCourse}
+                      onChange={e => setFilterCourse(e.target.value)}
+                      placeholder="Filter by course"
+                      className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-gray-700">
+                    College:
+                    <input
+                      type="text"
+                      value={filterCollege}
+                      onChange={e => setFilterCollege(e.target.value)}
+                      placeholder="Filter by college"
                       className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
                     />
                   </label>

@@ -822,7 +822,7 @@ export function listProfiles(role) {
   return rows.map((row) => mapProfile(row, examsByProfileId))
 }
 
-export function listProfilesPage({ role, search, status, page = 1, pageSize = 25 } = {}) {
+export function listProfilesPage({ role, search, status, department, program, course, college, page = 1, pageSize = 25 } = {}) {
   const whereClauses = []
   const params = []
 
@@ -846,6 +846,26 @@ export function listProfilesPage({ role, search, status, page = 1, pageSize = 25
       OR LOWER(COALESCE(semester, '')) LIKE ?
     )`)
     params.push(searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue)
+  }
+
+  if (typeof department === 'string' && department.trim()) {
+    whereClauses.push('LOWER(COALESCE(department, '')) = LOWER(?)')
+    params.push(department.trim())
+  }
+
+  if (typeof program === 'string' && program.trim()) {
+    whereClauses.push('LOWER(COALESCE(program, '')) = LOWER(?)')
+    params.push(program.trim())
+  }
+
+  if (typeof course === 'string' && course.trim()) {
+    whereClauses.push('LOWER(COALESCE(course, '')) = LOWER(?)')
+    params.push(course.trim())
+  }
+
+  if (typeof college === 'string' && college.trim()) {
+    whereClauses.push('LOWER(COALESCE(college, '')) = LOWER(?)')
+    params.push(college.trim())
   }
 
   if (status === 'paid') {

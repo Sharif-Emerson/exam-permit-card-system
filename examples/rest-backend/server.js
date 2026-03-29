@@ -69,7 +69,8 @@ app.use(cors({
       return
     }
 
-    callback(new Error('Origin is not allowed by CORS.'))
+    // Return 403 Forbidden instead of throwing an error
+    callback(null, false)
   },
 }))
 

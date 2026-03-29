@@ -321,6 +321,22 @@ export const restDataAdapter: DataAdapter = {
       params.set('status', query.status)
     }
 
+    if (typeof query?.department === 'string' && query.department.trim()) {
+      params.set('department', query.department.trim())
+    }
+
+    if (typeof query?.program === 'string' && query.program.trim()) {
+      params.set('program', query.program.trim())
+    }
+
+    if (typeof query?.course === 'string' && query.course.trim()) {
+      params.set('course', query.course.trim())
+    }
+
+    if (typeof query?.college === 'string' && query.college.trim()) {
+      params.set('college', query.college.trim())
+    }
+
     const payload = await request(`/profiles?${params.toString()}`, { method: 'GET' })
     return toStudentListPage(payload)
   },

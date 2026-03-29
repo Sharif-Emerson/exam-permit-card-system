@@ -124,6 +124,91 @@ export const KIU_CURRICULUM: Record<string, KiuProgramCurriculum> = {
       ]
     }
   },
+  'BSc Software Engineering': {
+    defaultCourse: 'BSc Software Engineering',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'SEN 1101: Introduction to Software Engineering', venue: 'Lab 1', time: '09:00 AM' },
+        { unitName: 'COS 1102: Introduction To Mathematical Analysis', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1100: Computer Fundamentals', venue: 'Auditorium', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'SEN 1201: Software Requirements Engineering', venue: 'Lab 2', time: '09:00 AM' },
+        { unitName: 'SEN 1202: Software Design Patterns', venue: 'Lab 1', time: '02:00 PM' },
+        { unitName: 'COS 1202: Data Structures and Algorithms', venue: 'Main Hall', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Computer Science (BCS)': {
+    defaultCourse: 'Bachelor of Computer Science (BCS)',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'BCS 1101: Computer Science Fundamentals', venue: 'Lab 1', time: '09:00 AM' },
+        { unitName: 'COS 1102: Introduction To Mathematical Analysis', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1100: Computer Fundamentals', venue: 'Auditorium', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'BCS 1201: Advanced Programming', venue: 'Lab 2', time: '09:00 AM' },
+        { unitName: 'BCS 1202: Database Systems', venue: 'Lab 1', time: '02:00 PM' },
+        { unitName: 'COS 1202: Data Structures and Algorithms', venue: 'Main Hall', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Information Technology (BIT)': {
+    defaultCourse: 'Bachelor of Information Technology (BIT)',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'BIT 1101: IT Fundamentals', venue: 'Lab 1', time: '09:00 AM' },
+        { unitName: 'COS 1102: Introduction To Mathematical Analysis', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1100: Computer Fundamentals', venue: 'Auditorium', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'BIT 1201: IT Infrastructure', venue: 'Lab 2', time: '09:00 AM' },
+        { unitName: 'BIT 1202: Network Administration', venue: 'Lab 1', time: '02:00 PM' },
+        { unitName: 'COS 1202: Data Structures and Algorithms', venue: 'Main Hall', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Electrical Engineering': {
+    defaultCourse: 'BSc Electrical Engineering',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'ELE 1101: Electrical Engineering Fundamentals', venue: 'Lab 1', time: '09:00 AM' },
+        { unitName: 'COS 1102: Introduction To Mathematical Analysis', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1100: Computer Fundamentals', venue: 'Auditorium', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'ELE 1201: Circuit Analysis', venue: 'Lab 2', time: '09:00 AM' },
+        { unitName: 'ELE 1202: Digital Electronics', venue: 'Lab 1', time: '02:00 PM' },
+        { unitName: 'COS 1202: Data Structures and Algorithms', venue: 'Main Hall', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Civil Engineering': {
+    defaultCourse: 'BSc Civil Engineering',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'CVE 1101: Civil Engineering Fundamentals', venue: 'Lab 1', time: '09:00 AM' },
+        { unitName: 'COS 1102: Introduction To Mathematical Analysis', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1100: Computer Fundamentals', venue: 'Auditorium', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'CVE 1201: Structural Analysis', venue: 'Lab 2', time: '09:00 AM' },
+        { unitName: 'CVE 1202: Surveying', venue: 'Lab 1', time: '02:00 PM' },
+        { unitName: 'COS 1202: Data Structures and Algorithms', venue: 'Main Hall', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
   'Bachelor of Laws (LLB)': {
     defaultCourse: 'Bachelor of Laws (LLB)',
     semesters: {
@@ -137,6 +222,142 @@ export const KIU_CURRICULUM: Record<string, KiuProgramCurriculum> = {
         { unitName: 'LAW 1201: Contracts II', venue: 'Law Hall 1', time: '09:00 AM' },
         { unitName: 'LAW 1202: Constitutional Law II', venue: 'Law Hall 2', time: '02:00 PM' },
         { unitName: 'LAW 1203: Torts I', venue: 'Law Hall 1', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
+  'MBChB (Medicine and Surgery)': {
+    defaultCourse: 'MBChB (Medicine and Surgery)',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'MED 1101: Anatomy I', venue: 'Medical Hall 1', time: '09:00 AM' },
+        { unitName: 'MED 1102: Physiology I', venue: 'Medical Hall 2', time: '02:00 PM' },
+        { unitName: 'MED 1103: Biochemistry I', venue: 'Lab 1', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'MED 1201: Anatomy II', venue: 'Medical Hall 1', time: '09:00 AM' },
+        { unitName: 'MED 1202: Physiology II', venue: 'Medical Hall 2', time: '02:00 PM' },
+        { unitName: 'MED 1203: Biochemistry II', venue: 'Lab 1', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BBA (Business Administration)': {
+    defaultCourse: 'BBA (Business Administration)',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'BBA 1101: Introduction to Business', venue: 'Business Hall 1', time: '09:00 AM' },
+        { unitName: 'BBA 1102: Principles of Management', venue: 'Business Hall 2', time: '02:00 PM' },
+        { unitName: 'BBA 1103: Business Mathematics', venue: 'Room 4', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'BBA 1201: Financial Accounting', venue: 'Business Hall 1', time: '09:00 AM' },
+        { unitName: 'BBA 1202: Marketing Principles', venue: 'Business Hall 2', time: '02:00 PM' },
+        { unitName: 'BBA 1203: Business Statistics', venue: 'Room 4', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Pharmacy': {
+    defaultCourse: 'Bachelor of Pharmacy',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'PHR 1101: Pharmaceutical Chemistry I', venue: 'Pharmacy Lab 1', time: '09:00 AM' },
+        { unitName: 'PHR 1102: Pharmacology I', venue: 'Pharmacy Hall 1', time: '02:00 PM' },
+        { unitName: 'PHR 1103: Pharmaceutics I', venue: 'Pharmacy Lab 2', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'PHR 1201: Pharmaceutical Chemistry II', venue: 'Pharmacy Lab 1', time: '09:00 AM' },
+        { unitName: 'PHR 1202: Pharmacology II', venue: 'Pharmacy Hall 1', time: '02:00 PM' },
+        { unitName: 'PHR 1203: Pharmaceutics II', venue: 'Pharmacy Lab 2', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Nursing Science': {
+    defaultCourse: 'BSc Nursing Science',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'NUR 1101: Fundamentals of Nursing', venue: 'Nursing Hall 1', time: '09:00 AM' },
+        { unitName: 'NUR 1102: Anatomy and Physiology', venue: 'Medical Hall 1', time: '02:00 PM' },
+        { unitName: 'NUR 1103: Medical-Surgical Nursing I', venue: 'Nursing Lab 1', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'NUR 1201: Community Health Nursing', venue: 'Nursing Hall 1', time: '09:00 AM' },
+        { unitName: 'NUR 1202: Maternal and Child Health', venue: 'Medical Hall 2', time: '02:00 PM' },
+        { unitName: 'NUR 1203: Medical-Surgical Nursing II', venue: 'Nursing Lab 1', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Mass Communication': {
+    defaultCourse: 'Bachelor of Mass Communication',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'MCO 1101: Introduction to Mass Communication', venue: 'Media Hall 1', time: '09:00 AM' },
+        { unitName: 'MCO 1102: Media Writing', venue: 'Media Lab 1', time: '02:00 PM' },
+        { unitName: 'MCO 1103: Communication Theory', venue: 'Media Hall 2', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'MCO 1201: Print Journalism', venue: 'Media Hall 1', time: '09:00 AM' },
+        { unitName: 'MCO 1202: Broadcast Journalism', venue: 'Media Lab 1', time: '02:00 PM' },
+        { unitName: 'MCO 1203: Public Relations', venue: 'Media Hall 2', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Public Health': {
+    defaultCourse: 'BSc Public Health',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'PHL 1101: Introduction to Public Health', venue: 'Health Hall 1', time: '09:00 AM' },
+        { unitName: 'PHL 1102: Epidemiology I', venue: 'Health Hall 2', time: '02:00 PM' },
+        { unitName: 'PHL 1103: Biostatistics I', venue: 'Room 4', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'PHL 1201: Environmental Health', venue: 'Health Hall 1', time: '09:00 AM' },
+        { unitName: 'PHL 1202: Epidemiology II', venue: 'Health Hall 2', time: '02:00 PM' },
+        { unitName: 'PHL 1203: Biostatistics II', venue: 'Room 4', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Statistics': {
+    defaultCourse: 'BSc Statistics',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'STA 1101: Introduction to Statistics', venue: 'Room 4', time: '09:00 AM' },
+        { unitName: 'STA 1102: Probability Theory', venue: 'Room 5', time: '02:00 PM' },
+        { unitName: 'STA 1103: Mathematical Statistics', venue: 'Room 6', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'STA 1201: Statistical Inference', venue: 'Room 4', time: '09:00 AM' },
+        { unitName: 'STA 1202: Regression Analysis', venue: 'Room 5', time: '02:00 PM' },
+        { unitName: 'STA 1203: Time Series Analysis', venue: 'Room 6', time: '09:00 AM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Mathematics': {
+    defaultCourse: 'BSc Mathematics',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'MAT 1101: Calculus I', venue: 'Room 4', time: '09:00 AM' },
+        { unitName: 'MAT 1102: Linear Algebra', venue: 'Room 5', time: '02:00 PM' },
+        { unitName: 'MAT 1103: Discrete Mathematics', venue: 'Room 6', time: '09:00 AM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '02:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'MAT 1201: Calculus II', venue: 'Room 4', time: '09:00 AM' },
+        { unitName: 'MAT 1202: Abstract Algebra', venue: 'Room 5', time: '02:00 PM' },
+        { unitName: 'MAT 1203: Real Analysis', venue: 'Room 6', time: '09:00 AM' },
         { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
       ]
     }
