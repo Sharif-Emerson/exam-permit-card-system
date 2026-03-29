@@ -1,5 +1,5 @@
 import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+
   // Ref to preserve search input focus
 import {
   BarChart2, Bell, CheckCircle2, CreditCard, Download, FileCheck,
@@ -332,7 +332,6 @@ export default function AdminPanel() {
   const { user, signOut, refreshUser } = useAuth()
   const { darkMode, toggleTheme } = useTheme()
   const { hasUnsavedChanges, setHasUnsavedChanges, registerSaveHandler } = useUnsavedChanges()
-  const navigate = useNavigate()
   // Removed unused variable 'location'
   const adminCapability = getAdminCapabilityProfile(user)
   const canViewStudents = adminCapability.sections.includes('students')
@@ -1026,7 +1025,7 @@ export default function AdminPanel() {
       message: `${outstandingStudents} student account(s) still have unpaid balances and cannot be issued permits.`,
       tone: 'critical' as const,
       actionLabel: 'Review Students',
-      onAction: () => navigate('students'),
+      onAction: () => setActiveSection('students'),
     }] : []),
     ...(permitStatusCounts.expired > 0 ? [{
       id: 'expired',
@@ -1034,7 +1033,7 @@ export default function AdminPanel() {
       message: `${permitStatusCounts.expired} exam schedule record(s) are now past the exam date and should be archived or reviewed.`,
       tone: 'warning' as const,
       actionLabel: 'Open Reports',
-      onAction: () => navigate('reports'),
+      onAction: () => setActiveSection('reports'),
     }] : []),
     ...(upcomingExamEntries.some((item) => item.student.feesBalance > 0 && item.examTimestamp - Date.now() <= 7 * 24 * 60 * 60 * 1000) ? [{
       id: 'upcoming-unpaid',
@@ -1055,7 +1054,7 @@ export default function AdminPanel() {
       message: `${openSupportRequestCount} support request(s) are still open or in progress.`,
       tone: 'info' as const,
       actionLabel: 'Open Support',
-      onAction: () => navigate('support'),
+      onAction: () => setActiveSection('support'),
     }] : []),
     ...(canViewPermitActivity && permitEventCount > 0 ? [{
       id: 'permit-events',
@@ -1063,7 +1062,7 @@ export default function AdminPanel() {
       message: `${permitEventCount} permit print/download event(s) are available in the activity log.`,
       tone: 'info' as const,
       actionLabel: 'Open Permit Activity',
-      onAction: () => navigate('permits'),
+      onAction: () => setActiveSection('permits'),
     }] : []),
   ]
   const notificationBadgeCount = notificationCenterAlerts.length
@@ -1092,7 +1091,7 @@ export default function AdminPanel() {
       return
     }
 
-    navigate('students')
+    setActiveSection('students')
     setSuccessMessage('Student verification view opened. Search by name, email, or registration number to review a record.')
   }
 
@@ -1730,7 +1729,7 @@ export default function AdminPanel() {
       description: 'Open the financial import workspace to upload spreadsheet updates in one pass.',
       icon: <FileUp className="h-5 w-5" />,
       disabled: !canManageFinancials,
-      action: () => navigate('import'),
+      action: () => setActiveSection('import'),
     },
     {
       key: 'generate-permits',
@@ -1764,7 +1763,7 @@ export default function AdminPanel() {
       description: 'Open the analytics view for financial and permit issuance insights.',
       icon: <BarChart2 className="h-5 w-5" />,
       disabled: !canAccessReports,
-      action: () => navigate('reports'),
+      action: () => setActiveSection('reports'),
     },
     {
       key: 'send-reminders',
@@ -1782,7 +1781,7 @@ export default function AdminPanel() {
       description: 'Review system integrations, session controls, and account scope.',
       icon: <Settings className="h-5 w-5" />,
       disabled: !adminCapability.sections.includes('settings'),
-      action: () => navigate('settings'),
+      action: () => setActiveSection('settings'),
     },
     {
       key: 'bulk-sync-curriculum',
@@ -1939,7 +1938,7 @@ export default function AdminPanel() {
               <li key={item.key}>
                 <button
                   type="button"
-                  onClick={() => navigate(item.key)}
+                  onClick={() => setActiveSection(item.key)}
                   className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     activeSection === item.key
                       ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
@@ -2391,7 +2390,7 @@ export default function AdminPanel() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => navigate('students')}
+                        onClick={() => setActiveSection('students')}
                         className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
                       >
                         Review list
@@ -2599,7 +2598,7 @@ export default function AdminPanel() {
                       <button
                         key={item.key}
                         type="button"
-                        onClick={() => navigate(item.key)}
+                        onClick={() => setActiveSection(item.key)}
                         className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-emerald-300 hover:bg-emerald-50"
                       >
                         <span className="text-emerald-600">{item.icon}</span>
@@ -2628,7 +2627,7 @@ export default function AdminPanel() {
                     {canManageFinancials && (
                       <button
                         type="button"
-                        onClick={() => navigate('import')}
+                        onClick={() => setActiveSection('import')}
                         className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
                       >
                         <FileUp className="h-3.5 w-3.5" />
