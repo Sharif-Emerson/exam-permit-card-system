@@ -2,10 +2,11 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 
-const { getSession, onAuthStateChange, signIn, signOut, fetchProfileById } = vi.hoisted(() => ({
+const { getSession, onAuthStateChange, signIn, signInWithToken, signOut, fetchProfileById } = vi.hoisted(() => ({
   getSession: vi.fn(),
   onAuthStateChange: vi.fn(),
   signIn: vi.fn(),
+  signInWithToken: vi.fn(),
   signOut: vi.fn(),
   fetchProfileById: vi.fn(),
 }))
@@ -18,6 +19,7 @@ describe('AuthProvider', () => {
     authAdaptersModule.activeAuthAdapter.getSession = getSession
     authAdaptersModule.activeAuthAdapter.onAuthStateChange = onAuthStateChange
     authAdaptersModule.activeAuthAdapter.signIn = signIn
+    authAdaptersModule.activeAuthAdapter.signInWithToken = signInWithToken
     authAdaptersModule.activeAuthAdapter.signOut = signOut
 
     const profileServiceModule = await import('../services/profileService')
@@ -62,6 +64,7 @@ describe('AuthProvider', () => {
     authAdaptersModule.activeAuthAdapter.getSession = getSession
     authAdaptersModule.activeAuthAdapter.onAuthStateChange = onAuthStateChange
     authAdaptersModule.activeAuthAdapter.signIn = signIn
+    authAdaptersModule.activeAuthAdapter.signInWithToken = signInWithToken
     authAdaptersModule.activeAuthAdapter.signOut = signOut
 
     const profileServiceModule = await import('../services/profileService')

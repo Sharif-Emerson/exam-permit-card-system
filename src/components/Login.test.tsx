@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { vi } from 'vitest'
+import { afterEach, vi } from 'vitest'
 import { institutionName } from '../config/branding'
 
 const { signIn } = vi.hoisted(() => ({
@@ -9,13 +9,29 @@ const { signIn } = vi.hoisted(() => ({
 }))
 
 describe('Login', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('submits the entered credentials through the auth provider', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = typeof input === 'string' ? input : input.url
+      if (url.includes('/auth/oidc/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ enabled: false }),
+        } as Response)
+      }
+      return Promise.resolve({ ok: false, status: 404 } as Response)
+    })
+
     const authContextModule = await import('../context/AuthContext')
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
       user: null,
       loading: false,
       configError: null,
       signIn,
+      signInWithToken: vi.fn(),
       signOut: vi.fn(),
       refreshUser: vi.fn().mockResolvedValue(undefined),
     })

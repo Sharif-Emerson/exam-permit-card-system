@@ -185,6 +185,37 @@ export const restAuthAdapter: AuthAdapter = {
     notify(session)
     return session
   },
+  async signInWithToken(token) {
+    if (!apiBaseUrl) {
+      throw new Error(getConfigError() ?? 'REST API is not configured.')
+    }
+
+    const trimmed = token.trim()
+
+    if (!trimmed) {
+      throw new Error('No sign-in token was provided.')
+    }
+
+    setStoredAuthToken(trimmed)
+
+    try {
+      const payload = await authenticatedRequest('/auth/me', { method: 'GET' })
+      const authUser = extractAuthUser(payload)
+      const userId = authUser?.id ?? extractUserId(payload)
+
+      if (!userId) {
+        throw new Error('Unable to resolve the current user.')
+      }
+
+      const session = { userId, user: authUser ?? undefined }
+      notify(session)
+      return session
+    } catch {
+      clearStoredAuthToken()
+      notify(null)
+      throw new Error('University sign-in failed or the session is invalid.')
+    }
+  },
   async signOut() {
     if (apiBaseUrl) {
       try {

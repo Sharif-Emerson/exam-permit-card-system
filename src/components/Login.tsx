@@ -1,16 +1,15 @@
-
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { Lock, Moon, Sun, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import BrandMark from './BrandMark'
-import { backendProvider } from '../config/provider'
+import { backendProvider, publicApiBaseUrl } from '../config/provider'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { resetPassword } from '../services/authService'
 
 export default function Login() {
   const navigate = useNavigate()
-  const { signIn, configError } = useAuth()
+  const { signIn, signInWithToken, configError } = useAuth()
   const { darkMode, toggleTheme } = useTheme()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -23,7 +22,91 @@ export default function Login() {
   const [resettingPassword, setResettingPassword] = useState(false)
   const [error, setError] = useState('')
   const [resetMessage, setResetMessage] = useState('')
+  const [oidcAvailable, setOidcAvailable] = useState<boolean | null>(null)
+  const [oidcCompleting, setOidcCompleting] = useState(false)
+  const signInWithTokenRef = useRef(signInWithToken)
+  signInWithTokenRef.current = signInWithToken
   const accountProviderLabel = backendProvider === 'rest' ? 'your connected account' : 'your account'
+
+  useEffect(() => {
+    if (backendProvider !== 'rest' || configError) {
+      setOidcAvailable(false)
+      return
+    }
+
+    let cancelled = false
+
+    void fetch(`${publicApiBaseUrl}/auth/oidc/status`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: unknown) => {
+        if (cancelled || !data || typeof data !== 'object') {
+          return
+        }
+        const enabled = (data as { enabled?: unknown }).enabled
+        if (typeof enabled === 'boolean') {
+          setOidcAvailable(enabled)
+        } else {
+          setOidcAvailable(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOidcAvailable(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [configError])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const raw = window.location.hash.replace(/^#/, '')
+    if (!raw) {
+      return
+    }
+
+    const params = new URLSearchParams(raw)
+    const token = params.get('oidc_token')
+
+    if (!token) {
+      return
+    }
+
+    let cancelled = false
+
+    async function completeOidc() {
+      setOidcCompleting(true)
+      setError('')
+      try {
+        const signedIn = await signInWithTokenRef.current(token)
+        if (cancelled) {
+          return
+        }
+        window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+        navigate(signedIn.role === 'admin' ? '/admin' : '/student', { replace: true })
+      } catch (signInError) {
+        if (!cancelled) {
+          setError(signInError instanceof Error ? signInError.message : 'University sign-in failed.')
+          window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+        }
+      } finally {
+        if (!cancelled) {
+          setOidcCompleting(false)
+        }
+      }
+    }
+
+    void completeOidc()
+
+    return () => {
+      cancelled = true
+    }
+  }, [navigate])
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -78,6 +161,17 @@ export default function Login() {
     } finally {
       setResettingPassword(false)
     }
+  }
+
+  if (oidcCompleting) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(187,247,208,0.75),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(254,249,195,0.75),_transparent_24%),linear-gradient(180deg,_#f0fdf4_0%,_#ecfdf5_40%,_#f7fee7_100%)] px-4 py-8 text-emerald-950 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.2),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(250,204,21,0.12),_transparent_18%),linear-gradient(180deg,_#020617_0%,_#052e16_52%,_#111827_100%)] dark:text-emerald-50 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-b-2 border-emerald-600" />
+          <p className="text-sm text-emerald-800 dark:text-emerald-200">Completing university sign-in…</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -178,7 +272,7 @@ export default function Login() {
                 Forgot password?
               </button>
             </div>
-            <div>
+            <div className="space-y-3">
               <button
                 type="submit"
                 disabled={loading || Boolean(configError)}
@@ -193,6 +287,14 @@ export default function Login() {
                   'Sign in'
                 )}
               </button>
+              {backendProvider === 'rest' && !configError && oidcAvailable ? (
+                <a
+                  href={`${publicApiBaseUrl}/auth/oidc/start`}
+                  className="flex w-full justify-center rounded-md border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-800 shadow-sm transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-100 dark:hover:bg-slate-800 sm:py-2 sm:text-base"
+                >
+                  Sign in with university
+                </a>
+              ) : null}
             </div>
           </form>
         ) : (

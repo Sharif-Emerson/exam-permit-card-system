@@ -12,5 +12,6 @@ export interface AuthAdapter {
   getSession: () => Promise<AuthSession | null>
   onAuthStateChange: (callback: (session: AuthSession | null) => void) => () => void
   signIn: (email: string, password: string) => Promise<AuthSession>
+  signInWithToken: (token: string) => Promise<AuthSession>
   signOut: () => Promise<void>
 }

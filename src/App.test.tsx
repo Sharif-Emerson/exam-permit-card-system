@@ -36,6 +36,7 @@ describe('App', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut: vi.fn(),
       refreshUser: vi.fn(),
     })
@@ -55,6 +56,7 @@ describe('App', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut: vi.fn(),
       refreshUser: vi.fn(),
     })

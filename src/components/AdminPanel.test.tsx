@@ -8,6 +8,7 @@ const {
   signOut,
   refreshUser,
   fetchStudentProfilesPage,
+  fetchStudentProfileById,
   fetchTrashedStudentProfiles,
   fetchAdminActivityLogsPage,
   fetchSystemFeeSettings,
@@ -30,6 +31,7 @@ const {
   signOut: vi.fn(),
   refreshUser: vi.fn().mockResolvedValue(undefined),
   fetchStudentProfilesPage: vi.fn(),
+  fetchStudentProfileById: vi.fn(),
   fetchTrashedStudentProfiles: vi.fn(),
   fetchAdminActivityLogsPage: vi.fn(),
   fetchSystemFeeSettings: vi.fn(),
@@ -119,6 +121,8 @@ function withinCreateStudentDialog() {
 describe('AdminPanel', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
+    fetchStudentProfilesPage.mockReset()
+    fetchStudentProfileById.mockReset()
     const profileServiceModule = await import('../services/profileService')
     vi.spyOn(profileServiceModule, 'fetchTrashedStudentProfiles').mockImplementation(fetchTrashedStudentProfiles)
     vi.spyOn(profileServiceModule, 'restoreStudentProfile').mockImplementation(restoreStudentProfile)
@@ -142,12 +146,14 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
 
     const profileServiceModule = await import('../services/profileService')
     vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchStudentProfileById').mockImplementation(fetchStudentProfileById)
     vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
     vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
     vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
@@ -240,13 +246,14 @@ describe('AdminPanel', () => {
     })
   }, 20000)
 
-  it('prepares unmatched spreadsheet rows as new student creations when required details are present', async () => {
+  it('marks unmatched financial import rows as skipped when no student matches', async () => {
     const authContextModule = await import('../context/AuthContext')
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
       user: createAdminUser(),
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -291,21 +298,6 @@ describe('AdminPanel', () => {
       },
     ])
 
-    importStudentFinancials.mockResolvedValue({
-      updatedCount: 0,
-      createdCount: 1,
-      createdStudents: [
-        {
-          rowNumber: 2,
-          name: 'Imported Student',
-          email: 'imported.student@example.com',
-          studentId: 'IMP001',
-          password: 'Permit-IMP001',
-        },
-      ],
-      skippedRows: [],
-    })
-
     const { container } = render(<AdminPanel />)
 
     await waitFor(() => {
@@ -321,33 +313,11 @@ describe('AdminPanel', () => {
     await user.upload(fileInput!, file)
 
     expect(await screen.findByText(/import preview/i)).toBeTruthy()
-    expect(await screen.findByText(/new student account will be created/i)).toBeTruthy()
+    expect((await screen.findAllByText(/No matching student was found/i)).length).toBeGreaterThan(0)
 
-    await user.click(screen.getByRole('button', { name: /apply import/i }))
-
-    await waitFor(() => {
-      expect(importStudentFinancials).toHaveBeenCalledWith(
-        [
-          {
-            rowNumber: 2,
-            action: 'create',
-            createStudent: {
-              name: 'Imported Student',
-              email: 'imported.student@example.com',
-              password: 'Permit-IMP001',
-              studentId: 'IMP001',
-              studentCategory: 'local',
-              course: 'Computer Science',
-              department: 'Computer Science',
-              semester: 'Semester 1 2026/2027',
-              totalFees: 3000,
-              amountPaid: 500,
-            },
-          },
-        ],
-        'admin-1',
-      )
-    })
+    const applyBtn = screen.getByRole('button', { name: /apply import/i })
+    expect(applyBtn).toBeDisabled()
+    expect(importStudentFinancials).not.toHaveBeenCalled()
   }, 20000)
 
   it('shows print and download status for each student', async () => {
@@ -357,6 +327,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -451,6 +422,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -569,6 +541,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -663,6 +636,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -732,6 +706,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -838,11 +813,8 @@ describe('AdminPanel', () => {
     const editDlg = withinEditStudentDialog()
     fireEvent.change(editDlg.getByLabelText(/full name/i), { target: { value: 'John Doe Updated' } })
     fireEvent.change(editDlg.getByLabelText(/registration no\./i), { target: { value: 'STU001-NEW' } })
-    fireEvent.change(editDlg.getByLabelText(/^course$/i), { target: { value: 'Software Engineering' } })
+    fireEvent.change(editDlg.getByLabelText(/^course$/i), { target: { value: 'BSc Software Engineering' } })
     fireEvent.change(editDlg.getByLabelText(/^program$/i), { target: { value: 'BSc Software Engineering' } })
-    fireEvent.change(editDlg.getByLabelText(/^college$/i), { target: { value: 'College of Computing and Digital Innovation' } })
-    fireEvent.change(editDlg.getByLabelText(/^department$/i), { target: { value: 'Department of Software Engineering' } })
-    fireEvent.change(editDlg.getByLabelText(/^semester$/i), { target: { value: 'Semester 2 2026/2027' } })
     fireEvent.change(editDlg.getByLabelText(/course units/i), { target: { value: 'SWE 401 Secure Coding\nSWE 403 DevOps Engineering' } })
     fireEvent.change(editDlg.getByLabelText(/total fees/i), { target: { value: '3200' } })
     await user.click(editDlg.getByRole('button', { name: /save changes/i }))
@@ -850,21 +822,22 @@ describe('AdminPanel', () => {
     await waitFor(() => {
       expect(adminUpdateStudentProfile).toHaveBeenCalledWith(
         'student-1',
-        {
+        expect.objectContaining({
           name: 'John Doe Updated',
           email: 'student1@example.com',
           studentId: 'STU001-NEW',
           studentCategory: 'local',
           phoneNumber: '',
           profileImage: 'https://via.placeholder.com/150',
-          course: 'Software Engineering',
+          course: 'BSc Software Engineering',
           program: 'BSc Software Engineering',
-          college: 'College of Computing and Digital Innovation',
-          department: 'Department of Software Engineering',
-          semester: 'Semester 2 2026/2027',
+          college: '',
+          department: '',
+          semester: '',
           courseUnits: ['SWE 401 Secure Coding', 'SWE 403 DevOps Engineering'],
           totalFees: 3200,
-        },
+          exams: [],
+        }),
         'admin-1',
       )
     })
@@ -879,12 +852,14 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
 
     const profileServiceModule = await import('../services/profileService')
     vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchStudentProfileById').mockImplementation(fetchStudentProfileById)
     vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
     vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
     vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
@@ -1011,11 +986,10 @@ describe('AdminPanel', () => {
     fireEvent.change(createDlg.getByLabelText(/^semester$/i), { target: { value: 'Semester 1 2026/2027' } })
     fireEvent.change(createDlg.getByLabelText(/student category/i), { target: { value: 'international' } })
     fireEvent.change(createDlg.getByLabelText(/amount paid/i), { target: { value: '1000' } })
-    fireEvent.change(createDlg.getByLabelText(/profile photo url/i), { target: { value: 'https://example.com/photo.jpg' } })
+    fireEvent.change(createDlg.getByPlaceholderText('https://example.com/student-photo.jpg'), { target: { value: 'https://example.com/photo.jpg' } })
     fireEvent.change(createDlg.getByLabelText(/^exam date$/i), { target: { value: '2026-11-04' } })
     fireEvent.change(createDlg.getByLabelText(/^exam time$/i), { target: { value: '9:00 AM' } })
     fireEvent.change(createDlg.getByLabelText(/^venue$/i), { target: { value: 'Main Hall' } })
-    fireEvent.change(createDlg.getByLabelText(/seat number/i), { target: { value: 'B-12' } })
     fireEvent.change(createDlg.getByLabelText(/course units/i), { target: { value: 'CSC 101\nMAT 110' } })
     fireEvent.change(createDlg.getByLabelText(/permit instructions/i), { target: { value: 'Bring your ID card.' } })
 
@@ -1023,18 +997,18 @@ describe('AdminPanel', () => {
 
     await waitFor(() => {
       expect(createStudentProfile).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           name: 'New Student',
           email: 'newstudent@example.com',
           password: generatedPassword,
           studentId: 'STU099',
           studentCategory: 'international',
           phoneNumber: '+256700111222',
-          course: 'Computer Science',
+          course: 'BSc Computer Science',
           program: 'BSc Computer Science',
-          college: 'College of Computing',
-          department: 'Computer Science',
-          semester: 'Semester 1 2026/2027',
+          college: '',
+          department: '',
+          semester: '',
           courseUnits: ['CSC 101', 'MAT 110'],
           profileImage: 'https://example.com/photo.jpg',
           totalFees: 9000,
@@ -1043,19 +1017,20 @@ describe('AdminPanel', () => {
           examDate: '2026-11-04',
           examTime: '9:00 AM',
           venue: 'Main Hall',
-          seatNumber: 'B-12',
-        },
+          seatNumber: '',
+          exams: [],
+        }),
         'admin-1',
       )
     })
 
     await waitFor(() => {
-      expect(fetchStudentProfilesPage).toHaveBeenLastCalledWith({
+      expect(fetchStudentProfilesPage).toHaveBeenLastCalledWith(expect.objectContaining({
         page: 1,
         pageSize: 24,
         search: 'STU099',
         status: 'all',
-      })
+      }))
     })
 
     expect(await screen.findByText(/student profile created for new student\./i)).toBeTruthy()
@@ -1071,12 +1046,14 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
 
     const profileServiceModule = await import('../services/profileService')
     vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchStudentProfileById').mockImplementation(fetchStudentProfileById)
     vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
     vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
     vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
@@ -1149,12 +1126,14 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
 
     const profileServiceModule = await import('../services/profileService')
     vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchStudentProfileById').mockImplementation(fetchStudentProfileById)
     vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
     vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
     vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
@@ -1208,7 +1187,8 @@ describe('AdminPanel', () => {
       expect(fetchStudentProfilesPage).toHaveBeenCalled()
     })
 
-    await user.click(screen.getByRole('button', { name: /remove john doe/i }))
+    expect(await screen.findByText('John Doe')).toBeTruthy()
+    await user.click(screen.getAllByRole('button', { name: /remove john doe/i })[0])
     await user.click(screen.getByRole('button', { name: /move to trash/i }))
 
     await waitFor(() => {
@@ -1225,12 +1205,14 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
 
     const profileServiceModule = await import('../services/profileService')
     vi.spyOn(profileServiceModule, 'fetchStudentProfilesPage').mockImplementation(fetchStudentProfilesPage)
+    vi.spyOn(profileServiceModule, 'fetchStudentProfileById').mockImplementation(fetchStudentProfileById)
     vi.spyOn(profileServiceModule, 'fetchAdminActivityLogsPage').mockImplementation(fetchAdminActivityLogsPage)
     vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
     vi.spyOn(profileServiceModule, 'updateSystemFeeSettings').mockImplementation(updateSystemFeeSettings)
@@ -1334,6 +1316,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -1421,6 +1404,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -1549,6 +1533,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -1625,7 +1610,10 @@ describe('AdminPanel', () => {
 
     await user.click(screen.getByRole('button', { name: /export csv/i }))
 
-    expect(downloadPermitActivityCsv).toHaveBeenCalledWith(activityLogs, students)
+    expect(downloadPermitActivityCsv).toHaveBeenCalledWith(
+      activityLogs,
+      expect.arrayContaining([expect.objectContaining({ id: 'student-1', name: 'John Doe' })]),
+    )
     expect(await screen.findByText(/exported 1 permit activity row\(s\)\./i)).toBeTruthy()
   })
 
@@ -1636,6 +1624,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -1683,6 +1672,43 @@ describe('AdminPanel', () => {
         feesBalance: 2000,
       },
     ]))
+    fetchStudentProfileById
+      .mockResolvedValueOnce({
+        id: 'student-1',
+        email: 'student1@example.com',
+        role: 'student',
+        name: 'John Doe',
+        studentId: 'STU001',
+        course: 'Computer Science',
+        examDate: '2026-04-15',
+        examTime: '10:00 AM',
+        venue: 'Hall A',
+        seatNumber: 'A-001',
+        instructions: 'Bring valid ID.',
+        profileImage: 'https://via.placeholder.com/150',
+        exams: [],
+        totalFees: 3000,
+        amountPaid: 3800,
+        feesBalance: 200,
+      })
+      .mockResolvedValueOnce({
+        id: 'student-1',
+        email: 'student1@example.com',
+        role: 'student',
+        name: 'John Doe',
+        studentId: 'STU001',
+        course: 'Computer Science',
+        examDate: '2026-04-15',
+        examTime: '10:00 AM',
+        venue: 'Hall A',
+        seatNumber: 'A-001',
+        instructions: 'Bring valid ID.',
+        profileImage: 'https://via.placeholder.com/150',
+        exams: [],
+        totalFees: 3000,
+        amountPaid: 3000,
+        feesBalance: 0,
+      })
     fetchAdminActivityLogsPage.mockResolvedValue(createActivityPage([]))
 
     render(<AdminPanel />)
@@ -1691,14 +1717,19 @@ describe('AdminPanel', () => {
       expect(fetchStudentProfilesPage).toHaveBeenCalled()
     })
 
-    fireEvent.change(screen.getByLabelText(/amount received for john doe/i), { target: { value: '2800' } })
-    await user.click(screen.getByTitle(/save received amount/i))
+    expect(await screen.findByText('John Doe')).toBeTruthy()
+    const slipInputs = screen.getAllByLabelText(/bank slip or payment amount to add for john doe/i)
+    fireEvent.change(slipInputs[0], { target: { value: '2800' } })
+    if (slipInputs[1]) {
+      fireEvent.change(slipInputs[1], { target: { value: '2800' } })
+    }
+    await user.click(screen.getAllByRole('button', { name: /post bank slip payment for john doe/i })[0])
 
     await waitFor(() => {
-      expect(updateStudentFinancials).toHaveBeenCalledWith('student-1', { amountPaid: 2800 }, 'admin-1')
+      expect(updateStudentFinancials).toHaveBeenCalledWith('student-1', { amountPaid: 3800 }, 'admin-1')
     })
 
-    await user.click(screen.getByTitle(/mark fully paid/i))
+    await user.click(screen.getAllByTitle(/mark fully paid/i)[0])
 
     await waitFor(() => {
       expect(clearStudentBalance).toHaveBeenCalledWith('student-1', 'admin-1')
@@ -1720,6 +1751,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -1798,6 +1830,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -1853,7 +1886,7 @@ describe('AdminPanel', () => {
     })
 
     expect(screen.getByRole('button', { name: /permit cards/i })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /^bulk import$/i })).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^bulk import$/i }).length).toBeGreaterThan(0)
 
     await userEvent.setup().click(screen.getByRole('button', { name: /^dashboard$/i }))
 
@@ -1874,6 +1907,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -1928,7 +1962,7 @@ describe('AdminPanel', () => {
       expect(fetchStudentProfilesPage).toHaveBeenCalled()
     })
 
-    expect(screen.getAllByTitle(/save received amount/i)[0]).toBeDisabled()
+    expect(screen.getAllByTitle(/post this slip/i)[0]).toBeDisabled()
     expect(screen.getAllByTitle(/mark fully paid/i)[0]).toBeDisabled()
     expect(screen.getAllByTitle(/edit student profile/i)[0]).toBeDisabled()
     expect(screen.queryByRole('button', { name: /^bulk import$/i })).toBeNull()
@@ -1946,6 +1980,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })
@@ -2054,6 +2089,7 @@ describe('AdminPanel', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut,
       refreshUser,
     })

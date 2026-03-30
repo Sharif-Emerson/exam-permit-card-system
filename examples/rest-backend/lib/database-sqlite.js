@@ -1166,6 +1166,10 @@ export function createStudentProfile(input) {
   const exams = normalizeExamAssignments(input.exams ?? null, fallbackProfile)
 
   upsertCampus(nextCampusId, nextCampusName)
+  const storedPasswordHash = typeof input.password_hash === 'string' && String(input.password_hash).startsWith('scrypt:')
+    ? String(input.password_hash).trim()
+    : hashPassword(typeof input.password === 'string' && input.password.trim() ? input.password.trim() : 'Permit@2026')
+
   db.exec('BEGIN')
 
   try {
@@ -1180,7 +1184,7 @@ export function createStudentProfile(input) {
       input.name.trim(),
       nextCampusId,
       nextCampusName,
-      hashPassword(input.password),
+      storedPasswordHash,
       timestamp,
       timestamp,
     )

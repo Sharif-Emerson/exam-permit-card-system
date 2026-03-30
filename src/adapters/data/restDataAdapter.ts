@@ -24,7 +24,13 @@ import type {
 import { requestWithApiFallback } from '../rest/request'
 import { getStoredAuthToken } from '../rest/tokenStorage'
 import { ensureStudentProfile, mapProfile } from '../shared/profileMapper'
-import type { BulkCurriculumSyncResult, DataAdapter, FinancialUpdateValues } from './types'
+import type {
+  BulkCurriculumSyncResult,
+  DataAdapter,
+  FinancialUpdateValues,
+  StudentAccountsImportApplyResult,
+  StudentProvisionPreviewRow,
+} from './types'
 
 function getConfigError() {
   return apiBaseUrl ? null : 'REST API is not configured. Add VITE_API_BASE_URL to your .env file.'
@@ -38,7 +44,7 @@ async function request(path: string, init?: RequestInit) {
     headers.set('Authorization', `Bearer ${token}`)
   }
 
-  if (init?.body && !headers.has('Content-Type')) {
+  if (init?.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
 
@@ -144,6 +150,35 @@ function toSystemFeeSettings(payload: unknown): SystemFeeSettings {
     deadlines: Array.isArray(rawDeadlines)
       ? rawDeadlines.map(normalizeUniversityDeadline).filter((d): d is UniversityDeadline => d !== null)
       : undefined,
+  }
+}
+
+function toStudentProvisionPreviewRow(raw: unknown): StudentProvisionPreviewRow | null {
+  if (!raw || typeof raw !== 'object') {
+    return null
+  }
+
+  const r = raw as Record<string, unknown>
+  const status = r.status === 'create' || r.status === 'skipped' ? r.status : null
+
+  if (!status) {
+    return null
+  }
+
+  return {
+    rowNumber: Number(r.rowNumber ?? 0) || 0,
+    studentName: typeof r.studentName === 'string' ? r.studentName : undefined,
+    studentId: typeof r.studentId === 'string' ? r.studentId : undefined,
+    email: typeof r.email === 'string' ? r.email : undefined,
+    course: typeof r.course === 'string' ? r.course : undefined,
+    status,
+    reason: typeof r.reason === 'string' ? r.reason : undefined,
+    totalFees:
+      typeof r.totalFees === 'number'
+        ? r.totalFees
+        : typeof r.total_fees === 'number'
+          ? r.total_fees
+          : undefined,
   }
 }
 
@@ -607,5 +642,47 @@ export const restDataAdapter: DataAdapter = {
       : []
 
     return { updated, failed, totalStudents }
+  },
+  async previewStudentAccountsImport(file: File): Promise<StudentProvisionPreviewRow[]> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const payload = await request('/imports/students/preview', { method: 'POST', body: formData })
+    return extractCollection(payload)
+      .map(toStudentProvisionPreviewRow)
+      .filter((row): row is StudentProvisionPreviewRow => row !== null)
+  },
+  async applyStudentAccountsImport(file: File): Promise<StudentAccountsImportApplyResult> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const payload = await request('/imports/students/apply', { method: 'POST', body: formData })
+
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('The API returned an invalid student import response.')
+    }
+
+    const record = payload as Record<string, unknown>
+    const createdStudentsRaw = Array.isArray(record.createdStudents) ? record.createdStudents : []
+    const skippedRowsRaw = Array.isArray(record.skippedRows) ? record.skippedRows : []
+
+    return {
+      createdCount: Number(record.createdCount ?? 0) || 0,
+      createdStudents: createdStudentsRaw.map((item) => {
+        const row = item as Record<string, unknown>
+        return {
+          rowNumber: Number(row.rowNumber ?? 0) || 0,
+          name: String(row.name ?? ''),
+          email: String(row.email ?? ''),
+          studentId: String(row.studentId ?? ''),
+          password: typeof row.password === 'string' ? row.password : undefined,
+        }
+      }),
+      skippedRows: skippedRowsRaw.map((item) => {
+        const row = item as Record<string, unknown>
+        return {
+          rowNumber: Number(row.rowNumber ?? 0) || 0,
+          reason: String(row.reason ?? ''),
+        }
+      }),
+    }
   },
 }

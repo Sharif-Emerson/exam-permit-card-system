@@ -46,6 +46,7 @@ import {
   createSession,
 } from './lib/database.js'
 import { sendEmail, sendSms } from './lib/notification.js'
+import * as oidcFlow from './lib/oidc-flow.js'
 // Default session TTL for login tokens (in hours)
 const sessionTtlHours = 24
 
@@ -337,6 +338,7 @@ function mapRowsToFinancialImports(rows) {
         seatNumber: normalizedRow.seatnumber ? String(normalizedRow.seatnumber).trim() : undefined,
         amountPaid: parseNumber(normalizedRow.amountpaid ?? normalizedRow.paid ?? normalizedRow.amount),
         totalFees: parseNumber(normalizedRow.totalfees ?? normalizedRow.fees ?? normalizedRow.total),
+        password_hash: normalizedRow.passwordhash ? String(normalizedRow.passwordhash).trim() : undefined,
       }
     })
     .filter((row) => {
@@ -377,11 +379,9 @@ function buildImportedStudentInput(row, requestUser = null) {
     return { reason: 'Expected fees are required to create a new student account.' }
   }
 
-  return {
-    createStudent: {
+  const baseStudent = {
       name: row.studentName,
       email: row.email,
-      password: getImportedStudentPassword(row),
       student_id: row.studentId,
       student_category: row.studentCategory ?? 'local',
       phone_number: row.phoneNumber ? normalizePhoneNumber(row.phoneNumber) || null : null,
@@ -400,8 +400,224 @@ function buildImportedStudentInput(row, requestUser = null) {
       seat_number: row.seatNumber ?? null,
       campus_id: requestUser?.campusId ?? 'main-campus',
       campus_name: requestUser?.campusName ?? 'Main Campus',
+  }
+
+  if (typeof row.password_hash === 'string' && row.password_hash.startsWith('scrypt:')) {
+    return {
+      createStudent: {
+        ...baseStudent,
+        password_hash: row.password_hash.trim(),
+      },
+    }
+  }
+
+  return {
+    createStudent: {
+      ...baseStudent,
+      password: getImportedStudentPassword(row),
     },
   }
+}
+
+function getStudentImportMaxRows() {
+  const raw = Number(process.env.STUDENT_IMPORT_MAX_ROWS ?? '5000')
+  return Math.min(Math.max(Number.isFinite(raw) ? raw : 5000, 1), 20000)
+}
+
+function mapRowsToStudentProvisionRows(dataRows, headerRow) {
+  const normalizedHeaders = headerRow.map((cell) => normalizeHeader(String(cell ?? '')))
+
+  return dataRows
+    .map((row, index) => {
+      const normalizedRow = normalizedHeaders.reduce((result, header, columnIndex) => {
+        if (header) {
+          result[header] = row[columnIndex] ?? ''
+        }
+
+        return result
+      }, {})
+
+      return {
+        rowNumber: index + 2,
+        studentName: normalizedRow.studentname ? String(normalizedRow.studentname).trim() : undefined,
+        studentId: normalizedRow.studentid ? String(normalizedRow.studentid).trim() : undefined,
+        studentCategory: parseStudentCategory(normalizedRow.studentcategory ?? normalizedRow.category) ?? undefined,
+        email: normalizedRow.email ? String(normalizedRow.email).trim().toLowerCase() : undefined,
+        phoneNumber: normalizedRow.phonenumber
+          ? String(normalizedRow.phonenumber).trim()
+          : normalizedRow.phone
+            ? String(normalizedRow.phone).trim()
+            : undefined,
+        course: normalizedRow.course ? String(normalizedRow.course).trim() : undefined,
+        program: normalizedRow.program ? String(normalizedRow.program).trim() : undefined,
+        college: normalizedRow.college ? String(normalizedRow.college).trim() : undefined,
+        department: normalizedRow.department ? String(normalizedRow.department).trim() : undefined,
+        semester: normalizedRow.semester ? String(normalizedRow.semester).trim() : undefined,
+        password: normalizedRow.password ? String(normalizedRow.password).trim() : undefined,
+        password_hash: normalizedRow.passwordhash ? String(normalizedRow.passwordhash).trim() : undefined,
+        courseUnits: parseList(normalizedRow.courseunits ?? normalizedRow.units),
+        totalFees: parseNumber(normalizedRow.totalfees ?? normalizedRow.fees ?? normalizedRow.total),
+        amountPaid: parseNumber(normalizedRow.amountpaid ?? normalizedRow.paid ?? normalizedRow.amount),
+      }
+    })
+    .filter((row) => row.studentName && row.studentId && row.email && row.course)
+}
+
+async function parseStudentProvisionSpreadsheet(buffer, originalName) {
+  const normalizedName = String(originalName ?? '').trim().toLowerCase()
+  const maxRows = getStudentImportMaxRows()
+
+  if (normalizedName.endsWith('.csv')) {
+    const result = Papa.parse(buffer.toString('utf8'), {
+      skipEmptyLines: true,
+    })
+
+    if (result.errors.length > 0) {
+      throw new Error(result.errors[0]?.message || 'Unable to parse the uploaded CSV file.')
+    }
+
+    const rows = mapRowsToStudentProvisionRows(result.data.slice(1), result.data[0] ?? [])
+
+    if (rows.length > maxRows) {
+      throw new Error(`Student import is limited to ${maxRows} rows per upload. Split the file and import in batches.`)
+    }
+
+    return rows
+  }
+
+  if (normalizedName.endsWith('.xlsx')) {
+    const sheet = await readXlsxFile(buffer)
+    const rows = mapRowsToStudentProvisionRows(sheet.slice(1), sheet[0] ?? [])
+
+    if (rows.length > maxRows) {
+      throw new Error(`Student import is limited to ${maxRows} rows per upload. Split the file and import in batches.`)
+    }
+
+    return rows
+  }
+
+  if (normalizedName.endsWith('.xls')) {
+    throw new Error('Legacy .xls files are not supported. Save the file as .xlsx or .csv and try again.')
+  }
+
+  throw new Error('Unsupported file type. Upload a .xlsx or .csv file.')
+}
+
+function resolveStudentProvisionPreview(rows, defaultTotalFees, requestUser) {
+  const students = listProfiles('student')
+
+  return rows.map((row) => {
+    const existing = students.find((profile) => (row.email && profile.email.toLowerCase() === row.email.toLowerCase())
+      || (row.studentId && profile.student_id?.toLowerCase() === row.studentId.toLowerCase()))
+
+    if (existing) {
+      return {
+        ...row,
+        status: 'skipped',
+        reason: 'A student with this email or registration number already exists.',
+      }
+    }
+
+    const totalFees = typeof row.totalFees === 'number' ? row.totalFees : defaultTotalFees
+    const enriched = { ...row, totalFees, amountPaid: row.amountPaid ?? 0 }
+    const imported = buildImportedStudentInput(enriched, requestUser)
+
+    if (!imported.createStudent) {
+      return {
+        ...row,
+        totalFees,
+        status: 'skipped',
+        reason: imported.reason ?? 'Unable to create this student from the row.',
+      }
+    }
+
+    return {
+      ...enriched,
+      status: 'create',
+      reason: imported.createStudent.password_hash
+        ? 'New account with provided scrypt password hash.'
+        : enriched.password?.trim()
+          ? 'New account with password from spreadsheet.'
+          : `New account with generated password ${imported.createStudent.password}.`,
+    }
+  })
+}
+
+function requireStudentProvisionApiKey(request, response, next) {
+  const expected = process.env.STUDENT_PROVISION_API_KEY?.trim()
+
+  if (!expected) {
+    response.status(503).json({ message: 'Student provisioning API is disabled. Set STUDENT_PROVISION_API_KEY on the server.' })
+    return
+  }
+
+  const provided = request.header('X-Provision-Key')
+
+  if (provided !== expected) {
+    response.status(401).json({ message: 'Invalid or missing X-Provision-Key header.' })
+    return
+  }
+
+  next()
+}
+
+function normalizeBatchStudentPayload(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return { error: 'Each student must be a JSON object.' }
+  }
+
+  const name = typeof entry.name === 'string' ? entry.name.trim() : ''
+  const email = typeof entry.email === 'string' ? entry.email.trim().toLowerCase() : ''
+  const student_id = typeof entry.student_id === 'string'
+    ? entry.student_id.trim()
+    : typeof entry.registration_number === 'string'
+      ? entry.registration_number.trim()
+      : ''
+  const course = typeof entry.course === 'string' ? entry.course.trim() : ''
+
+  if (!name || !email || !student_id || !course) {
+    return { error: 'Each student needs name, email, student_id (or registration_number), and course.' }
+  }
+
+  const studentCategory = parseStudentCategory(entry.student_category ?? entry.studentCategory)
+  if (studentCategory === null && (entry.student_category != null || entry.studentCategory != null)) {
+    return { error: 'student_category must be local or international when provided.' }
+  }
+
+  const totalFeesRaw = parseNumber(entry.total_fees ?? entry.totalFees)
+  const settings = getSystemSettings()
+  const total_fees = typeof totalFeesRaw === 'number' ? totalFeesRaw : settings.local_student_fee
+  const password_hash = typeof entry.password_hash === 'string' ? entry.password_hash.trim() : ''
+  const password = typeof entry.password === 'string' ? entry.password.trim() : ''
+
+  const base = {
+    name,
+    email,
+    student_id,
+    student_category: studentCategory ?? 'local',
+    course,
+    program: typeof entry.program === 'string' ? entry.program.trim() || null : null,
+    college: typeof entry.college === 'string' ? entry.college.trim() || null : null,
+    department: typeof entry.department === 'string' ? entry.department.trim() || null : null,
+    semester: typeof entry.semester === 'string' ? entry.semester.trim() || null : null,
+    course_units: Array.isArray(entry.course_units)
+      ? entry.course_units.map((unit) => String(unit ?? '').trim()).filter(Boolean)
+      : [],
+    total_fees,
+    amount_paid: parseNumber(entry.amount_paid ?? entry.amountPaid) ?? 0,
+    campus_id: String(process.env.DEFAULT_CAMPUS_ID ?? 'main-campus').trim() || 'main-campus',
+    campus_name: String(process.env.DEFAULT_CAMPUS_NAME ?? 'Main Campus').trim() || 'Main Campus',
+  }
+
+  if (password_hash.startsWith('scrypt:')) {
+    return { createStudent: { ...base, password_hash } }
+  }
+
+  if (password.length >= 8 && password.length <= 128) {
+    return { createStudent: { ...base, password } }
+  }
+
+  return { error: 'Each student must include password (8–128 chars) or password_hash (scrypt:… from your identity system).' }
 }
 
 async function parseSpreadsheetRows(buffer, originalName) {
@@ -715,6 +931,7 @@ app.post('/profiles', authenticate, requireAdminPermission('manage_student_profi
   const name = typeof request.body.name === 'string' ? request.body.name.trim() : ''
   const email = typeof request.body.email === 'string' ? request.body.email.trim().toLowerCase() : ''
   const password = typeof request.body.password === 'string' ? request.body.password.trim() : ''
+  const passwordHash = typeof request.body.password_hash === 'string' ? request.body.password_hash.trim() : ''
   const studentId = typeof request.body.student_id === 'string' ? request.body.student_id.trim() : ''
   const studentCategory = parseStudentCategory(request.body.student_category)
   const phoneNumber = typeof request.body.phone_number === 'string' ? normalizePhoneNumber(request.body.phone_number) : ''
@@ -749,8 +966,9 @@ app.post('/profiles', authenticate, requireAdminPermission('manage_student_profi
     return
   }
 
-  if (password.length < 8 || password.length > 128) {
-    response.status(400).json({ message: 'Password must be between 8 and 128 characters long.' })
+  const hasValidPasswordHash = passwordHash.startsWith('scrypt:') && passwordHash.length > 20
+  if (!hasValidPasswordHash && (password.length < 8 || password.length > 128)) {
+    response.status(400).json({ message: 'Provide a password (8–128 characters) or a scrypt password_hash from your identity system.' })
     return
   }
 
@@ -837,7 +1055,7 @@ app.post('/profiles', authenticate, requireAdminPermission('manage_student_profi
     const createdProfile = createStudentProfile({
       name,
       email,
-      password,
+      ...(hasValidPasswordHash ? { password_hash: passwordHash } : { password }),
       student_id: studentId,
       student_category: resolvedStudentCategory,
       phone_number: phoneNumber || null,
@@ -1870,7 +2088,7 @@ app.post('/imports/financials/apply', authenticate, requireAdminPermission('mana
           name: createdProfile.name,
           email: createdProfile.email,
           studentId: createdProfile.student_id,
-          password: importedStudent.createStudent.password,
+          password: importedStudent.createStudent.password ?? (importedStudent.createStudent.password_hash ? '(password hash stored)' : undefined),
         })
       } catch (error) {
         skippedRows.push({
@@ -1891,6 +2109,214 @@ app.post('/imports/financials/apply', authenticate, requireAdminPermission('mana
   await fs.writeFile(path.join(uploadsDir, `${Date.now()}-${request.file.originalname}`), request.file.buffer)
 
   response.json({ updatedCount, createdCount, createdStudents, skippedRows })
+})
+
+app.post('/imports/students/preview', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to import student accounts.'), upload.single('file'), async (request, response) => {
+  if (!request.file) {
+    response.status(400).json({ message: 'No file was uploaded.' })
+    return
+  }
+
+  try {
+    const rows = await parseStudentProvisionSpreadsheet(request.file.buffer, request.file.originalname)
+    const settings = getSystemSettings()
+    const data = resolveStudentProvisionPreview(rows, settings.local_student_fee, request.user)
+    response.json({ data })
+  } catch (error) {
+    response.status(400).json({ message: error instanceof Error ? error.message : 'Unable to parse the student import file.' })
+  }
+})
+
+app.post('/imports/students/apply', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to import student accounts.'), upload.single('file'), async (request, response) => {
+  if (!request.file) {
+    response.status(400).json({ message: 'No file was uploaded.' })
+    return
+  }
+
+  let rows
+
+  try {
+    rows = await parseStudentProvisionSpreadsheet(request.file.buffer, request.file.originalname)
+  } catch (error) {
+    response.status(400).json({ message: error instanceof Error ? error.message : 'Unable to parse the student import file.' })
+    return
+  }
+
+  const settings = getSystemSettings()
+  const previewRows = resolveStudentProvisionPreview(rows, settings.local_student_fee, request.user)
+  let createdCount = 0
+  const skippedRows = []
+  const createdStudents = []
+
+  for (const row of previewRows) {
+    if (row.status !== 'create') {
+      if (row.status === 'skipped') {
+        skippedRows.push({ rowNumber: row.rowNumber, reason: row.reason ?? 'Skipped' })
+      }
+      continue
+    }
+
+    const imported = buildImportedStudentInput(row, request.user)
+
+    if (!imported.createStudent) {
+      skippedRows.push({ rowNumber: row.rowNumber, reason: imported.reason ?? 'Unable to create this student account.' })
+      continue
+    }
+
+    try {
+      const createdProfile = createStudentProfile(imported.createStudent)
+      insertActivityLog({
+        adminId: request.userId,
+        targetProfileId: createdProfile.id,
+        action: 'bulk_import_student_accounts',
+        details: {
+          rowNumber: row.rowNumber,
+          studentId: imported.createStudent.student_id,
+          email: imported.createStudent.email,
+          source: 'student_spreadsheet',
+        },
+        campusId: request.user?.campusId,
+        campusName: request.user?.campusName,
+      })
+
+      createdCount += 1
+      createdStudents.push({
+        rowNumber: row.rowNumber,
+        name: createdProfile.name,
+        email: createdProfile.email,
+        studentId: createdProfile.student_id,
+        password: imported.createStudent.password ?? (imported.createStudent.password_hash ? '(password hash stored)' : undefined),
+      })
+    } catch (error) {
+      skippedRows.push({
+        rowNumber: row.rowNumber,
+        reason: error instanceof Error ? error.message : 'Unable to create this student account.',
+      })
+    }
+  }
+
+  await fs.writeFile(path.join(uploadsDir, `students-${Date.now()}-${request.file.originalname}`), request.file.buffer)
+
+  response.json({ createdCount, createdStudents, skippedRows })
+})
+
+app.post('/integrations/students/batch', requireStudentProvisionApiKey, (request, response) => {
+  const students = request.body?.students
+
+  if (!Array.isArray(students)) {
+    response.status(400).json({ message: 'JSON body must include a students array.' })
+    return
+  }
+
+  if (students.length === 0) {
+    response.status(400).json({ message: 'The students array must not be empty.' })
+    return
+  }
+
+  if (students.length > 500) {
+    response.status(400).json({ message: 'Maximum 500 students per request. Send multiple batches for larger cohorts.' })
+    return
+  }
+
+  const created = []
+  const skipped = []
+
+  for (let index = 0; index < students.length; index += 1) {
+    const normalized = normalizeBatchStudentPayload(students[index])
+
+    if (normalized.error) {
+      skipped.push({ index, reason: normalized.error })
+      continue
+    }
+
+    try {
+      const conflict = getIdentityConflictMessage({
+        email: normalized.createStudent.email,
+        phoneNumber: null,
+        studentId: normalized.createStudent.student_id,
+      })
+
+      if (conflict) {
+        skipped.push({ index, email: normalized.createStudent.email, reason: conflict })
+        continue
+      }
+
+      const profile = createStudentProfile(normalized.createStudent)
+      const opsAdmin = listProfiles('admin')[0]
+      if (opsAdmin) {
+        insertActivityLog({
+          adminId: opsAdmin.id,
+          targetProfileId: profile.id,
+          action: 'api_batch_create_student',
+          details: {
+            index,
+            studentId: profile.student_id,
+            email: profile.email,
+          },
+        })
+      }
+      created.push({ id: profile.id, email: profile.email, student_id: profile.student_id })
+    } catch (error) {
+      skipped.push({
+        index,
+        reason: error instanceof Error ? error.message : 'Unable to create student.',
+      })
+    }
+  }
+
+  response.json({
+    createdCount: created.length,
+    created,
+    skippedCount: skipped.length,
+    skipped,
+  })
+})
+
+app.get('/auth/oidc/status', (_request, response) => {
+  response.json({
+    enabled: oidcFlow.isOidcConfigured(),
+    issuer: process.env.OIDC_ISSUER?.trim() ?? null,
+  })
+})
+
+app.get('/auth/oidc/start', async (_request, response) => {
+  try {
+    if (!oidcFlow.isOidcConfigured()) {
+      response.status(503).json({ message: 'University SSO (OIDC) is not configured on this server.' })
+      return
+    }
+
+    const url = await oidcFlow.beginOidcLogin()
+    response.redirect(url)
+  } catch (error) {
+    response.status(500).json({ message: error instanceof Error ? error.message : 'Unable to start university sign-in.' })
+  }
+})
+
+app.get('/auth/oidc/callback', async (request, response) => {
+  try {
+    if (!oidcFlow.isOidcConfigured()) {
+      response.status(503).send('SSO is not configured.')
+      return
+    }
+
+    const callbackUrl = `${request.protocol}://${request.get('host')}${request.originalUrl}`
+    const { email } = await oidcFlow.finishOidcLogin(callbackUrl)
+    const user = getUserByEmail(email)
+
+    if (!user || user.role !== 'student') {
+      response
+        .status(403)
+        .send(`<!DOCTYPE html><html><body style="font-family:system-ui;padding:2rem"><p>No student profile is linked to <strong>${email}</strong>.</p><p>Ask your registrar to provision your account (bulk file or API), then try again.</p></body></html>`)
+      return
+    }
+
+    const token = createSession(user.id, sessionTtlHours)
+    const front = String(process.env.FRONTEND_ORIGIN).replace(/\/$/, '')
+    response.redirect(`${front}/login#oidc_token=${encodeURIComponent(token)}`)
+  } catch (error) {
+    response.status(400).send(error instanceof Error ? error.message : 'SSO callback failed.')
+  }
 })
 
 

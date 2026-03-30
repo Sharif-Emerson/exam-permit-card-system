@@ -10,6 +10,7 @@ describe('ProtectedRoute', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut: vi.fn(),
       refreshUser: vi.fn().mockResolvedValue(undefined),
     })
@@ -42,6 +43,7 @@ describe('ProtectedRoute', () => {
       loading: false,
       configError: null,
       signIn: vi.fn(),
+      signInWithToken: vi.fn(),
       signOut: vi.fn(),
       refreshUser: vi.fn().mockResolvedValue(undefined),
     })

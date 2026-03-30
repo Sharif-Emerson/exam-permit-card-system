@@ -31,6 +31,29 @@ export type BulkCurriculumSyncResult = {
   totalStudents: number
 }
 
+export type StudentProvisionPreviewRow = {
+  rowNumber: number
+  studentName?: string
+  studentId?: string
+  email?: string
+  course?: string
+  status: 'create' | 'skipped'
+  reason?: string
+  totalFees?: number
+}
+
+export type StudentAccountsImportApplyResult = {
+  createdCount: number
+  createdStudents: Array<{
+    rowNumber: number
+    name: string
+    email: string
+    studentId: string
+    password?: string
+  }>
+  skippedRows: Array<{ rowNumber: number; reason: string }>
+}
+
 export interface DataAdapter {
   provider: string
   isConfigured: boolean
@@ -62,4 +85,6 @@ export interface DataAdapter {
   createSupportRequest: (studentId: string, values: CreateSupportRequestInput) => Promise<SupportRequest>
   updateSupportRequest: (requestId: string, values: SupportRequestUpdateInput) => Promise<SupportRequest>
   bulkSyncCurriculum: () => Promise<BulkCurriculumSyncResult>
+  previewStudentAccountsImport: (file: File) => Promise<StudentProvisionPreviewRow[]>
+  applyStudentAccountsImport: (file: File) => Promise<StudentAccountsImportApplyResult>
 }

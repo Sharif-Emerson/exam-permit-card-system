@@ -9,6 +9,7 @@ interface AuthContextValue {
   loading: boolean
   configError: string | null
   signIn: (email: string, password: string) => Promise<AuthUser>
+  signInWithToken: (token: string) => Promise<AuthUser>
   signOut: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -128,6 +129,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function signInWithToken(token: string) {
+    setLoading(true)
+    try {
+      const session = await activeAuthAdapter.signInWithToken(token)
+      const nextUser = await loadUserProfile(session.userId, session.user)
+      return nextUser
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function signOut() {
     setLoading(true)
     try {
@@ -162,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     configError,
     signIn,
+    signInWithToken,
     signOut,
     refreshUser,
   }

@@ -1,4 +1,4 @@
-import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useState, useRef } from 'react'
+import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useState, useRef } from 'react'
 
   // Ref to preserve search input focus
 import {
@@ -15,12 +15,13 @@ import { useUnsavedChanges } from '../hooks/useUnsavedChanges'
 import { publicApiBaseUrl } from '../config/provider'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
+import { downloadFinancialImportTemplate, downloadStudentAccountsImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById } from '../services/profileService'
+import { adminUpdateStudentProfile, applyStudentAccountsImport, bulkSyncCurriculum, clearStudentBalance, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, previewStudentAccountsImport, purgePermitActivityLogs, restoreStudentProfile, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById } from '../services/profileService'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
 import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline } from '../types'
+import type { StudentProvisionPreviewRow } from '../adapters/data/types'
 import { DIALOG_Z } from '../constants/dialogLayers'
 import SignOutDialog from './SignOutDialog'
 
@@ -35,6 +36,7 @@ type ImportPreviewRow = {
   studentName?: string
 }
 type NavSection = 'dashboard' | 'students' | 'support' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'settings'
+type BulkImportSubSection = 'financial' | 'student_accounts' | 'api'
 
 type AdminPermitDesignFields = {
   photo: boolean
@@ -220,7 +222,7 @@ function getAdminSections(permissions: Set<AdminPermission>): NavSection[] {
     sections.add('permit-cards')
   }
 
-  if (permissions.has('manage_financials')) {
+  if (permissions.has('manage_financials') || permissions.has('manage_student_profiles')) {
     sections.add('import')
   }
 
@@ -284,6 +286,8 @@ function formatAdminActionLabel(action: string) {
       return 'Financials updated'
     case 'bulk_import_student_financials':
       return 'Bulk financial import'
+    case 'bulk_import_student_accounts':
+      return 'Bulk student account import'
     case 'admin_update_student_profile':
       return 'Student profile updated'
     default:
@@ -441,6 +445,16 @@ export default function AdminPanel() {
   const canManageSupportRequests = adminCapability.sections.includes('support')
   const canManageStudentProfiles = adminCapability.sections.includes('permit-cards')
   const canManageFinancials = adminCapability.canImportFinancials
+  const bulkImportTabs = useMemo((): BulkImportSubSection[] => {
+    const tabs: BulkImportSubSection[] = []
+    if (canManageFinancials) {
+      tabs.push('financial')
+    }
+    if (canManageStudentProfiles) {
+      tabs.push('student_accounts', 'api')
+    }
+    return tabs
+  }, [canManageFinancials, canManageStudentProfiles])
   const canDeleteAuditLogs = Boolean(user?.role === 'admin' && user.permissions?.includes('write_audit_logs'))
   const canAccessReports = adminCapability.sections.includes('reports')
   const [students, setStudents] = useState<StudentProfile[]>([])
@@ -454,6 +468,12 @@ export default function AdminPanel() {
   const [importFileName, setImportFileName] = useState('')
   const [importPreviewRows, setImportPreviewRows] = useState<ImportPreviewRow[]>([])
   const [pendingImportUpdates, setPendingImportUpdates] = useState<FinancialImportUpdate[]>([])
+  const [bulkImportSubSection, setBulkImportSubSection] = useState<BulkImportSubSection>('financial')
+  const [studentAccountsImporting, setStudentAccountsImporting] = useState(false)
+  const [studentAccountsDragActive, setStudentAccountsDragActive] = useState(false)
+  const [studentImportFileName, setStudentImportFileName] = useState('')
+  const [studentImportPreviewRows, setStudentImportPreviewRows] = useState<StudentProvisionPreviewRow[]>([])
+  const [pendingStudentImportFile, setPendingStudentImportFile] = useState<File | null>(null)
   const [activityLogs, setActivityLogs] = useState<AdminActivityLog[]>([])
   const [supportRequests, setSupportRequests] = useState<SupportRequest[]>([])
   const [supportReplyDrafts, setSupportReplyDrafts] = useState<SupportReplyDrafts>({})
@@ -1021,6 +1041,15 @@ export default function AdminPanel() {
   }, [activeSection, adminCapability.sections])
 
   useEffect(() => {
+    if (bulkImportTabs.length === 0) {
+      return
+    }
+    if (!bulkImportTabs.includes(bulkImportSubSection)) {
+      setBulkImportSubSection(bulkImportTabs[0])
+    }
+  }, [bulkImportTabs, bulkImportSubSection])
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return
     }
@@ -1302,6 +1331,7 @@ export default function AdminPanel() {
   }
 
   function resetStudentView() {
+    setSearchInputValue('')
     setSearchQuery('')
     setFilterStatus('all')
     setShowPrintedOnly(false)
@@ -1310,6 +1340,16 @@ export default function AdminPanel() {
     setFilterCourse('')
     setFilterCollege('')
     setPage(1)
+    void loadStudents({
+      page: 1,
+      search: '',
+      status: 'all',
+      department: '',
+      program: '',
+      course: '',
+      college: '',
+      silent: true,
+    })
   }
 
   function handleExportDashboardCsv() {
@@ -1903,6 +1943,129 @@ export default function AdminPanel() {
     setPendingImportUpdates([])
   }
 
+  async function prepareStudentAccountsImport(file: File) {
+    if (!user) {
+      return
+    }
+
+    if (!canManageStudentProfiles) {
+      setError('Your admin view does not allow student account imports.')
+      return
+    }
+
+    try {
+      setStudentAccountsImporting(true)
+      setError('')
+      setSuccessMessage('')
+      const rows = await previewStudentAccountsImport(file)
+      setStudentImportFileName(file.name)
+      setStudentImportPreviewRows(rows)
+      setPendingStudentImportFile(file)
+      const readyCount = rows.filter((row) => row.status === 'create').length
+      setSuccessMessage(`Prepared ${rows.length} row(s) from ${file.name}. ${readyCount} row(s) are ready to create.`)
+    } catch (importError) {
+      const nextError = importError instanceof Error ? importError.message : 'Unable to preview the student import file'
+      setError(nextError)
+      setStudentImportFileName('')
+      setStudentImportPreviewRows([])
+      setPendingStudentImportFile(null)
+    } finally {
+      setStudentAccountsImporting(false)
+    }
+  }
+
+  async function handleStudentImportFile(event: ChangeEvent<HTMLInputElement>) {
+    if (!event.target.files?.[0]) {
+      return
+    }
+
+    const file = event.target.files[0]
+    await prepareStudentAccountsImport(file)
+    event.target.value = ''
+  }
+
+  async function handleApplyStudentAccountsImport() {
+    if (!user || !pendingStudentImportFile) {
+      return
+    }
+
+    if (!canManageStudentProfiles) {
+      setError('Your admin view does not allow student account imports.')
+      return
+    }
+
+    try {
+      setStudentAccountsImporting(true)
+      setError('')
+      const importResult = await applyStudentAccountsImport(pendingStudentImportFile)
+      await loadStudents({ page: 1, status: 'all' })
+
+      const failedRows = new Map(importResult.skippedRows.map((item) => [item.rowNumber, item.reason]))
+      setStudentImportPreviewRows((current) =>
+        current.map((row) =>
+          failedRows.has(row.rowNumber)
+            ? { ...row, status: 'skipped' as const, reason: failedRows.get(row.rowNumber) }
+            : row,
+        ),
+      )
+
+      setPendingStudentImportFile(null)
+      setSuccessMessage(
+        `Created ${importResult.createdCount} student account(s) from ${studentImportFileName}.${
+          importResult.skippedRows.length > 0 ? ` ${importResult.skippedRows.length} row(s) skipped or failed.` : ''
+        }`,
+      )
+
+      if (importResult.skippedRows.length > 0) {
+        setError(
+          importResult.skippedRows
+            .slice(0, 5)
+            .map((item) => `Row ${item.rowNumber}: ${item.reason}`)
+            .join(' '),
+        )
+      }
+    } catch (importError) {
+      const nextError = importError instanceof Error ? importError.message : 'Unable to apply the student import'
+      setError(nextError)
+    } finally {
+      setStudentAccountsImporting(false)
+    }
+  }
+
+  function clearStudentImportPreview() {
+    setStudentImportFileName('')
+    setStudentImportPreviewRows([])
+    setPendingStudentImportFile(null)
+  }
+
+  function handleStudentImportDragEnter(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault()
+    setStudentAccountsDragActive(true)
+  }
+
+  function handleStudentImportDragOver(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault()
+    setStudentAccountsDragActive(true)
+  }
+
+  function handleStudentImportDragLeave(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault()
+    setStudentAccountsDragActive(false)
+  }
+
+  async function handleStudentImportDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault()
+    setStudentAccountsDragActive(false)
+
+    const file = event.dataTransfer.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    await prepareStudentAccountsImport(file)
+  }
+
   const handleSaveAdminSettings = useCallback(async (event: { preventDefault: () => void }) => {
     event.preventDefault()
 
@@ -2067,9 +2230,9 @@ export default function AdminPanel() {
     {
       key: 'bulk-import',
       label: 'Bulk Import',
-      description: 'Open the financial import workspace to upload spreadsheet updates in one pass.',
+      description: 'Financial spreadsheet updates, student account CSV/XLSX, or HTTP batch integration details.',
       icon: <FileUp className="h-5 w-5" />,
-      disabled: !canManageFinancials,
+      disabled: !canManageFinancials && !canManageStudentProfiles,
       action: () => setActiveSection('import'),
     },
     {
@@ -2616,6 +2779,14 @@ export default function AdminPanel() {
             className="hidden"
             disabled={importing}
             onChange={(e) => void handleImportFile(e)}
+          />
+          <input
+            id="admin-student-import-input"
+            type="file"
+            accept=".xlsx,.csv"
+            className="hidden"
+            disabled={studentAccountsImporting}
+            onChange={(e) => void handleStudentImportFile(e)}
           />
 
           <div key={activeSection} className="kiu-page-in-animate"> {/* 4. Wrap activeSection renders */}
@@ -3564,124 +3735,339 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ BULK IMPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* Bulk import: financials, student accounts (spreadsheet), HTTP batch + OIDC notes */}
             {activeSection === 'import' && (
               <div className="space-y-5">
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">Bulk Financial Import</h1>
-                  <p className="text-sm text-gray-500">Upload a .xlsx or .csv file to update student financial data in bulk.</p>
+                  <h1 className="text-xl font-bold text-gray-900">Bulk import and integrations</h1>
+                  <p className="text-sm text-gray-500">
+                    Choose financial updates, new student accounts from a spreadsheet, or server-to-server batch provisioning details.
+                  </p>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <p className="max-w-sm text-sm text-gray-600">
-                      Use columns such as{' '}
-                      <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_name</code>,{' '}
-                      <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_id</code> or{' '}
-                      <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">email</code>, plus{' '}
-                      <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">amount_paid</code> and optional{' '}
-                      <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">total_fees</code>.
-                    </p>
-                    <div className="flex flex-col gap-3 sm:flex-row">
+                {bulkImportTabs.length > 1 ? (
+                  <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-gray-50 p-1">
+                    {bulkImportTabs.includes('financial') ? (
                       <button
                         type="button"
-                        disabled={!canManageFinancials}
-                        onClick={downloadFinancialImportTemplate}
-                        className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        onClick={() => setBulkImportSubSection('financial')}
+                        className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                          bulkImportSubSection === 'financial'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
                       >
-                        <Download className="h-4 w-4" />
-                        Download Template
+                        Financial spreadsheet
                       </button>
-                      <label
-                        htmlFor="admin-financial-import-input"
-                        className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white ${!canManageFinancials ? 'cursor-not-allowed bg-emerald-300' : importing ? 'cursor-pointer bg-emerald-400' : dragActive ? 'cursor-pointer bg-emerald-700' : 'cursor-pointer bg-emerald-600 hover:bg-emerald-700'}`}
-                        onDragEnter={handleDragEnter}
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => void handleDrop(e)}
+                    ) : null}
+                    {bulkImportTabs.includes('student_accounts') ? (
+                      <button
+                        type="button"
+                        onClick={() => setBulkImportSubSection('student_accounts')}
+                        className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                          bulkImportSubSection === 'student_accounts'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
                       >
-                        <Upload className="h-4 w-4" />
-                        {importing ? 'Importing...' : dragActive ? 'Drop File Here' : 'Upload Spreadsheet'}
-                      </label>
-                    </div>
+                        Student accounts
+                      </button>
+                    ) : null}
+                    {bulkImportTabs.includes('api') ? (
+                      <button
+                        type="button"
+                        onClick={() => setBulkImportSubSection('api')}
+                        className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                          bulkImportSubSection === 'api'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        HTTP API and SSO
+                      </button>
+                    ) : null}
                   </div>
+                ) : null}
 
-                  {importPreviewRows.length > 0 && (
-                    <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <h3 className="font-semibold text-gray-800">Import Preview</h3>
-                          <p className="text-xs text-gray-500">
-                            {importPreviewRows.length} row(s) from {importFileName}. â€” {pendingImportUpdates.length} row(s) are ready to apply.
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={clearImportPreview}
-                            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                          >
-                            Clear
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!canManageFinancials || importing || pendingImportUpdates.length === 0}
-                            onClick={() => void handleApplyImport()}
-                            className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-                          >
-                            Apply Import
-                          </button>
-                        </div>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-sm">
-                          <thead className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            <tr>
-                              <th className="px-3 py-2 text-left">Row</th>
-                              <th className="px-3 py-2 text-left">Key</th>
-                              <th className="px-3 py-2 text-left">Student</th>
-                              <th className="px-3 py-2 text-left">Amount Received</th>
-                              <th className="px-3 py-2 text-left">Expected Fees</th>
-                              <th className="px-3 py-2 text-left">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200">
-                            {importPreviewRows.slice(0, 12).map((row) => (
-                              <tr key={`${row.rowNumber}-${row.matcher}`} className="bg-white">
-                                <td className="px-3 py-2 text-gray-500">{row.rowNumber}</td>
-                                <td className="px-3 py-2 text-gray-700">{row.matcher}</td>
-                                <td className="px-3 py-2 text-gray-700">{row.studentName ?? '-'}</td>
-                                <td className="px-3 py-2 text-gray-700">
-                                  {typeof row.amountPaid === 'number' ? `$${row.amountPaid.toFixed(2)}` : '-'}
-                                </td>
-                                <td className="px-3 py-2 text-gray-700">
-                                  {typeof row.totalFees === 'number' ? `$${row.totalFees.toFixed(2)}` : '-'}
-                                </td>
-                                <td className="px-3 py-2">
-                                  <span className={`rounded px-2.5 py-1 text-xs font-medium ${
-                                    row.status === 'ready'
-                                      ? 'bg-green-100 text-green-700'
-                                      : row.status === 'create'
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : 'bg-red-100 text-red-700'
-                                  }`}>
-                                    {row.status === 'ready' ? 'Update' : row.status === 'create' ? 'Create' : (row.reason ?? 'Skipped')}
-                                  </span>
-                                  {row.status !== 'ready' && row.reason ? (
-                                    <p className="mt-1 max-w-xs text-[11px] text-gray-500">{row.reason}</p>
-                                  ) : null}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {importPreviewRows.length > 12 && (
-                          <p className="mt-2 text-xs text-gray-400">Showing the first 12 rows.</p>
-                        )}
+                {bulkImportSubSection === 'financial' && canManageFinancials && (
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <h2 className="mb-1 text-lg font-semibold text-gray-900">Bulk financial import</h2>
+                    <p className="mb-4 text-sm text-gray-500">Upload a .xlsx or .csv file to update student financial data in bulk.</p>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <p className="max-w-sm text-sm text-gray-600">
+                        Use columns such as{' '}
+                        <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_name</code>,{' '}
+                        <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_id</code> or{' '}
+                        <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">email</code>, plus{' '}
+                        <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">amount_paid</code> and optional{' '}
+                        <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">total_fees</code>.
+                      </p>
+                      <div className="flex flex-col gap-3 sm:flex-row">
+                        <button
+                          type="button"
+                          disabled={!canManageFinancials}
+                          onClick={downloadFinancialImportTemplate}
+                          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          <Download className="h-4 w-4" />
+                          Download template
+                        </button>
+                        <label
+                          htmlFor="admin-financial-import-input"
+                          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white ${!canManageFinancials ? 'cursor-not-allowed bg-emerald-300' : importing ? 'cursor-pointer bg-emerald-400' : dragActive ? 'cursor-pointer bg-emerald-700' : 'cursor-pointer bg-emerald-600 hover:bg-emerald-700'}`}
+                          onDragEnter={handleDragEnter}
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => void handleDrop(e)}
+                        >
+                          <Upload className="h-4 w-4" />
+                          {importing ? 'Importing...' : dragActive ? 'Drop file here' : 'Upload spreadsheet'}
+                        </label>
                       </div>
                     </div>
-                  )}
-                </div>
+
+                    {importPreviewRows.length > 0 && (
+                      <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <h3 className="font-semibold text-gray-800">Import preview</h3>
+                            <p className="text-xs text-gray-500">
+                              {importPreviewRows.length} row(s) from {importFileName} — {pendingImportUpdates.length} row(s) are ready to apply.
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={clearImportPreview}
+                              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                            >
+                              Clear
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!canManageFinancials || importing || pendingImportUpdates.length === 0}
+                              onClick={() => void handleApplyImport()}
+                              className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+                            >
+                              Apply import
+                            </button>
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-sm">
+                            <thead className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              <tr>
+                                <th className="px-3 py-2 text-left">Row</th>
+                                <th className="px-3 py-2 text-left">Key</th>
+                                <th className="px-3 py-2 text-left">Student</th>
+                                <th className="px-3 py-2 text-left">Amount received</th>
+                                <th className="px-3 py-2 text-left">Expected fees</th>
+                                <th className="px-3 py-2 text-left">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              {importPreviewRows.slice(0, 12).map((row) => (
+                                <tr key={`${row.rowNumber}-${row.matcher}`} className="bg-white">
+                                  <td className="px-3 py-2 text-gray-500">{row.rowNumber}</td>
+                                  <td className="px-3 py-2 text-gray-700">{row.matcher}</td>
+                                  <td className="px-3 py-2 text-gray-700">{row.studentName ?? '-'}</td>
+                                  <td className="px-3 py-2 text-gray-700">
+                                    {typeof row.amountPaid === 'number' ? `$${row.amountPaid.toFixed(2)}` : '-'}
+                                  </td>
+                                  <td className="px-3 py-2 text-gray-700">
+                                    {typeof row.totalFees === 'number' ? `$${row.totalFees.toFixed(2)}` : '-'}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span className={`rounded px-2.5 py-1 text-xs font-medium ${
+                                      row.status === 'ready'
+                                        ? 'bg-green-100 text-green-700'
+                                        : row.status === 'create'
+                                          ? 'bg-blue-100 text-blue-700'
+                                          : 'bg-red-100 text-red-700'
+                                    }`}>
+                                      {row.status === 'ready' ? 'Update' : row.status === 'create' ? 'Create' : (row.reason ?? 'Skipped')}
+                                    </span>
+                                    {row.status !== 'ready' && row.reason ? (
+                                      <p className="mt-1 max-w-xs text-[11px] text-gray-500">{row.reason}</p>
+                                    ) : null}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {importPreviewRows.length > 12 && (
+                            <p className="mt-2 text-xs text-gray-400">Showing the first 12 rows.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {bulkImportSubSection === 'student_accounts' && canManageStudentProfiles && (
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <h2 className="mb-1 text-lg font-semibold text-gray-900">Student accounts (spreadsheet)</h2>
+                    <p className="mb-4 text-sm text-gray-500">
+                      Create many student logins from .xlsx or .csv. Use either a plain <code className="rounded bg-gray-100 px-1 text-xs">password</code> column or a{' '}
+                      <code className="rounded bg-gray-100 px-1 text-xs">password_hash</code> value prefixed with <code className="rounded bg-gray-100 px-1 text-xs">scrypt:</code>.
+                      Missing <code className="rounded bg-gray-100 px-1 text-xs">total_fees</code> defaults to the system local fee.
+                    </p>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <p className="max-w-md text-sm text-gray-600">
+                        Required columns include <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_name</code>,{' '}
+                        <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">student_id</code>, <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">email</code>, and{' '}
+                        <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">course</code>. Row limits are enforced on the server (<code className="rounded bg-gray-100 px-1 text-xs">STUDENT_IMPORT_MAX_ROWS</code>, default 5000, max 20000).
+                      </p>
+                      <div className="flex flex-col gap-3 sm:flex-row">
+                        <button
+                          type="button"
+                          disabled={!canManageStudentProfiles}
+                          onClick={downloadStudentAccountsImportTemplate}
+                          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          <Download className="h-4 w-4" />
+                          Download template
+                        </button>
+                        <label
+                          htmlFor="admin-student-import-input"
+                          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white ${!canManageStudentProfiles ? 'cursor-not-allowed bg-emerald-300' : studentAccountsImporting ? 'cursor-pointer bg-emerald-400' : studentAccountsDragActive ? 'cursor-pointer bg-emerald-700' : 'cursor-pointer bg-emerald-600 hover:bg-emerald-700'}`}
+                          onDragEnter={handleStudentImportDragEnter}
+                          onDragOver={handleStudentImportDragOver}
+                          onDragLeave={handleStudentImportDragLeave}
+                          onDrop={(e) => void handleStudentImportDrop(e)}
+                        >
+                          <Upload className="h-4 w-4" />
+                          {studentAccountsImporting ? 'Working...' : studentAccountsDragActive ? 'Drop file here' : 'Upload spreadsheet'}
+                        </label>
+                      </div>
+                    </div>
+
+                    {studentImportPreviewRows.length > 0 && (
+                      <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <h3 className="font-semibold text-gray-800">Import preview</h3>
+                            <p className="text-xs text-gray-500">
+                              {studentImportPreviewRows.length} row(s) from {studentImportFileName} —{' '}
+                              {studentImportPreviewRows.filter((r) => r.status === 'create').length} row(s) ready to create.
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={clearStudentImportPreview}
+                              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                            >
+                              Clear
+                            </button>
+                            <button
+                              type="button"
+                              disabled={
+                                !canManageStudentProfiles
+                                || studentAccountsImporting
+                                || !pendingStudentImportFile
+                                || studentImportPreviewRows.filter((r) => r.status === 'create').length === 0
+                              }
+                              onClick={() => void handleApplyStudentAccountsImport()}
+                              className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+                            >
+                              Apply import
+                            </button>
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-sm">
+                            <thead className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              <tr>
+                                <th className="px-3 py-2 text-left">Row</th>
+                                <th className="px-3 py-2 text-left">Name</th>
+                                <th className="px-3 py-2 text-left">Reg. no.</th>
+                                <th className="px-3 py-2 text-left">Email</th>
+                                <th className="px-3 py-2 text-left">Course</th>
+                                <th className="px-3 py-2 text-left">Fees</th>
+                                <th className="px-3 py-2 text-left">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              {studentImportPreviewRows.slice(0, 12).map((row) => (
+                                <tr key={row.rowNumber} className="bg-white">
+                                  <td className="px-3 py-2 text-gray-500">{row.rowNumber}</td>
+                                  <td className="px-3 py-2 text-gray-700">{row.studentName ?? '-'}</td>
+                                  <td className="px-3 py-2 text-gray-700">{row.studentId ?? '-'}</td>
+                                  <td className="px-3 py-2 text-gray-700">{row.email ?? '-'}</td>
+                                  <td className="px-3 py-2 text-gray-700">{row.course ?? '-'}</td>
+                                  <td className="px-3 py-2 text-gray-700">
+                                    {typeof row.totalFees === 'number' ? `$${row.totalFees.toFixed(2)}` : '-'}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span
+                                      className={`rounded px-2.5 py-1 text-xs font-medium ${
+                                        row.status === 'create' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
+                                      }`}
+                                    >
+                                      {row.status === 'create' ? 'Create' : (row.reason ?? 'Skipped')}
+                                    </span>
+                                    {row.status === 'skipped' && row.reason ? (
+                                      <p className="mt-1 max-w-xs text-[11px] text-gray-500">{row.reason}</p>
+                                    ) : null}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {studentImportPreviewRows.length > 12 && (
+                            <p className="mt-2 text-xs text-gray-400">Showing the first 12 rows.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {bulkImportSubSection === 'api' && canManageStudentProfiles && (
+                  <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <h2 className="text-lg font-semibold text-gray-900">HTTP batch provisioning</h2>
+                    <p className="text-sm text-gray-600">
+                      Your student information system can create accounts by calling the REST API with a shared secret. Set <code className="rounded bg-gray-100 px-1 text-xs">STUDENT_PROVISION_API_KEY</code> on the server, then send{' '}
+                      <code className="rounded bg-gray-100 px-1 text-xs">X-Provision-Key</code> on each request. Maximum{' '}
+                      <strong className="font-medium text-gray-800">500</strong> students per request; split larger cohorts into multiple calls.
+                    </p>
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Endpoint</p>
+                      <code className="block overflow-x-auto rounded-lg bg-slate-900 px-3 py-2 text-xs text-emerald-100">
+                        POST {publicApiBaseUrl}/integrations/students/batch
+                      </code>
+                    </div>
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Example body</p>
+                      <pre className="max-h-64 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-emerald-100">
+{`{
+  "students": [
+    {
+      "name": "Jane Student",
+      "email": "jane.student@university.edu",
+      "student_id": "REG-2026-001",
+      "course": "BSc Software Engineering",
+      "student_category": "local",
+      "total_fees": 3000,
+      "password": "choose-a-strong-password"
+    }
+  ]
+}`}
+                      </pre>
+                      <p className="mt-2 text-xs text-gray-500">
+                        Use <code className="rounded bg-gray-100 px-1 text-xs">password</code> (8–128 characters) or, instead of <code className="rounded bg-gray-100 px-1 text-xs">password</code>, a <code className="rounded bg-gray-100 px-1 text-xs">password_hash</code> string beginning with <code className="rounded bg-gray-100 px-1 text-xs">scrypt:</code>.
+                      </p>
+                    </div>
+                    <h2 className="pt-2 text-lg font-semibold text-gray-900">University sign-in (OIDC)</h2>
+                    <p className="text-sm text-gray-600">
+                      When the backend is configured with <code className="rounded bg-gray-100 px-1 text-xs">OIDC_ISSUER</code>, <code className="rounded bg-gray-100 px-1 text-xs">OIDC_CLIENT_ID</code>,{' '}
+                      <code className="rounded bg-gray-100 px-1 text-xs">OIDC_CLIENT_SECRET</code>, <code className="rounded bg-gray-100 px-1 text-xs">OIDC_REDIRECT_URI</code>, and{' '}
+                      <code className="rounded bg-gray-100 px-1 text-xs">FRONTEND_ORIGIN</code>, students who already exist in this portal can use{' '}
+                      <span className="font-medium text-gray-800">Sign in with university</span> on the login page. New students must still be provisioned first (spreadsheet or API).
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

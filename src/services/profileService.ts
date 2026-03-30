@@ -1,5 +1,5 @@
 import { activeDataAdapter } from '../adapters/data'
-import type { FinancialUpdateValues } from '../adapters/data/types'
+import type { FinancialUpdateValues, StudentAccountsImportApplyResult, StudentProvisionPreviewRow } from '../adapters/data/types'
 import type {
   AdminActivityLog,
   AdminActivityLogPage,
@@ -165,4 +165,12 @@ export async function importStudentFinancials(updates: FinancialImportUpdate[], 
 
 export async function bulkSyncCurriculum() {
   return activeDataAdapter.bulkSyncCurriculum()
+}
+
+export async function previewStudentAccountsImport(file: File): Promise<StudentProvisionPreviewRow[]> {
+  return activeDataAdapter.previewStudentAccountsImport(file)
+}
+
+export async function applyStudentAccountsImport(file: File): Promise<StudentAccountsImportApplyResult> {
+  return activeDataAdapter.applyStudentAccountsImport(file)
 }
