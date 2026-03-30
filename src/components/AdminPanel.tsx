@@ -6,10 +6,11 @@ import {
   FileSpreadsheet, FileUp, LayoutDashboard, LogOut, Menu,
   Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Sun, Trash2, Upload, Users, X,
 } from 'lucide-react'
-import { KIU_COLLEGES, KIU_COURSES, KIU_CURRICULUM, KIU_DEPARTMENTS, KIU_SEMESTERS, KiuCourseUnit } from '../config/universityData'
+import { KIU_COLLEGES, KIU_COURSES, KIU_CURRICULUM, KIU_DEPARTMENT_DEFAULT_PROGRAM, KIU_DEPARTMENTS, KIU_SEMESTERS, KiuCourseUnit } from '../config/universityData'
 import BrandMark from './BrandMark'
 import PermitCard from './PermitCard'
-// Removed unused SaveConfirmationDialog imports
+import ConfirmDialog from './ConfirmDialog'
+import { SaveConfirmationDialog } from './SaveConfirmationDialog'
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges'
 import { publicApiBaseUrl } from '../config/provider'
 import { useAuth } from '../context/AuthContext'
@@ -17,9 +18,10 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, clearStudentBalance, createStudentProfile, deleteStudentProfile, fetchAdminActivityLogsPage, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, restoreStudentProfile, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById } from '../services/profileService'
+import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById } from '../services/profileService'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
 import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline } from '../types'
+import { DIALOG_Z } from '../constants/dialogLayers'
 import SignOutDialog from './SignOutDialog'
 
 type PaymentDrafts = Record<string, string>
@@ -33,6 +35,25 @@ type ImportPreviewRow = {
   studentName?: string
 }
 type NavSection = 'dashboard' | 'students' | 'support' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'settings'
+
+type AdminPermitDesignFields = {
+  photo: boolean
+  department: boolean
+  semester: boolean
+  course: boolean
+}
+
+type AdminPermitDesignState = {
+  logo: string
+  name: string
+  fields: AdminPermitDesignFields
+}
+
+const DEFAULT_ADMIN_PERMIT_DESIGN: AdminPermitDesignState = {
+  logo: '',
+  name: '',
+  fields: { photo: true, department: true, semester: true, course: true },
+}
 
 const STUDENT_PAGE_SIZE = 24
 const ACTIVITY_PAGE_SIZE = 12
@@ -131,6 +152,36 @@ function getDaysUntilDate(targetDate: string) {
 
   const diffMs = targetTime - Date.now()
   return Math.max(Math.ceil(diffMs / (24 * 60 * 60 * 1000)), 0)
+}
+
+function readAdminNotificationReadSet(adminId: string): Set<string> {
+  if (typeof window === 'undefined') {
+    return new Set()
+  }
+
+  try {
+    const raw = localStorage.getItem(`admin-notifications-read:${adminId}`)
+    if (!raw) {
+      return new Set()
+    }
+
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) {
+      return new Set()
+    }
+
+    return new Set(parsed.filter((x): x is string => typeof x === 'string'))
+  } catch {
+    return new Set()
+  }
+}
+
+function persistAdminNotificationReadSet(adminId: string, ids: Set<string>) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  localStorage.setItem(`admin-notifications-read:${adminId}`, JSON.stringify([...ids]))
 }
 
 function hasAnyPermission(permissions: Set<AdminPermission>, required: AdminPermission[]) {
@@ -265,6 +316,57 @@ function createFeeSettingsDraft(feeSettings: SystemFeeSettings): FeeSettingsDraf
   }
 }
 
+function programFromDepartment(department: string | null | undefined): string {
+  const d = typeof department === 'string' ? department.trim() : ''
+  if (!d) {
+    return ''
+  }
+  const direct = KIU_DEPARTMENT_DEFAULT_PROGRAM[d]
+  if (direct) {
+    return direct
+  }
+  const lower = d.toLowerCase()
+  for (const [name, prog] of Object.entries(KIU_DEPARTMENT_DEFAULT_PROGRAM)) {
+    if (name.toLowerCase() === lower) {
+      return prog
+    }
+  }
+  return ''
+}
+
+function inferProgramAndCourseForEdit(student: StudentProfile): { program: string; course: string } {
+  const rawProgram = (student.program ?? '').trim()
+  const rawCourse = (student.course ?? '').trim()
+  let program = rawProgram
+  let course = rawCourse
+
+  if (program) {
+    const ciKey = Object.keys(KIU_CURRICULUM).find((k) => k.toLowerCase() === program.toLowerCase())
+    if (ciKey) {
+      program = ciKey
+    }
+  }
+
+  if (!program || !KIU_CURRICULUM[program]) {
+    const fromDept = programFromDepartment(student.department)
+    if (fromDept && KIU_CURRICULUM[fromDept]) {
+      program = fromDept
+    }
+  }
+
+  if (!program) {
+    program = rawProgram
+  }
+
+  if (program && KIU_CURRICULUM[program] && !course) {
+    course = KIU_CURRICULUM[program].defaultCourse
+  }
+  if (!course) {
+    course = rawCourse
+  }
+  return { program, course }
+}
+
 function createExamsFromCurriculum(units: KiuCourseUnit[]): StudentExam[] {
   return units.map((u, index) => ({
     id: `exam-${Date.now()}-${index}`,
@@ -331,7 +433,7 @@ export default function AdminPanel() {
   const [refreshing, setRefreshing] = useState(false)
   const { user, signOut, refreshUser } = useAuth()
   const { darkMode, toggleTheme } = useTheme()
-  const { hasUnsavedChanges, setHasUnsavedChanges, registerSaveHandler } = useUnsavedChanges()
+  const { setHasUnsavedChanges, registerSaveHandler, registerDiscardHandler, unregisterDiscardHandler } = useUnsavedChanges()
   // Removed unused variable 'location'
   const adminCapability = getAdminCapabilityProfile(user)
   const canViewStudents = adminCapability.sections.includes('students')
@@ -339,6 +441,7 @@ export default function AdminPanel() {
   const canManageSupportRequests = adminCapability.sections.includes('support')
   const canManageStudentProfiles = adminCapability.sections.includes('permit-cards')
   const canManageFinancials = adminCapability.canImportFinancials
+  const canDeleteAuditLogs = Boolean(user?.role === 'admin' && user.permissions?.includes('write_audit_logs'))
   const canAccessReports = adminCapability.sections.includes('reports')
   const [students, setStudents] = useState<StudentProfile[]>([])
   // Ref for search input (no focus logic)
@@ -396,9 +499,11 @@ export default function AdminPanel() {
   const [restoringStudentId, setRestoringStudentId] = useState('')
   const [grantingPrintAccessId, setGrantingPrintAccessId] = useState('')
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null)
+  const [unsavedLeaveIntent, setUnsavedLeaveIntent] = useState<null | 'edit' | 'create'>(null)
   const [savingCreate, setSavingCreate] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showNotificationCenter, setShowNotificationCenter] = useState(false)
+  const [readAdminAlertIds, setReadAdminAlertIds] = useState<Set<string>>(() => new Set())
   const [bulkPrintStudents, setBulkPrintStudents] = useState<StudentProfile[]>([])
   const [bulkPrintQrCodes, setBulkPrintQrCodes] = useState<Record<string, string>>({})
   const [bulkPrinting, setBulkPrinting] = useState(false)
@@ -406,7 +511,8 @@ export default function AdminPanel() {
   const [lastSyncAt, setLastSyncAt] = useState('')
   const [lastReminderAt, setLastReminderAt] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
-  const [savingFeeSettings, setSavingFeeSettings] = useState(false)
+  const [savingFeeStructure, setSavingFeeStructure] = useState(false)
+  const [savingDeadlines, setSavingDeadlines] = useState(false)
   const [settingsDraft, setSettingsDraft] = useState<AdminSettingsDraft>({
     name: user?.name ?? '',
     email: user?.email ?? '',
@@ -415,6 +521,38 @@ export default function AdminPanel() {
     password: '',
     confirmPassword: '',
   })
+  // Permit design settings
+  const [permitDesign, setPermitDesign] = useState<AdminPermitDesignState>(() => {
+    try {
+      const raw = localStorage.getItem('permitDesign')
+      if (!raw) {
+        return DEFAULT_ADMIN_PERMIT_DESIGN
+      }
+      const parsed = JSON.parse(raw) as Partial<AdminPermitDesignState>
+      return {
+        ...DEFAULT_ADMIN_PERMIT_DESIGN,
+        ...parsed,
+        fields: { ...DEFAULT_ADMIN_PERMIT_DESIGN.fields, ...parsed.fields },
+      }
+    } catch {
+      return DEFAULT_ADMIN_PERMIT_DESIGN
+    }
+  })
+
+  function handlePermitDesignChange(field: 'logo' | 'name', value: string) {
+    setPermitDesign((current) => {
+      const next = { ...current, [field]: value }
+      localStorage.setItem('permitDesign', JSON.stringify(next))
+      return next
+    })
+  }
+  function handlePermitFieldToggle(field: keyof AdminPermitDesignFields) {
+    setPermitDesign((current) => {
+      const next = { ...current, fields: { ...current.fields, [field]: !current.fields[field] } }
+      localStorage.setItem('permitDesign', JSON.stringify(next))
+      return next
+    })
+  }
 
   const loadStudents = useCallback(async (options?: {
     silent?: boolean
@@ -464,10 +602,8 @@ export default function AdminPanel() {
       setPaymentDrafts((currentDrafts) => {
         const nextDrafts: PaymentDrafts = {}
         for (const student of nextStudents) {
-          // Keep existing draft value if user has typed something different
-          // Otherwise use server value
-          const serverValue = student.amountPaid.toFixed(2)
-          nextDrafts[student.id] = currentDrafts[student.id] ?? serverValue
+          // Field is "payment to add this time", not running total — default empty, keep in-progress typing on refresh
+          nextDrafts[student.id] = currentDrafts[student.id] ?? ''
         }
         return nextDrafts
       })
@@ -613,23 +749,28 @@ export default function AdminPanel() {
       return
     }
 
-    const draftValue = parseCurrencyDraft(paymentDrafts[student.id] ?? '')
+    const paymentIncrement = parseCurrencyDraft(paymentDrafts[student.id] ?? '')
 
-    if (Number.isNaN(draftValue) || draftValue < 0) {
-      setError('Amount paid must be a valid positive number.')
+    if (Number.isNaN(paymentIncrement) || paymentIncrement <= 0) {
+      setError('Enter the amount on this bank slip or payment (greater than zero). It will be added to what is already recorded.')
       return
     }
+
+    const nextAmountPaid = Number((student.amountPaid + paymentIncrement).toFixed(2))
 
     try {
       setSavingId(student.id)
       setError('')
       setSuccessMessage('')
-      await updateStudentFinancials(student.id, { amountPaid: draftValue }, user.id)
+      await updateStudentFinancials(student.id, { amountPaid: nextAmountPaid }, user.id)
+      setPaymentDrafts((cur) => ({ ...cur, [student.id]: '' }))
       await loadStudents()
       // Fetch and update the individual student profile to ensure permit status is up-to-date
       const updatedProfile = await fetchStudentProfileById(student.id)
       setStudents((prev) => prev.map((s) => (s.id === student.id ? updatedProfile : s)))
-      setSuccessMessage(`Saved received payment for ${student.name}.`)
+      setSuccessMessage(
+        `Posted $${paymentIncrement.toFixed(2)} for ${student.name} (e.g. new bank slip). Cumulative amount received: $${nextAmountPaid.toFixed(2)} of $${student.totalFees.toFixed(2)} expected.`,
+      )
     } catch (saveError) {
       const nextError = saveError instanceof Error ? saveError.message : 'Unable to save payment changes'
       setError(nextError)
@@ -638,16 +779,16 @@ export default function AdminPanel() {
     }
   }, [user, canManageFinancials, paymentDrafts, loadStudents])
 
-  const handleSaveEdit = useCallback(async (event: { preventDefault: () => void }) => {
+  const handleSaveEdit = useCallback(async (event: { preventDefault: () => void }): Promise<boolean> => {
     event.preventDefault()
 
     if (!editingStudent || !user) {
-      return
+      return false
     }
 
     if (!canManageStudentProfiles) {
       setError('Your admin view does not allow student profile edits.')
-      return
+      return false
     }
 
     const totalFeesNum = parseCurrencyDraft(editDraft.totalFees)
@@ -655,7 +796,7 @@ export default function AdminPanel() {
 
     if (Number.isNaN(totalFeesNum) || totalFeesNum < 0) {
       setError('Expected total fees must be a valid positive number.')
-      return
+      return false
     }
 
     try {
@@ -685,22 +826,25 @@ export default function AdminPanel() {
       await loadStudents()
       setSuccessMessage(`Student profile updated for ${editDraft.name}.`)
       setEditingStudent(null)
+      return true
     } catch (saveError) {
       const nextError = saveError instanceof Error ? saveError.message : 'Unable to update student profile'
       setError(nextError)
+      return false
     } finally {
       setSavingEdit(false)
     }
   }, [user, editingStudent, canManageStudentProfiles, editDraft, loadStudents])
 
-  const handleCreateStudent = useCallback(async (event: { preventDefault: () => void }) => {
+  const handleCreateStudent = useCallback(async (event: { preventDefault: () => void }): Promise<boolean> => {
     event.preventDefault()
-    if (!user) return
-
+    if (!user) {
+      return false
+    }
 
     if (!canManageStudentProfiles) {
       setError('Your admin view does not allow student profile edits.')
-      return
+      return false
     }
 
     const totalFeesNum = parseCurrencyDraft(createDraft.totalFees)
@@ -709,12 +853,12 @@ export default function AdminPanel() {
 
     if (Number.isNaN(totalFeesNum) || totalFeesNum < 0) {
       setError('Expected total fees must be a valid positive number.')
-      return
+      return false
     }
 
     if (Number.isNaN(amountPaidNum) || amountPaidNum < 0) {
       setError('Amount paid must be a valid positive number.')
-      return
+      return false
     }
 
     try {
@@ -767,9 +911,11 @@ export default function AdminPanel() {
       setShowCreateStudent(false)
       setCreateDraft(createEmptyStudentDraft(systemFeeSettings))
       setCreatePasswordGenerated(false)
+      return true
     } catch (createError) {
       const nextError = createError instanceof Error ? createError.message : 'Unable to create student profile'
       setError(nextError)
+      return false
     } finally {
       setSavingCreate(false)
     }
@@ -779,14 +925,11 @@ export default function AdminPanel() {
   useEffect(() => {
     // Register save handler for unsaved changes
     registerSaveHandler(async () => {
-      // Auto-save any pending changes
       if (editingStudent) {
-        await handleSaveEdit({ preventDefault: () => {} } as FormEvent<HTMLFormElement>)
-        return true
+        return await handleSaveEdit({ preventDefault: () => {} } as FormEvent<HTMLFormElement>)
       }
       if (showCreateStudent) {
-        await handleCreateStudent({ preventDefault: () => {} } as FormEvent<HTMLFormElement>)
-        return true
+        return await handleCreateStudent({ preventDefault: () => {} } as FormEvent<HTMLFormElement>)
       }
       // Save any pending payment drafts
       const pendingPayments = Object.entries(paymentDrafts).filter(([_, value]) => value !== '')
@@ -808,28 +951,24 @@ export default function AdminPanel() {
     }
   }, [editingStudent, showCreateStudent, paymentDrafts, students, registerSaveHandler, handleSaveEdit, handleCreateStudent, handleSavePayment])
 
-  // Track unsaved changes when editing or creating students
+  // Track unsaved changes while edit/create dialogs are open (do not auto-save: that closed the dialog after idle time while scrolling)
   useEffect(() => {
     if (editingStudent || showCreateStudent) {
       setHasUnsavedChanges(true)
+    } else {
+      setHasUnsavedChanges(false)
     }
   }, [editingStudent, showCreateStudent, setHasUnsavedChanges])
 
-  // Auto-save effect - saves changes after 2 seconds of inactivity
   useEffect(() => {
-    if (!hasUnsavedChanges) {
-      return
-    }
-
-    const autoSaveTimer = setTimeout(async () => {
-      // Auto-save logic here
-      if (editingStudent) {
-        await handleSaveEdit({ preventDefault: () => {} } as FormEvent<HTMLFormElement>)
-      }
-    }, 2000)
-
-    return () => clearTimeout(autoSaveTimer)
-  }, [hasUnsavedChanges, editingStudent, handleSaveEdit])
+    registerDiscardHandler(() => {
+      setEditingStudent(null)
+      setShowCreateStudent(false)
+      setCreateDraft(createEmptyStudentDraft(systemFeeSettings))
+      setCreatePasswordGenerated(false)
+    })
+    return unregisterDiscardHandler
+  }, [registerDiscardHandler, unregisterDiscardHandler, systemFeeSettings])
 
   useEffect(() => {
     if (!canViewPermitActivity) {
@@ -858,6 +997,14 @@ export default function AdminPanel() {
   useEffect(() => {
     void loadFeeSettings()
   }, [loadFeeSettings])
+
+  useEffect(() => {
+    if (!user?.id || user.role !== 'admin') {
+      return
+    }
+
+    setReadAdminAlertIds(readAdminNotificationReadSet(user.id))
+  }, [user?.id, user.role])
 
   useEffect(() => {
     setPage(1)
@@ -1054,6 +1201,15 @@ export default function AdminPanel() {
     return acc
   }, {})
   const busiestOutstandingDepartment = Object.entries(departmentOutstandingBreakdown).sort((left, right) => right[1] - left[1])[0] ?? null
+  // Automated alert: students with outstanding balances and exams within 7 days
+  const studentsWithUpcomingUnpaidExams = students.filter(student => {
+    if (student.feesBalance <= 0 || !student.exams?.length) return false
+    return student.exams.some(exam => {
+      const examTimestamp = new Date(exam.examDate).getTime()
+      return !Number.isNaN(examTimestamp) && examTimestamp - Date.now() <= 7 * 24 * 60 * 60 * 1000 && examTimestamp > Date.now()
+    })
+  })
+
   const dashboardAlerts: DashboardAlert[] = [
     ...(outstandingStudents > 0 ? [{
       id: 'outstanding',
@@ -1071,10 +1227,10 @@ export default function AdminPanel() {
       actionLabel: 'Open Reports',
       onAction: () => setActiveSection('reports'),
     }] : []),
-    ...(upcomingExamEntries.some((item) => item.student.feesBalance > 0 && item.examTimestamp - Date.now() <= 7 * 24 * 60 * 60 * 1000) ? [{
-      id: 'upcoming-unpaid',
-      title: 'Urgent fee reminders recommended',
-      message: 'Some upcoming exams are within 7 days while student balances are still outstanding.',
+    ...(studentsWithUpcomingUnpaidExams.length > 0 ? [{
+      id: 'auto-unpaid-upcoming',
+      title: 'Automatic Alert: Outstanding Balances Before Exams',
+      message: `${studentsWithUpcomingUnpaidExams.length} student(s) have exams within 7 days and still owe fees.`,
       tone: 'warning' as const,
       actionLabel: 'Send Reminders',
       onAction: () => {
@@ -1101,7 +1257,7 @@ export default function AdminPanel() {
       onAction: () => setActiveSection('permits'),
     }] : []),
   ]
-  const notificationBadgeCount = notificationCenterAlerts.length
+  const notificationBadgeCount = notificationCenterAlerts.filter((alert) => !readAdminAlertIds.has(alert.id)).length
 
   function handleNotificationAlertAction(action?: () => void) {
     setShowNotificationCenter(false)
@@ -1344,6 +1500,7 @@ export default function AdminPanel() {
     }
 
     setEditingStudent(student)
+    const { program: inferredProgram, course: inferredCourse } = inferProgramAndCourseForEdit(student)
     setEditDraft({
       name: student.name,
       email: student.email,
@@ -1351,8 +1508,8 @@ export default function AdminPanel() {
       studentCategory: student.studentCategory ?? 'local',
       phoneNumber: student.phoneNumber === 'Not assigned' ? '' : student.phoneNumber ?? '',
       profileImage: student.profileImage ?? '',
-      course: student.course ?? '',
-      program: student.program ?? '',
+      course: inferredCourse,
+      program: inferredProgram,
       college: student.college ?? '',
       department: student.department ?? '',
       semester: student.semester ?? '',
@@ -1468,6 +1625,89 @@ export default function AdminPanel() {
     } finally {
       setPendingConfirmation(null)
     }
+  }
+
+  async function handleDeletePermitActivityLog(log: AdminActivityLog) {
+    if (!canDeleteAuditLogs) {
+      setError('You do not have permission to delete activity logs.')
+      return
+    }
+
+    try {
+      setError('')
+      await deleteAdminActivityLog(log.id)
+      await loadActivityLogs({ silent: true })
+      setSuccessMessage('That permit activity entry was removed.')
+    } catch (deleteLogError) {
+      const nextError = deleteLogError instanceof Error ? deleteLogError.message : 'Unable to delete the activity log.'
+      setError(nextError)
+    }
+  }
+
+  function handleRequestPurgePermitActivity() {
+    if (!canDeleteAuditLogs) {
+      setError('You do not have permission to delete activity logs.')
+      return
+    }
+
+    if (permitActivityLogs.length === 0) {
+      setError('There is no permit activity to clear.')
+      return
+    }
+
+    setError('')
+    setPendingConfirmation({
+      title: 'Clear all permit activity?',
+      message: 'This permanently deletes every recorded permit print and download event. Other admin audit entries are kept.',
+      confirmLabel: 'Clear permit activity',
+      tone: 'danger',
+      action: async () => {
+        await purgePermitActivityLogs()
+        setActivityPage(1)
+        await loadActivityLogs({ silent: true })
+        setSuccessMessage('Permit activity log cleared.')
+      },
+    })
+  }
+
+  function handlePermanentTrashRow(student: TrashedStudentProfile) {
+    if (!canManageStudentProfiles || !user?.id) {
+      return
+    }
+
+    setPendingConfirmation({
+      title: 'Permanently delete from trash?',
+      message: `${student.name} cannot be recovered after this step.`,
+      confirmLabel: 'Delete forever',
+      tone: 'danger',
+      action: async () => {
+        await permanentlyDeleteTrashedStudent(student.id)
+        await loadTrashedStudents()
+        setSuccessMessage('The trashed record was permanently deleted.')
+      },
+    })
+  }
+
+  function handlePurgeEntireTrash() {
+    if (!canManageStudentProfiles) {
+      return
+    }
+
+    if (trashedStudents.length === 0) {
+      return
+    }
+
+    setPendingConfirmation({
+      title: 'Empty trash permanently?',
+      message: `${trashedStudents.length} deleted student record(s) will be removed with no recovery path.`,
+      confirmLabel: 'Empty trash',
+      tone: 'danger',
+      action: async () => {
+        await permanentlyPurgeAllTrashedStudents()
+        await loadTrashedStudents()
+        setSuccessMessage('Trash emptied permanently.')
+      },
+    })
   }
 
   async function handleGrantPrintAccess(student: StudentProfile) {
@@ -1724,13 +1964,13 @@ export default function AdminPanel() {
     }
 
     try {
-      setSavingFeeSettings(true)
+      setSavingFeeStructure(true)
       setError('')
       setSuccessMessage('')
       const nextFeeSettings = await updateSystemFeeSettings({
         localStudentFee,
         internationalStudentFee,
-        deadlines: feeSettingsDraft.deadlines,
+        deadlines: [...(systemFeeSettings.deadlines ?? [])],
       })
       setSystemFeeSettings(nextFeeSettings)
       setFeeSettingsDraft(createFeeSettingsDraft(nextFeeSettings))
@@ -1744,7 +1984,35 @@ export default function AdminPanel() {
       const nextError = saveError instanceof Error ? saveError.message : 'Unable to update fee structure settings.'
       setError(nextError)
     } finally {
-      setSavingFeeSettings(false)
+      setSavingFeeStructure(false)
+    }
+  }
+
+  async function handleSaveDeadlines(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!canManageFinancials) {
+      setError('Your admin view does not allow financial updates.')
+      return
+    }
+
+    try {
+      setSavingDeadlines(true)
+      setError('')
+      setSuccessMessage('')
+      const nextFeeSettings = await updateSystemFeeSettings({
+        localStudentFee: systemFeeSettings.localStudentFee,
+        internationalStudentFee: systemFeeSettings.internationalStudentFee,
+        deadlines: feeSettingsDraft.deadlines,
+      })
+      setSystemFeeSettings(nextFeeSettings)
+      setFeeSettingsDraft(createFeeSettingsDraft(nextFeeSettings))
+      setSuccessMessage('Deadline settings updated successfully.')
+    } catch (saveError) {
+      const nextError = saveError instanceof Error ? saveError.message : 'Unable to update deadline settings.'
+      setError(nextError)
+    } finally {
+      setSavingDeadlines(false)
     }
   }
 
@@ -1866,13 +2134,13 @@ export default function AdminPanel() {
         setError('')
         setSuccessMessage('')
         try {
-          const res = await fetch('/admin/bulk-sync-curriculum', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-          if (!res.ok) throw new Error('Bulk sync failed');
-          const data = await res.json();
-          setSuccessMessage(`Bulk curriculum sync complete. Updated: ${data.updated}, Failed: ${data.failed.length}`);
-          await loadStudents();
+          const data = await bulkSyncCurriculum()
+          setSuccessMessage(
+            `Bulk curriculum sync complete. Students in system: ${data.totalStudents}. Updated: ${data.updated}. No match or error: ${data.failed.length}.`,
+          )
+          await loadStudents()
         } catch (err) {
-          setError(err instanceof Error ? err.message : 'Bulk curriculum sync failed');
+          setError(err instanceof Error ? err.message : 'Bulk curriculum sync failed')
         }
       },
     },
@@ -2147,15 +2415,33 @@ export default function AdminPanel() {
                       <h2 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Notifications</h2>
                       <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">Operational alerts, support queue updates, and permit activity notices.</p>
                     </div>
-                    <button
-                      type="button"
-                      title="Close notification center"
-                      aria-label="Close notification center"
-                      onClick={() => setShowNotificationCenter(false)}
-                      className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {notificationCenterAlerts.length > 0 && user?.id ? (
+                        <button
+                          type="button"
+                          className="rounded-lg px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                          onClick={() => {
+                            const next = new Set(readAdminAlertIds)
+                            for (const alert of notificationCenterAlerts) {
+                              next.add(alert.id)
+                            }
+                            setReadAdminAlertIds(next)
+                            persistAdminNotificationReadSet(user.id, next)
+                          }}
+                        >
+                          Mark all read
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        title="Close notification center"
+                        aria-label="Close notification center"
+                        onClick={() => setShowNotificationCenter(false)}
+                        className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {notificationCenterAlerts.length === 0 ? (
@@ -2163,32 +2449,60 @@ export default function AdminPanel() {
                       No new notifications right now.
                     </div>
                   ) : (
-                    <div className="mt-4 space-y-3">
-                      {notificationCenterAlerts.map((alert) => (
+                    notificationCenterAlerts.map((alert) => {
+                      const isRead = readAdminAlertIds.has(alert.id)
+
+                      function markThisRead() {
+                        if (!user?.id || isRead) {
+                          return
+                        }
+                        const next = new Set(readAdminAlertIds)
+                        next.add(alert.id)
+                        setReadAdminAlertIds(next)
+                        persistAdminNotificationReadSet(user.id, next)
+                      }
+
+                      return (
                         <div
                           key={alert.id}
-                          className={`rounded-xl border p-3 ${
+                          role="presentation"
+                          className={`mt-3 rounded-2xl border p-4 text-left shadow-sm transition ${
                             alert.tone === 'critical'
-                              ? 'border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/30'
+                              ? 'border-red-200 bg-red-50'
                               : alert.tone === 'warning'
-                                ? 'border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30'
-                                : 'border-blue-200 bg-blue-50 dark:border-blue-900/60 dark:bg-blue-950/30'
-                          }`}
+                                ? 'border-amber-200 bg-amber-50'
+                                : 'border-blue-200 bg-blue-50'
+                          } ${isRead ? 'opacity-60' : ''}`}
                         >
-                          <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">{alert.title}</p>
-                          <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-slate-300">{alert.message}</p>
+                          <button
+                            type="button"
+                            title={alert.message}
+                            onClick={markThisRead}
+                            className="w-full text-left"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900">{alert.title}</p>
+                                <p className="mt-1 text-xs leading-5 text-gray-600">{alert.message}</p>
+                              </div>
+                              <Bell className="h-4 w-4 shrink-0 text-gray-400" />
+                            </div>
+                          </button>
                           {alert.actionLabel && alert.onAction && (
                             <button
                               type="button"
-                              onClick={() => handleNotificationAlertAction(alert.onAction)}
+                              onClick={() => {
+                                handleNotificationAlertAction(alert.onAction)
+                                markThisRead()
+                              }}
                               className="mt-3 rounded-lg border border-white/80 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                             >
                               {alert.actionLabel}
                             </button>
                           )}
                         </div>
-                      ))}
-                    </div>
+                      )
+                    })
                   )}
                 </div>
               )}
@@ -2843,15 +3157,16 @@ export default function AdminPanel() {
                                     onChange={(e) =>
                                       setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
                                     }
-                                    aria-label={`Amount received for ${student.name}`}
-                                    title={`Amount received for ${student.name}`}
-                                    placeholder="Received"
+                                    aria-label={`Bank slip or payment amount to add for ${student.name}`}
+                                    title={`Amount on this slip only — adds to cumulative total (already recorded: $${student.amountPaid.toFixed(2)})`}
+                                    placeholder="Slip amount"
                                     className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
                                   />
                                   <button
                                     type="submit"
                                     disabled={!canManageFinancials || savingId === student.id}
-                                    title="Save received amount"
+                                    title="Post this slip — adds to cumulative amount received"
+                                    aria-label={`Post bank slip payment for ${student.name}`}
                                     className="rounded bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
                                   >
                                     <Save className="h-3.5 w-3.5" />
@@ -2945,9 +3260,21 @@ export default function AdminPanel() {
                         <h2 className="font-semibold text-gray-800">Trash</h2>
                         <p className="text-xs text-gray-400">Deleted student records stay here until the retention period expires.</p>
                       </div>
-                      <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-                        {trashedStudents.length} in trash
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                          {trashedStudents.length} in trash
+                        </span>
+                        {canManageStudentProfiles && trashedStudents.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={handlePurgeEntireTrash}
+                            className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-800 hover:bg-red-100"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Empty trash permanently
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                   {trashedStudents.length === 0 ? (
@@ -2970,15 +3297,26 @@ export default function AdminPanel() {
                               )
                             })()}
                           </div>
-                          <button
-                            type="button"
-                            disabled={!canManageStudentProfiles || restoringStudentId === student.id}
-                            onClick={() => handleRestoreStudentProfile(student)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
-                          >
-                            <RefreshCcw className="h-4 w-4" />
-                            {restoringStudentId === student.id ? 'Restoring…' : 'Restore'}
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={!canManageStudentProfiles || restoringStudentId === student.id}
+                              onClick={() => handleRestoreStudentProfile(student)}
+                              className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                            >
+                              <RefreshCcw className="h-4 w-4" />
+                              {restoringStudentId === student.id ? 'Restoring…' : 'Restore'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!canManageStudentProfiles}
+                              onClick={() => handlePermanentTrashRow(student)}
+                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete forever
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -3121,20 +3459,33 @@ export default function AdminPanel() {
             {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ PERMIT ACTIVITY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {activeSection === 'permits' && (
               <div className="space-y-5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h1 className="text-xl font-bold text-gray-900">Permit Activity</h1>
                     <p className="text-sm text-gray-500">Showing {activityPageStart}-{activityPageEnd} of {activityTotalItems} event(s)</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleExportPermitActivity}
-                    disabled={permitActivityLogs.length === 0}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <Download className="h-4 w-4" />
-                    Export CSV
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {canDeleteAuditLogs ? (
+                      <button
+                        type="button"
+                        onClick={handleRequestPurgePermitActivity}
+                        disabled={permitActivityLogs.length === 0}
+                        className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-800 shadow-sm hover:bg-red-100 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Clear all
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={handleExportPermitActivity}
+                      disabled={permitActivityLogs.length === 0}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <Download className="h-4 w-4" />
+                      Export CSV
+                    </button>
+                  </div>
                 </div>
 
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -3146,6 +3497,7 @@ export default function AdminPanel() {
                           <th className="px-5 py-3 text-left">Student ID</th>
                           <th className="px-5 py-3 text-left">Action</th>
                           <th className="px-5 py-3 text-left">Time</th>
+                          {canDeleteAuditLogs ? <th className="px-5 py-3 text-right"> </th> : null}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -3163,12 +3515,25 @@ export default function AdminPanel() {
                               <td className="px-5 py-3 text-gray-500">
                                 {log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}
                               </td>
+                              {canDeleteAuditLogs ? (
+                                <td className="px-5 py-3 text-right">
+                                  <button
+                                    type="button"
+                                    title="Delete this activity row"
+                                    aria-label="Delete this activity row"
+                                    onClick={() => void handleDeletePermitActivityLog(log)}
+                                    className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </td>
+                              ) : null}
                             </tr>
                           )
                         })}
                         {permitActivityLogs.length === 0 && (
                           <tr>
-                            <td className="px-5 py-8 text-center text-gray-400" colSpan={4}>No permit activity has been recorded yet.</td>
+                            <td className="px-5 py-8 text-center text-gray-400" colSpan={canDeleteAuditLogs ? 5 : 4}>No permit activity has been recorded yet.</td>
                           </tr>
                         )}
                       </tbody>
@@ -3524,6 +3889,53 @@ export default function AdminPanel() {
                   </p>
                 </div>
 
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <h2 className="text-sm font-semibold text-gray-900">Permit layout (student-facing card)</h2>
+                  <p className="mt-1 text-xs text-gray-500">Saved in this browser; student permit cards read these settings on load.</p>
+                  <div className="mt-3 flex flex-wrap gap-4">
+                    <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-medium text-gray-700">
+                      Custom logo URL
+                      <input
+                        type="text"
+                        value={permitDesign.logo}
+                        onChange={(e) => handlePermitDesignChange('logo', e.target.value)}
+                        placeholder="Leave empty for default"
+                        className="rounded border border-gray-300 px-2 py-1 text-sm font-normal"
+                      />
+                    </label>
+                    <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-medium text-gray-700">
+                      Institution name override
+                      <input
+                        type="text"
+                        value={permitDesign.name}
+                        onChange={(e) => handlePermitDesignChange('name', e.target.value)}
+                        placeholder="Leave empty for default"
+                        className="rounded border border-gray-300 px-2 py-1 text-sm font-normal"
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-700">
+                    {(
+                      [
+                        ['photo', 'Photo'],
+                        ['department', 'Department'],
+                        ['semester', 'Semester'],
+                        ['course', 'Course on permit'],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <label key={key} className="inline-flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={permitDesign.fields[key]}
+                          onChange={() => handlePermitFieldToggle(key)}
+                          className="rounded border-gray-300"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="text-xs font-medium text-gray-700">
                     Department:
@@ -3681,16 +4093,16 @@ export default function AdminPanel() {
                               onChange={(e) =>
                                 setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
                               }
-                              aria-label={`Amount received for ${student.name}`}
-                              title={`Amount received for ${student.name}`}
-                              placeholder="Received"
+                              aria-label={`Bank slip or payment amount to add for ${student.name}`}
+                              title={`Amount on this slip only — adds to cumulative total (already recorded: $${student.amountPaid.toFixed(2)})`}
+                              placeholder="Slip amount"
                               className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
                             />
                             <button
                               type="submit"
                               disabled={!canManageFinancials || savingId === student.id}
-                              title="Save received amount"
-                              aria-label={`Save received amount for ${student.name}`}
+                              title="Post this slip — adds to cumulative amount received"
+                              aria-label={`Post bank slip payment for ${student.name}`}
                               className="rounded bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
                             >
                               <Save className="h-3.5 w-3.5" />
@@ -3828,7 +4240,7 @@ export default function AdminPanel() {
                       <h2 className="font-semibold text-gray-800">Fee Structure</h2>
                       <p className="mt-1 text-xs text-gray-400">Set the default exam clearance fees used for new local and international student accounts.</p>
                     </div>
-                    <form className="space-y-6 px-6 py-5" onSubmit={(event) => void handleSaveFeeStructure(event)}>
+                    <form className="space-y-4 px-6 py-5" onSubmit={(event) => void handleSaveFeeStructure(event)}>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
                           <label htmlFor="fee-settings-local" className="mb-2 block text-sm font-medium text-gray-700">Local student fee</label>
@@ -3855,114 +4267,141 @@ export default function AdminPanel() {
                           />
                         </div>
                       </div>
-
-                      <div className="border-t border-gray-100 pt-5">
-                        <div className="mb-4 flex items-center justify-between">
-                          <div>
-                            <h3 className="text-sm font-semibold text-gray-800">Important Deadlines</h3>
-                            <p className="text-[10px] text-gray-400 uppercase tracking-tight">Shown on all student dashboards</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setFeeSettingsDraft(prev => ({
-                              ...prev,
-                              deadlines: [...prev.deadlines, { id: `dl-${Date.now()}`, title: '', subtitle: '', dateLabel: '', type: 'info' }]
-                            }))}
-                            className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
-                          >
-                            + Add Deadline
-                          </button>
-                        </div>
-                        <div className="space-y-3">
-                          {feeSettingsDraft.deadlines.map((deadline, idx) => (
-                            <div key={deadline.id} className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1.5fr_1.2fr_1fr_auto] items-end rounded-xl border border-gray-100 bg-gray-50/50 p-3">
-                              <div>
-                                <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Title</label>
-                                <input
-                                  type="text"
-                                  value={deadline.title}
-                                  onChange={(e) => {
-                                    const next = [...feeSettingsDraft.deadlines]
-                                    next[idx] = { ...deadline, title: e.target.value }
-                                    setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
-                                  }}
-                                  className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
-                                  placeholder="e.g. Final Exam Clearance"
-                                />
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Subtitle</label>
-                                <input
-                                  type="text"
-                                  value={deadline.subtitle}
-                                  onChange={(e) => {
-                                    const next = [...feeSettingsDraft.deadlines]
-                                    next[idx] = { ...deadline, subtitle: e.target.value }
-                                    setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
-                                  }}
-                                  className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
-                                  placeholder="e.g. Clear all balances"
-                                />
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Date/Label</label>
-                                <input
-                                  type="text"
-                                  value={deadline.dateLabel}
-                                  onChange={(e) => {
-                                    const next = [...feeSettingsDraft.deadlines]
-                                    next[idx] = { ...deadline, dateLabel: e.target.value }
-                                    setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
-                                  }}
-                                  className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
-                                  placeholder="e.g. In 14 Days"
-                                />
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Type</label>
-                                <select
-                                  value={deadline.type}
-                                  onChange={(e) => {
-                                    const next = [...feeSettingsDraft.deadlines]
-                                    next[idx] = { ...deadline, type: e.target.value as any }
-                                    setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
-                                  }}
-                                  className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
-                                  aria-label="Deadline type"
-                                  title="Deadline type"
-                                >
-                                  <option value="info">Info (Blue)</option>
-                                  <option value="danger">Danger (Red)</option>
-                                  <option value="warning">Warning (Amber)</option>
-                                </select>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const next = feeSettingsDraft.deadlines.filter((_, i) => i !== idx)
-                                  setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
-                                }}
-                                className="rounded p-1 text-red-400 hover:bg-red-50"
-                                aria-label="Remove deadline"
-                                title="Remove deadline"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ))}
-                          {feeSettingsDraft.deadlines.length === 0 && (
-                            <p className="text-center py-4 text-xs text-gray-400 font-medium border-2 border-dashed border-gray-100 rounded-xl">No global deadlines set. Add one to show on student dashboards.</p>
-                          )}
-                        </div>
-                      </div>
-
+                      <p className="text-xs text-gray-500">Saves default fees only. Deadline changes use the button below.</p>
                       <button
                         type="submit"
-                        disabled={savingFeeSettings}
+                        disabled={savingFeeStructure || savingDeadlines}
                         className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         <Save className="h-4 w-4" />
-                        {savingFeeSettings ? 'Saving...' : 'Save fee & deadline settings'}
+                        {savingFeeStructure ? 'Saving...' : 'Save fee structure'}
+                      </button>
+                    </form>
+
+                    <form className="space-y-4 border-t border-gray-100 px-6 py-5" onSubmit={(event) => void handleSaveDeadlines(event)}>
+                      <div className="mb-2 flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-800">Important Deadlines</h3>
+                          <p className="text-[10px] text-gray-400 uppercase tracking-tight">Shown on all student dashboards</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setFeeSettingsDraft(prev => ({
+                            ...prev,
+                            deadlines: [...prev.deadlines, { id: `dl-${Date.now()}`, title: '', subtitle: '', dateLabel: '', type: 'info' as const }]
+                          }))}
+                          className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                        >
+                          + Add Deadline
+                        </button>
+                      </div>
+                      <div className="space-y-3">
+                        {feeSettingsDraft.deadlines.map((deadline, idx) => (
+                          <div key={deadline.id} className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1.5fr_1fr_1fr_1fr_auto] items-end rounded-xl border border-gray-100 bg-gray-50/50 p-3">
+                            <div>
+                              <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Title</label>
+                              <input
+                                type="text"
+                                value={deadline.title}
+                                onChange={(e) => {
+                                  const next = [...feeSettingsDraft.deadlines]
+                                  next[idx] = { ...deadline, title: e.target.value }
+                                  setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
+                                }}
+                                className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                                placeholder="e.g. Final Exam Clearance"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Subtitle</label>
+                              <input
+                                type="text"
+                                value={deadline.subtitle}
+                                onChange={(e) => {
+                                  const next = [...feeSettingsDraft.deadlines]
+                                  next[idx] = { ...deadline, subtitle: e.target.value }
+                                  setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
+                                }}
+                                className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                                placeholder="e.g. Clear all balances"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Date/Label</label>
+                              <input
+                                type="text"
+                                value={deadline.dateLabel}
+                                onChange={(e) => {
+                                  const next = [...feeSettingsDraft.deadlines]
+                                  next[idx] = { ...deadline, dateLabel: e.target.value }
+                                  setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
+                                }}
+                                className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                                placeholder="e.g. In 14 Days"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Due (countdown)</label>
+                              <input
+                                type="date"
+                                value={deadline.dueAt ? deadline.dueAt.slice(0, 10) : ''}
+                                onChange={(e) => {
+                                  const next = [...feeSettingsDraft.deadlines]
+                                  const v = e.target.value
+                                  next[idx] = {
+                                    ...deadline,
+                                    ...(v ? { dueAt: `${v}T23:59:59.000Z` } : { dueAt: undefined }),
+                                  }
+                                  setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
+                                }}
+                                className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                                title="Optional — drives the live countdown on student dashboards"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-[10px] font-bold uppercase text-gray-400">Type</label>
+                              <select
+                                value={deadline.type}
+                                onChange={(e) => {
+                                  const next = [...feeSettingsDraft.deadlines]
+                                  next[idx] = { ...deadline, type: e.target.value as any }
+                                  setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
+                                }}
+                                className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
+                                aria-label="Deadline type"
+                                title="Deadline type"
+                              >
+                                <option value="info">Info (Blue)</option>
+                                <option value="danger">Danger (Red)</option>
+                                <option value="warning">Warning (Amber)</option>
+                              </select>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = feeSettingsDraft.deadlines.filter((_, i) => i !== idx)
+                                setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
+                              }}
+                              className="rounded p-1 text-red-400 hover:bg-red-50"
+                              aria-label="Remove deadline"
+                              title="Remove deadline"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                        {feeSettingsDraft.deadlines.length === 0 && (
+                          <p className="text-center py-4 text-xs text-gray-400 font-medium border-2 border-dashed border-gray-100 rounded-xl">No global deadlines set. Add one to show on student dashboards.</p>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500">Saves dashboard deadlines only, using the fee amounts already stored on the server.</p>
+                      <button
+                        type="submit"
+                        disabled={savingDeadlines || savingFeeStructure}
+                        className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                      >
+                        <Save className="h-4 w-4" />
+                        {savingDeadlines ? 'Saving...' : 'Save deadlines'}
                       </button>
                     </form>
                   </div>
@@ -4082,54 +4521,65 @@ export default function AdminPanel() {
         </main>
       </div>
 
-      {pendingConfirmation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 py-6">
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <h2 className="text-base font-semibold text-gray-900">{pendingConfirmation.title}</h2>
-              <button
-                type="button"
-                title="Close confirmation dialog"
-                aria-label="Close confirmation dialog"
-                onClick={() => setPendingConfirmation(null)}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="space-y-3 px-6 py-5 text-sm text-gray-600">
-              <p>{pendingConfirmation.message}</p>
-            </div>
-            <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
-              <button
-                type="button"
-                onClick={() => setPendingConfirmation(null)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleConfirmPendingAction()}
-                className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${pendingConfirmation.tone === 'danger' ? 'bg-red-500 hover:bg-red-600' : pendingConfirmation.tone === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-              >
-                {pendingConfirmation.confirmLabel}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={pendingConfirmation !== null}
+        title={pendingConfirmation?.title ?? ''}
+        message={pendingConfirmation?.message ?? ''}
+        confirmLabel={pendingConfirmation?.confirmLabel ?? 'Confirm'}
+        tone={
+          pendingConfirmation?.tone === 'danger'
+            ? 'danger'
+            : pendingConfirmation?.tone === 'success'
+              ? 'success'
+              : 'primary'
+        }
+        onCancel={() => setPendingConfirmation(null)}
+        onConfirm={() => void handleConfirmPendingAction()}
+      />
+
+      <SaveConfirmationDialog
+        isOpen={unsavedLeaveIntent !== null}
+        onConfirm={async () => {
+          if (unsavedLeaveIntent === 'edit') {
+            const ok = await handleSaveEdit({ preventDefault: () => {} } as FormEvent<HTMLFormElement>)
+            if (ok) {
+              setUnsavedLeaveIntent(null)
+            }
+          } else if (unsavedLeaveIntent === 'create') {
+            const ok = await handleCreateStudent({ preventDefault: () => {} } as FormEvent<HTMLFormElement>)
+            if (ok) {
+              setUnsavedLeaveIntent(null)
+            }
+          }
+        }}
+        onDontSave={() => {
+          if (unsavedLeaveIntent === 'edit') {
+            setEditingStudent(null)
+          } else if (unsavedLeaveIntent === 'create') {
+            setShowCreateStudent(false)
+            setCreateDraft(createEmptyStudentDraft(systemFeeSettings))
+            setCreatePasswordGenerated(false)
+          }
+          setUnsavedLeaveIntent(null)
+        }}
+        onCancel={() => setUnsavedLeaveIntent(null)}
+      />
 
       {editingStudent && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 py-6">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl">
+        <div
+          className={`fixed inset-0 ${DIALOG_Z.modalBackdrop} flex items-start justify-center overflow-y-auto bg-black/40 p-4 py-6`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-edit-student-title"
+        >
+          <div className={`relative ${DIALOG_Z.modalContent} max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl`}>
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <h2 className="text-base font-semibold text-gray-900">Edit Student Profile</h2>
+              <h2 id="admin-edit-student-title" className="text-base font-semibold text-gray-900">Edit Student Profile</h2>
               <button
                 type="button"
                 title="Close edit student dialog"
                 aria-label="Close edit student dialog"
-                onClick={() => setEditingStudent(null)}
+                onClick={() => setUnsavedLeaveIntent('edit')}
                 className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               >
                 <X className="h-4 w-4" />
@@ -4321,7 +4771,25 @@ export default function AdminPanel() {
                   <select
                     id="edit-student-department"
                     value={editDraft.department ?? ''}
-                    onChange={(e) => setEditDraft((d) => ({ ...d, department: e.target.value }))}
+                    onChange={(e) => {
+                      const nextDept = e.target.value
+                      setEditDraft((d) => {
+                        const inferredProg = programFromDepartment(nextDept)
+                        if (!inferredProg || !KIU_CURRICULUM[inferredProg]) {
+                          return { ...d, department: nextDept }
+                        }
+                        const curriculum = KIU_CURRICULUM[inferredProg]
+                        const units = (curriculum && d.semester) ? curriculum.semesters[d.semester] : null
+                        return {
+                          ...d,
+                          department: nextDept,
+                          program: inferredProg,
+                          course: curriculum.defaultCourse,
+                          courseUnitsText: units ? units.map((u) => u.unitName).join('\n') : (inferredProg ? '' : d.courseUnitsText),
+                          exams: units ? createExamsFromCurriculum(units) : (inferredProg ? [] : d.exams),
+                        }
+                      })
+                    }}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
                     <option value="">Select Department</option>
@@ -4460,7 +4928,7 @@ export default function AdminPanel() {
                 <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={() => setEditingStudent(null)}
+                    onClick={() => setUnsavedLeaveIntent('edit')}
                     className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
                   >
                     Cancel
@@ -4479,15 +4947,20 @@ export default function AdminPanel() {
         </div>
       )}
       {showCreateStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-xl">
+        <div
+          className={`fixed inset-0 ${DIALOG_Z.modalBackdrop} flex items-center justify-center bg-black/40 p-4`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-create-student-title"
+        >
+          <div className={`relative ${DIALOG_Z.modalContent} max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-xl`}>
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <h2 className="text-base font-semibold text-gray-900">Add New Student</h2>
+              <h2 id="admin-create-student-title" className="text-base font-semibold text-gray-900">Add New Student</h2>
               <button
                 type="button"
                 title="Close add student dialog"
                 aria-label="Close add student dialog"
-                onClick={() => setShowCreateStudent(false)}
+                onClick={() => setUnsavedLeaveIntent('create')}
                 className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               >
                 <X className="h-4 w-4" />
@@ -4644,7 +5117,25 @@ export default function AdminPanel() {
                   <select
                     id="create-student-department"
                     value={createDraft.department ?? ''}
-                    onChange={(event) => setCreateDraft((current) => ({ ...current, department: event.target.value }))}
+                    onChange={(event) => {
+                      const nextDept = event.target.value
+                      setCreateDraft((current) => {
+                        const inferredProg = programFromDepartment(nextDept)
+                        if (!inferredProg || !KIU_CURRICULUM[inferredProg]) {
+                          return { ...current, department: nextDept }
+                        }
+                        const curriculum = KIU_CURRICULUM[inferredProg]
+                        const units = (curriculum && current.semester) ? curriculum.semesters[current.semester] : null
+                        return {
+                          ...current,
+                          department: nextDept,
+                          program: inferredProg,
+                          course: curriculum.defaultCourse,
+                          courseUnitsText: units ? units.map((u) => u.unitName).join('\n') : (inferredProg ? '' : current.courseUnitsText),
+                          exams: units ? createExamsFromCurriculum(units) : (inferredProg ? [] : current.exams),
+                        }
+                      })
+                    }}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
                     <option value="">Select Department</option>
@@ -4879,7 +5370,7 @@ export default function AdminPanel() {
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowCreateStudent(false)}
+                  onClick={() => setUnsavedLeaveIntent('create')}
                   className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
                 >
                   Cancel

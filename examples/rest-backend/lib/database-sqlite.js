@@ -194,6 +194,7 @@ ensureColumn('profiles', 'college TEXT')
 ensureColumn('profiles', 'department TEXT')
 ensureColumn('profiles', 'semester TEXT')
 ensureColumn('profiles', "course_units_json TEXT NOT NULL DEFAULT '[]'")
+ensureColumn('system_settings', "deadlines_json TEXT NOT NULL DEFAULT '[]'")
 ensureColumn('admin_activity_logs', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
 ensureColumn('admin_activity_logs', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
 
@@ -318,9 +319,13 @@ function ensureSystemSettingsRow() {
 }
 
 function mapSystemSettings(row) {
+  const rawDeadlines = parseJsonValue(row?.deadlines_json, [])
+  const deadlines = Array.isArray(rawDeadlines) ? rawDeadlines : []
+
   return {
     local_student_fee: normalizeNumber(row?.local_student_fee ?? defaultSystemFeeSettings.local_student_fee),
     international_student_fee: normalizeNumber(row?.international_student_fee ?? defaultSystemFeeSettings.international_student_fee),
+    deadlines,
   }
 }
 
@@ -892,28 +897,42 @@ export function updateSystemSettings(updates) {
     ? normalizeNumber(updates.international_student_fee)
     : normalizeNumber(existing.international_student_fee)
 
+  const prevLocal = normalizeNumber(existing.local_student_fee)
+  const prevIntl = normalizeNumber(existing.international_student_fee)
+  const feesChanged = Math.abs(nextLocalStudentFee - prevLocal) > 0.0001
+    || Math.abs(nextInternationalStudentFee - prevIntl) > 0.0001
+
+  let nextDeadlinesJson = typeof existing.deadlines_json === 'string' && existing.deadlines_json.trim()
+    ? existing.deadlines_json
+    : '[]'
+  if (Array.isArray(updates.deadlines)) {
+    nextDeadlinesJson = JSON.stringify(updates.deadlines)
+  }
+
   db.exec('BEGIN')
 
   try {
     db.prepare(`
       UPDATE system_settings
-      SET local_student_fee = ?, international_student_fee = ?, updated_at = ?
+      SET local_student_fee = ?, international_student_fee = ?, deadlines_json = ?, updated_at = ?
       WHERE id = ?
-    `).run(nextLocalStudentFee, nextInternationalStudentFee, updatedAt, 'default')
+    `).run(nextLocalStudentFee, nextInternationalStudentFee, nextDeadlinesJson, updatedAt, 'default')
 
-    db.prepare(`
-      UPDATE profiles
-      SET total_fees = CASE
-        WHEN role != 'student' THEN total_fees
-        WHEN student_category = 'international' THEN ?
-        ELSE ?
-      END,
-      updated_at = CASE
-        WHEN role = 'student' THEN ?
-        ELSE updated_at
-      END
-      WHERE role = 'student'
-    `).run(nextInternationalStudentFee, nextLocalStudentFee, updatedAt)
+    if (feesChanged) {
+      db.prepare(`
+        UPDATE profiles
+        SET total_fees = CASE
+          WHEN role != 'student' THEN total_fees
+          WHEN student_category = 'international' THEN ?
+          ELSE ?
+        END,
+        updated_at = CASE
+          WHEN role = 'student' THEN ?
+          ELSE updated_at
+        END
+        WHERE role = 'student'
+      `).run(nextInternationalStudentFee, nextLocalStudentFee, updatedAt)
+    }
 
     db.exec('COMMIT')
   } catch (error) {
@@ -1309,6 +1328,20 @@ export function adminUpdateStudentProfile(profileId, updates) {
   const nextCourseUnitsJson = 'course_units' in updates
     ? serializeCourseUnits(updates.course_units)
     : profileRow.course_units_json
+  const fallbackForExams = {
+    id: profileId,
+    course: profileRow.course,
+    exam_date: profileRow.exam_date,
+    exam_time: profileRow.exam_time,
+    venue: profileRow.venue,
+    seat_number: profileRow.seat_number,
+  }
+  let nextExamsJson = profileRow.exams_json
+  let examsToReplace = null
+  if ('exams' in updates) {
+    examsToReplace = normalizeExamAssignments(updates.exams, fallbackForExams)
+    nextExamsJson = serializeExamAssignments(examsToReplace)
+  }
   const nextProfileImage = 'profile_image' in updates ? (updates.profile_image ?? null) : profileRow.profile_image
   const nextTotalFees = typeof updates.total_fees === 'number' ? updates.total_fees : profileRow.total_fees
   const updatedAt = nowIso()
@@ -1324,9 +1357,13 @@ export function adminUpdateStudentProfile(profileId, updates) {
 
     db.prepare(`
       UPDATE profiles
-      SET email = ?, phone_number = ?, name = ?, student_id = ?, student_category = ?, course = ?, program = ?, college = ?, department = ?, semester = ?, course_units_json = ?, profile_image = ?, total_fees = ?, updated_at = ?
+      SET email = ?, phone_number = ?, name = ?, student_id = ?, student_category = ?, course = ?, program = ?, college = ?, department = ?, semester = ?, course_units_json = ?, profile_image = ?, total_fees = ?, exams_json = ?, updated_at = ?
       WHERE id = ?
-    `).run(nextEmail, nextPhoneNumber, nextName, nextStudentId, nextStudentCategory, nextCourse, nextProgram, nextCollege, nextDepartment, nextSemester, nextCourseUnitsJson, nextProfileImage, nextTotalFees, updatedAt, profileId)
+    `).run(nextEmail, nextPhoneNumber, nextName, nextStudentId, nextStudentCategory, nextCourse, nextProgram, nextCollege, nextDepartment, nextSemester, nextCourseUnitsJson, nextProfileImage, nextTotalFees, nextExamsJson, updatedAt, profileId)
+
+    if (examsToReplace) {
+      replaceProfileExams(profileId, examsToReplace)
+    }
 
     db.exec('COMMIT')
   } catch (error) {
@@ -1355,6 +1392,19 @@ export function insertActivityLog({ adminId, targetProfileId, action, details, c
     nextCampusName,
     nowIso(),
   )
+}
+
+export function deleteAdminActivityLogById(logId) {
+  const result = db.prepare('DELETE FROM admin_activity_logs WHERE id = ?').run(logId)
+  return result.changes > 0
+}
+
+export function deletePermitActivityLogs() {
+  const result = db.prepare(`
+    DELETE FROM admin_activity_logs
+    WHERE action IN ('print_permit', 'download_permit')
+  `).run()
+  return Number(result.changes ?? 0)
 }
 
 export function listActivityLogs() {
@@ -1707,6 +1757,27 @@ export function restoreStudentProfile(trashId, restoredByAdminId = null) {
   }
 
   return getProfileById(profileRow.id)
+}
+
+export function permanentlyDeleteTrashedProfile(trashId) {
+  pruneExpiredTrashedProfiles()
+  const trashRow = db.prepare('SELECT * FROM trashed_profiles WHERE id = ?').get(trashId)
+
+  if (!trashRow || trashRow.role !== 'student' || trashRow.restored_at) {
+    return false
+  }
+
+  db.prepare('DELETE FROM trashed_profiles WHERE id = ?').run(trashId)
+  return true
+}
+
+export function permanentlyPurgeAllTrashedProfiles() {
+  pruneExpiredTrashedProfiles()
+  const result = db.prepare(`
+    DELETE FROM trashed_profiles
+    WHERE role = 'student' AND restored_at IS NULL
+  `).run()
+  return Number(result.changes ?? 0)
 }
 
 export function listActivityLogsPage({ page = 1, pageSize = 20 } = {}) {

@@ -1,6 +1,7 @@
-import React from 'react';
+import React from 'react'
+import { DIALOG_Z } from '../constants/dialogLayers'
 
-export type NotificationType = 'success' | 'error';
+export type NotificationType = 'success' | 'error'
 
 export interface NotificationProps {
   message: string;
@@ -16,7 +17,7 @@ const bgColors = {
 export default function Notification({ message, type, onClose }: NotificationProps) {
   if (!message) return null;
   return (
-    <div className={`fixed top-6 right-6 z-50 rounded-lg border px-4 py-3 shadow-lg transition-all duration-300 ${bgColors[type]}`}
+    <div className={`fixed top-6 right-6 ${DIALOG_Z.toast} rounded-lg border px-4 py-3 shadow-lg transition-all duration-300 ${bgColors[type]}`}
          role="alert">
       <div className="flex items-center justify-between gap-4">
         <span>{message}</span>

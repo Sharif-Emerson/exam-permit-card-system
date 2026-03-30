@@ -10,6 +10,8 @@ import './lib/load-env.js'
 import {
   createStudentProfile,
   createSupportRequest,
+  deleteAdminActivityLogById,
+  deletePermitActivityLogs,
   deleteStudentProfile,
   getConfiguredDbPath,
   getPermitByToken,
@@ -29,6 +31,8 @@ import {
   listProfiles,
   listProfilesPage,
   listTrashedStudentProfiles,
+  permanentlyDeleteTrashedProfile,
+  permanentlyPurgeAllTrashedProfiles,
   listSupportRequests,
   resetUserPassword,
   restoreStudentProfile,
@@ -595,12 +599,16 @@ app.get('/health', (_request, response) => {
 })
 
 app.get('/system-settings', authenticate, (request, response) => {
+  const settings = getSystemSettings()
+
   if (request.userRole !== 'admin') {
-    response.status(403).json({ message: 'Administrator access is required.' })
+    response.json({
+      deadlines: Array.isArray(settings.deadlines) ? settings.deadlines : [],
+    })
     return
   }
 
-  response.json(getSystemSettings())
+  response.json(settings)
 })
 
 app.put('/system-settings', authenticate, requireAdminPermission('manage_financials', 'You do not have permission to update fee settings.'), (request, response) => {
@@ -612,10 +620,16 @@ app.put('/system-settings', authenticate, requireAdminPermission('manage_financi
     return
   }
 
-  const updatedSettings = updateSystemSettings({
+  const payload = {
     local_student_fee: localStudentFee,
     international_student_fee: internationalStudentFee,
-  })
+  }
+
+  if (Array.isArray(request.body.deadlines)) {
+    payload.deadlines = request.body.deadlines
+  }
+
+  const updatedSettings = updateSystemSettings(payload)
 
   insertActivityLog({
     adminId: request.userId,
@@ -1171,6 +1185,9 @@ app.patch('/profiles/:id/financials', authenticate, requireAdminPermission('mana
     return
   }
 
+  const previousAmountPaid = Number(profile.amount_paid ?? 0)
+  const previousTotalFees = Number(profile.total_fees ?? 0)
+
   const amountPaid = parseNumber(request.body.amountPaid)
   const totalFees = parseNumber(request.body.totalFees)
 
@@ -1195,13 +1212,22 @@ app.patch('/profiles/:id/financials', authenticate, requireAdminPermission('mana
     return
   }
 
+  const newAmountPaid = Number(updatedProfile.amount_paid ?? 0)
+  const newTotalFees = Number(updatedProfile.total_fees ?? 0)
+  const paymentIncrement = Number((newAmountPaid - previousAmountPaid).toFixed(2))
+  const totalFeesDelta = Number((newTotalFees - previousTotalFees).toFixed(2))
+
   insertActivityLog({
     adminId: request.userId,
     targetProfileId: request.params.id,
     action: 'update_student_financials',
     details: {
-      amountPaid: request.body.amountPaid,
-      totalFees: request.body.totalFees,
+      previousAmountPaid: Number(previousAmountPaid.toFixed(2)),
+      cumulativeAmountPaid: Number(newAmountPaid.toFixed(2)),
+      paymentIncrementRecorded: paymentIncrement,
+      previousTotalFees: Number(previousTotalFees.toFixed(2)),
+      totalFees: Number(newTotalFees.toFixed(2)),
+      totalFeesDelta,
     },
   })
 
@@ -1220,6 +1246,27 @@ app.patch('/profiles/:id/financials', authenticate, requireAdminPermission('mana
 
 app.get('/profiles-trash', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to access deleted student records.'), (_request, response) => {
   response.json({ items: listTrashedStudentProfiles() })
+})
+
+app.delete('/profiles-trash', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to purge deleted student records.'), (request, response) => {
+  if (request.query.purge !== 'all') {
+    response.status(400).json({ message: 'Use ?purge=all to permanently remove every student record currently in trash.' })
+    return
+  }
+
+  const deleted = permanentlyPurgeAllTrashedProfiles()
+  response.json({ ok: true, deleted })
+})
+
+app.delete('/profiles-trash/:id', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to purge deleted student records.'), (request, response) => {
+  const ok = permanentlyDeleteTrashedProfile(request.params.id)
+
+  if (!ok) {
+    response.status(404).json({ message: 'Trash entry not found or already restored.' })
+    return
+  }
+
+  response.json({ ok: true })
 })
 
 app.post('/profiles-trash/:id/restore', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to restore student profiles.'), (request, response) => {
@@ -1336,51 +1383,198 @@ app.post('/admin-activity-logs', authenticate, requireAdminPermission('write_aud
 })
 
 // --- Bulk Curriculum Sync Helper and Endpoint ---
-import { KIU_CURRICULUM } from '../../src/config/universityData.ts'
+import { KIU_CURRICULUM, KIU_DEPARTMENT_DEFAULT_PROGRAM, KIU_SEMESTERS } from '../../src/config/universityData.ts'
 
-function getCurriculumForStudent(student) {
-  if (!student.program || !student.semester) return null;
-  const curriculum = KIU_CURRICULUM[student.program];
-  if (!curriculum) return null;
-  const units = curriculum.semesters[student.semester];
-  if (!units) return null;
-  return units;
+function trimStr(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function curriculumKeyCaseInsensitive(name) {
+  const n = trimStr(name)
+  if (!n) {
+    return null
+  }
+  const lower = n.toLowerCase()
+  return Object.keys(KIU_CURRICULUM).find((key) => key.toLowerCase() === lower) ?? null
+}
+
+function findCurriculumForStudent(student) {
+  const program = trimStr(student.program)
+  const course = trimStr(student.course)
+  const department = trimStr(student.department)
+
+  if (program && KIU_CURRICULUM[program]) {
+    return KIU_CURRICULUM[program]
+  }
+  if (course && KIU_CURRICULUM[course]) {
+    return KIU_CURRICULUM[course]
+  }
+
+  const programKey = curriculumKeyCaseInsensitive(program)
+  if (programKey) {
+    return KIU_CURRICULUM[programKey]
+  }
+  const courseKey = curriculumKeyCaseInsensitive(course)
+  if (courseKey) {
+    return KIU_CURRICULUM[courseKey]
+  }
+
+  for (const curriculum of Object.values(KIU_CURRICULUM)) {
+    const dc = trimStr(curriculum?.defaultCourse)
+    if (dc && (dc === program || dc === course)) {
+      return curriculum
+    }
+  }
+
+  if (department) {
+    const deptProgram = KIU_DEPARTMENT_DEFAULT_PROGRAM[department]
+    if (deptProgram && KIU_CURRICULUM[deptProgram]) {
+      return KIU_CURRICULUM[deptProgram]
+    }
+    const deptLower = department.toLowerCase()
+    for (const [deptName, progName] of Object.entries(KIU_DEPARTMENT_DEFAULT_PROGRAM)) {
+      if (deptName.toLowerCase() === deptLower && progName && KIU_CURRICULUM[progName]) {
+        return KIU_CURRICULUM[progName]
+      }
+    }
+  }
+
+  const haystack = `${program} ${course} ${department}`.toLowerCase().replace(/\s+/g, ' ')
+  const sortedKeys = Object.keys(KIU_CURRICULUM).sort((a, b) => b.length - a.length)
+  for (const key of sortedKeys) {
+    if (haystack.includes(key.toLowerCase())) {
+      return KIU_CURRICULUM[key]
+    }
+  }
+
+  return null
+}
+
+function normalizeSemesterLabel(value) {
+  return trimStr(value).replace(/[–—]/g, '-').replace(/\s+/g, ' ')
+}
+
+function getSemesterUnits(curriculum, semesterRaw) {
+  const semester = normalizeSemesterLabel(semesterRaw)
+  if (!curriculum?.semesters) {
+    return null
+  }
+  if (semester && curriculum.semesters[semester]) {
+    return curriculum.semesters[semester]
+  }
+  if (semester) {
+    const lower = semester.toLowerCase()
+    const key = Object.keys(curriculum.semesters).find((k) => k.toLowerCase() === lower)
+    if (key) {
+      return curriculum.semesters[key]
+    }
+    const normKey = Object.keys(curriculum.semesters).find((k) => normalizeSemesterLabel(k).toLowerCase() === lower)
+    if (normKey) {
+      return curriculum.semesters[normKey]
+    }
+  }
+  return null
+}
+
+/**
+ * Prefer the student's semester; if it does not match any block (missing, typo, legacy label),
+ * use the first semester with content (KIU_SEMESTERS order) so bulk sync still updates most students.
+ */
+function resolveSemesterUnits(curriculum, student) {
+  const units = getSemesterUnits(curriculum, student.semester)
+  if (units && Array.isArray(units) && units.length > 0) {
+    return units
+  }
+  for (const sem of KIU_SEMESTERS) {
+    const block = curriculum.semesters?.[sem]
+    if (Array.isArray(block) && block.length > 0) {
+      return block
+    }
+  }
+  const firstKey = Object.keys(curriculum.semesters ?? {})[0]
+  const block = firstKey ? curriculum.semesters[firstKey] : null
+  if (Array.isArray(block) && block.length > 0) {
+    return block
+  }
+  return null
+}
+
+function buildSyncPayloadFromKiuUnits(studentId, kiuUnits) {
+  if (!Array.isArray(kiuUnits) || kiuUnits.length === 0) {
+    return { course_units: [], exams: [] }
+  }
+
+  const course_units = kiuUnits
+    .map((u) => {
+      if (typeof u === 'string') {
+        return u.trim()
+      }
+      if (u && typeof u === 'object' && typeof u.unitName === 'string') {
+        return u.unitName.trim()
+      }
+      return ''
+    })
+    .filter(Boolean)
+
+  const exams = kiuUnits.map((u, index) => {
+    const unitName = u && typeof u === 'object' && typeof u.unitName === 'string'
+      ? u.unitName.trim()
+      : `Course unit ${index + 1}`
+    const venue = u && typeof u === 'object' && typeof u.venue === 'string' ? u.venue.trim() : 'To be announced'
+    const time = u && typeof u === 'object' && typeof u.time === 'string' ? u.time.trim() : 'To be announced'
+    return {
+      id: `${studentId}-curriculum-${index + 1}`,
+      title: unitName,
+      examDate: 'To be announced',
+      examTime: time,
+      venue,
+      seatNumber: 'To be assigned',
+    }
+  })
+
+  return { course_units, exams }
 }
 
 // Bulk sync endpoint: aligns all students' course_units and exams with curriculum
 app.post('/admin/bulk-sync-curriculum', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to sync curriculum.'), async (request, response) => {
   try {
-    const allStudents = listProfiles('student');
-    let updated = 0;
-    const failed = [];
+    const allStudents = listProfiles('student')
+    const totalStudents = allStudents.length
+    let updated = 0
+    const failed = []
     for (const student of allStudents) {
-      const units = getCurriculumForStudent(student);
-      if (!units) {
-        failed.push({ id: student.id, reason: 'No curriculum for program/semester' });
-        continue;
+      const curriculum = findCurriculumForStudent(student)
+      if (!curriculum) {
+        failed.push({ id: student.id, reason: 'No curriculum match for program/course' })
+        continue
+      }
+      const kiuUnits = resolveSemesterUnits(curriculum, student)
+      if (!kiuUnits) {
+        failed.push({ id: student.id, reason: 'No semester block found in curriculum' })
+        continue
       }
       try {
-        // Update course_units and exams fields
+        const { course_units, exams } = buildSyncPayloadFromKiuUnits(student.id, kiuUnits)
         adminUpdateStudentProfile(student.id, {
-          course_units: units.units || [],
-          exams: units.exams || [],
-        });
-        updated++;
+          course_units,
+          exams,
+        })
+        updated++
       } catch (err) {
-        failed.push({ id: student.id, reason: err instanceof Error ? err.message : 'Unknown error' });
+        failed.push({ id: student.id, reason: err instanceof Error ? err.message : 'Unknown error' })
       }
     }
     insertActivityLog({
       adminId: request.userId,
       targetProfileId: request.userId,
       action: 'bulk_sync_curriculum',
-      details: { updated, failedCount: failed.length },
+      details: { updated, failedCount: failed.length, totalStudents },
       campusId: request.user?.campusId,
       campusName: request.user?.campusName,
-    });
-    response.json({ updated, failed });
+    })
+    response.json({ updated, failed, totalStudents })
   } catch (error) {
-    response.status(500).json({ message: error instanceof Error ? error.message : 'Bulk sync failed.' });
+    response.status(500).json({ message: error instanceof Error ? error.message : 'Bulk sync failed.' })
   }
 });
 
@@ -1461,6 +1655,22 @@ app.get('/permit-activity', authenticate, (request, response) => {
   response.json({ data })
 })
 
+app.delete('/admin-activity-logs/all-permit-events', authenticate, requireAdminPermission('write_audit_logs', 'You do not have permission to delete permit activity.'), (_request, response) => {
+  const deleted = deletePermitActivityLogs()
+  response.json({ ok: true, deleted })
+})
+
+app.delete('/admin-activity-logs/:id', authenticate, requireAdminPermission('write_audit_logs', 'You do not have permission to delete audit activity.'), (request, response) => {
+  const ok = deleteAdminActivityLogById(request.params.id)
+
+  if (!ok) {
+    response.status(404).json({ message: 'Activity log not found.' })
+    return
+  }
+
+  response.json({ ok: true })
+})
+
 app.get('/admin-activity-logs', authenticate, requireAdminPermission('view_audit_logs', 'You do not have permission to view audit activity.'), (request, response) => {
   const { page, pageSize } = request.query
 
@@ -1484,7 +1694,6 @@ app.get('/admin-activity-logs', authenticate, requireAdminPermission('view_audit
 
   response.json({ data: listActivityLogs() })
 })
-
 app.get('/support-requests', authenticate, (request, response) => {
   if (request.userRole === 'admin' && !request.adminPermissions.includes('manage_support_requests')) {
     response.status(403).json({ message: 'You do not have permission to view support requests.' })
@@ -1706,7 +1915,8 @@ async function findAvailablePort(startPort, maxAttempts = 10) {
 
 let shuttingDown = false
 
-app.use((error, _request, response) => {
+app.use((error, _request, response, next) => {
+  void next
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       response.status(400).json({ message: 'Uploaded file is too large. Use a file under 2 MB.' })

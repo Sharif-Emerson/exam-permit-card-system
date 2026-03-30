@@ -1,13 +1,22 @@
-
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-// ...existing code...
+import {
+  createBrowserRouter,
+  Navigate,
+  Outlet,
+  RouterProvider,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom'
+
 import ProtectedRoute from './components/ProtectedRoute'
 import SignOutDialog from './components/SignOutDialog'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { ConfirmationProvider } from './context/ConfirmationContext'
 import { UnsavedChangesProvider } from './context/UnsavedChangesContext'
+import { useUnsavedChanges } from './hooks/useUnsavedChanges'
 import { institutionLogo, institutionName } from './config/branding'
+import InvigilatorCheckIn from './components/InvigilatorCheckIn'
 
 const Login = lazy(() => import('./components/Login'))
 const Dashboard = lazy(() => import('./components/Dashboard'))
@@ -47,7 +56,6 @@ function BackNavigationHandler() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
 
-  // Keep refs so the event listener always has the latest values
   const userRef = useRef(user)
   const signOutRef = useRef(signOut)
   const navigateRef = useRef(navigate)
@@ -63,17 +71,15 @@ function BackNavigationHandler() {
       const currentUser = userRef.current
       if (!currentUser) return
 
-      // Push the user's page back so the URL doesn't change visually
       const targetPath = currentUser.role === 'admin' ? '/admin' : '/student'
       navigateRef.current(targetPath, { replace: true })
 
-      // Show the sign-out confirmation dialog
       setShowDialog(true)
     }
 
     window.addEventListener('popstate', handle)
     return () => window.removeEventListener('popstate', handle)
-  }, []) // intentionally empty — uses refs
+  }, [])
 
   async function handleConfirm() {
     setSigningOut(true)
@@ -95,47 +101,6 @@ function BackNavigationHandler() {
       onCancel={handleCancel}
       signingOut={signingOut}
     />
-  )
-}
-
-/* ─── Animated route wrapper ──────────────────────────────────────────────── */
-
-function AnimatedRoutes() {
-  const location = useLocation()
-
-  return (
-    <>
-      <div
-        key={location.pathname}
-        className="kiu-page-in"
-      >
-        <Routes location={location}>
-          <Route path="/" element={<HomeRedirect />} />
-          <Route path="/login" element={<LoginRoute />} />
-          <Route
-            path="/student"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <Suspense fallback={<AppLoadingScreen />}>
-                  <Dashboard />
-                </Suspense>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute requiredRole="admin">
-                <Suspense fallback={<AppLoadingScreen />}>
-                  <AdminPanel />
-                </Suspense>
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </div>
-    </>
   )
 }
 
@@ -163,9 +128,10 @@ function LoginRoute() {
 
 function LeaveConfirmation() {
   const { user } = useAuth()
+  const { hasUnsavedChanges } = useUnsavedChanges()
 
   useEffect(() => {
-    if (!user) return
+    if (!user || !hasUnsavedChanges) return
 
     const handle = (e: BeforeUnloadEvent) => {
       e.preventDefault()
@@ -175,25 +141,67 @@ function LeaveConfirmation() {
 
     window.addEventListener('beforeunload', handle)
     return () => window.removeEventListener('beforeunload', handle)
-  }, [user])
+  }, [user, hasUnsavedChanges])
 
   return null
 }
 
-/* ─── App root ────────────────────────────────────────────────────────────── */
+/* ─── Root layout (data router: enables useBlocker for unsaved changes) ───── */
 
-export default function App() {
+function RootLayout() {
+  const location = useLocation()
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <UnsavedChangesProvider>
+        <UnsavedChangesProvider>
+          <ConfirmationProvider>
             <BackNavigationHandler />
             <LeaveConfirmation />
-            <AnimatedRoutes />
-          </UnsavedChangesProvider>
-        </BrowserRouter>
+            <div key={location.pathname} className="kiu-page-in">
+              <Outlet />
+            </div>
+          </ConfirmationProvider>
+        </UnsavedChangesProvider>
       </AuthProvider>
     </ThemeProvider>
   )
+}
+
+const appRouter = createBrowserRouter([
+  {
+    path: '/',
+    element: <RootLayout />,
+    children: [
+      { index: true, element: <HomeRedirect /> },
+      { path: 'login', element: <LoginRoute /> },
+      {
+        path: 'student',
+        element: (
+          <ProtectedRoute requiredRole="student">
+            <Suspense fallback={<AppLoadingScreen />}>
+              <Dashboard />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'admin',
+        element: (
+          <ProtectedRoute requiredRole="admin">
+            <Suspense fallback={<AppLoadingScreen />}>
+              <AdminPanel />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      { path: 'invigilator-checkin', element: <InvigilatorCheckIn /> },
+      { path: '*', element: <Navigate to="/" replace /> },
+    ],
+  },
+])
+
+/* ─── App root ────────────────────────────────────────────────────────────── */
+
+export default function App() {
+  return <RouterProvider router={appRouter} />
 }

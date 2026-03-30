@@ -6,6 +6,8 @@ interface UnsavedChangesContextType {
   savePendingChanges: () => Promise<boolean | undefined>
   registerSaveHandler: (handler: () => Promise<boolean>) => void
   unregisterSaveHandler: () => void
+  registerDiscardHandler: (handler: () => void) => void
+  unregisterDiscardHandler: () => void
   forceShowDialog: () => void
 }
 

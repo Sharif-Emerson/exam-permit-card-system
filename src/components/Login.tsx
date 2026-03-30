@@ -4,7 +4,6 @@ import { Lock, Moon, Sun, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import BrandMark from './BrandMark'
 import { backendProvider } from '../config/provider'
-import { institutionName } from '../config/branding'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { resetPassword } from '../services/authService'
@@ -99,12 +98,11 @@ export default function Login() {
         <div className="text-center">
           <BrandMark
             align="center"
+            showSubtitle={false}
             titleClassName="text-2xl font-bold text-emerald-950 dark:text-emerald-50 sm:text-3xl"
             subtitleClassName="text-sm text-emerald-700 dark:text-emerald-300 sm:text-base"
           />
-          <p className="mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-300 sm:text-sm">
-            {institutionName}
-          </p>
+          <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-300 sm:text-base">Secure examination permit portal</p>
           <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-300 sm:text-base">Sign in with {accountProviderLabel}</p>
         </div>
         {configError && (

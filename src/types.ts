@@ -265,6 +265,8 @@ export interface UniversityDeadline {
   subtitle: string
   dateLabel: string // e.g., "In 14 Days" or "August 1st"
   type: 'danger' | 'info' | 'warning'
+  /** Optional ISO datetime for live countdown on student dashboards */
+  dueAt?: string
 }
 
 export interface SystemFeeSettings {

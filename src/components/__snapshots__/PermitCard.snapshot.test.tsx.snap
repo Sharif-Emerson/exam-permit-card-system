@@ -86,8 +86,14 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
       </div>
     </div>
     <div
-      class="permit-sheet bg-amber-50 rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border border-amber-200"
+      class="permit-sheet bg-amber-50 rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border border-amber-200 relative"
     >
+      <div
+        class="hidden print:block pointer-events-none select-none"
+        style="position: absolute; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 0; opacity: 0.08; display: flex; align-items: center; justify-content: center; font-size: 5rem; font-weight: 900; text-transform: uppercase; color: rgb(15, 81, 50); letter-spacing: 0.2em; user-select: none; pointer-events: none;"
+      >
+        Kampala International University (KIU)
+      </div>
       <div
         class="text-center mb-6 sm:mb-8 border-b border-slate-200 pb-5 print:hidden"
       >
@@ -96,64 +102,42 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
         >
           Official Examination Access Card
         </p>
+        <img
+          alt="Permit Logo"
+          class="h-12 mx-auto mb-2"
+          src="https://images.seeklogo.com/logo-png/55/1/kampala-international-university-kiu-logo-png_seeklogo-550306.png"
+        />
         <div
-          class="flex items-center gap-3 justify-center text-center"
+          class="text-2xl sm:text-3xl font-bold text-gray-900"
         >
-          <div
-            class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 via-green-600 to-lime-500 shadow-md shadow-emerald-200"
-          >
-            <svg
-              class="h-6 w-6 text-white"
-              fill="none"
-              height="24"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              viewBox="0 0 24 24"
-              width="24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
-              />
-              <path
-                d="m9 12 2 2 4-4"
-              />
-            </svg>
-          </div>
-          <div>
-            <div
-              class="text-2xl sm:text-3xl font-bold text-gray-900"
-            >
-              MNS INSTUTITE
-            </div>
-            <div
-              class="text-sm sm:text-base text-gray-600"
-            >
-              Secure examination permit portal
-            </div>
-          </div>
+          Kampala International University (KIU)
         </div>
-        <p
-          class="mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700"
-        >
-          MNS INSTUTITE
-        </p>
       </div>
       <div
-        class="mb-5 hidden rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center print:block print:mb-4"
+        class="mb-5 hidden rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-center print:block print:mb-4"
       >
-        <p
-          class="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-800"
+        <div
+          class="flex flex-col items-center gap-2"
         >
-          Institution
-        </p>
-        <p
-          class="mt-1 text-sm font-semibold text-emerald-900"
-        >
-          MNS INSTUTITE
-        </p>
+          <img
+            alt="Permit Logo"
+            class="h-14 w-14 object-contain"
+            draggable="false"
+            src="https://images.seeklogo.com/logo-png/55/1/kampala-international-university-kiu-logo-png_seeklogo-550306.png"
+          />
+          <div>
+            <p
+              class="text-[10px] font-semibold uppercase tracking-[0.26em] text-emerald-700"
+            >
+              Official Examination Permit
+            </p>
+            <p
+              class="mt-0.5 text-sm font-bold text-emerald-900"
+            >
+              Kampala International University (KIU)
+            </p>
+          </div>
+        </div>
       </div>
       <div
         class="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 sm:gap-8 mb-6 sm:mb-8 print:grid-cols-1 print:gap-3 print:mb-4"
@@ -163,7 +147,7 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
         >
           <img
             alt="Profile"
-            class="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover print:w-14 print:h-14"
+            class="w-[70px] h-[90px] sm:w-[88px] sm:h-[113px] rounded object-cover object-top border border-slate-300 shadow-sm print:w-[70px] print:h-[90px] print:rounded-sm print:border print:border-slate-400"
             src="https://via.placeholder.com/150"
           />
           <div
@@ -183,6 +167,21 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
               class="text-sm sm:text-base text-gray-600 print:hidden"
             >
               student@example.com
+            </p>
+            <p
+              class="text-sm text-gray-600 print:hidden"
+            >
+              Computer Science Department
+            </p>
+            <p
+              class="text-sm text-gray-600 print:hidden"
+            >
+              Semester 1 2026/2027
+            </p>
+            <p
+              class="text-sm text-gray-600 print:hidden"
+            >
+              Computer Science
             </p>
           </div>
         </div>
@@ -326,11 +325,20 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
         </div>
       </div>
       <div
-        class="mb-5 hidden rounded-xl border border-slate-200 bg-white px-4 py-3 print:block print:mb-4"
+        class="mb-5 hidden rounded-xl border border-slate-200 bg-white px-4 py-3 print:block print:mb-2 print:px-3 print:py-2"
       >
         <div
-          class="grid grid-cols-2 gap-2 text-[11px] text-slate-700"
+          class="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-slate-700 print:text-[9px]"
         >
+          <p>
+            <span
+              class="font-semibold"
+            >
+              Student ID:
+            </span>
+             
+            SNAP001
+          </p>
           <p>
             <span
               class="font-semibold"
@@ -376,7 +384,9 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
              
             International
           </p>
-          <p>
+          <p
+            class="col-span-2"
+          >
             <span
               class="font-semibold"
             >
@@ -388,433 +398,509 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
         </div>
       </div>
       <div
-        class="hidden print:flex print:items-center print:justify-center print:mb-4"
+        class="hidden print:flex print:items-center print:justify-center print:mb-2"
       >
         <div
-          class="rounded-full border px-4 py-2 text-sm font-semibold border-green-300 bg-green-50 text-green-700"
+          class="rounded-full border px-3 py-1 text-[10px] font-semibold border-green-300 bg-green-50 text-green-700"
         >
           Cleared Status: 
           Cleared
         </div>
       </div>
       <div
-        class="bg-gray-50 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8 print:bg-transparent print:p-0"
+        class="hidden print:block print:mb-1.5 text-center text-[9px] text-slate-700 font-semibold tracking-wide"
+      >
+        Permit Valid: 
+        30/03/2026
+         — 
+        15/04/2026
+      </div>
+      <div
+        class="print:grid print:grid-cols-[1.15fr_0.85fr] print:gap-x-4 print:items-start print:[page-break-inside:avoid]"
       >
         <div
-          class="flex items-center justify-between gap-4 mb-4 print:hidden"
+          class="bg-gray-50 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8 print:bg-transparent print:p-0 print:mb-0"
         >
-          <h3
-            class="text-base sm:text-lg font-semibold text-gray-900"
-          >
-            Assigned Exams
-          </h3>
-          <span
-            class="text-xs sm:text-sm text-slate-500"
-          >
-            1
-             scheduled
-          </span>
-        </div>
-        <div
-          class="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:mb-2 print:rounded-lg print:p-3 print:shadow-none"
-        >
-          <h4
-            class="mb-2 text-sm font-semibold text-slate-900 print:text-sm"
-          >
-            Registered Course Units
-          </h4>
           <div
-            class="flex flex-wrap gap-2 print:gap-1.5"
+            class="flex items-center justify-between gap-4 mb-4 print:hidden"
           >
-            <span
-              class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700 print:bg-slate-50 print:text-[10px]"
+            <h3
+              class="text-base sm:text-lg font-semibold text-gray-900"
             >
-              CSC 401 - Compiler Construction
-            </span>
+              Assigned Exams
+            </h3>
             <span
-              class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700 print:bg-slate-50 print:text-[10px]"
+              class="text-xs sm:text-sm text-slate-500"
             >
-              CSC 402 - Distributed Systems
+              1
+               scheduled
             </span>
           </div>
-        </div>
-        <div
-          class="grid grid-cols-1 gap-4 print:gap-2"
-        >
           <div
-            class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:rounded-lg print:p-3 print:shadow-none"
+            class="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:mb-1.5 print:rounded-md print:p-1.5 print:shadow-none"
           >
             <h4
-              class="text-sm sm:text-base font-semibold text-slate-900 mb-3 print:text-sm print:mb-2"
+              class="mb-2 text-sm font-semibold text-slate-900 print:text-[10px] print:mb-1"
             >
-              Computer Science Theory
+              Registered Course Units
             </h4>
             <div
-              class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 print:gap-2"
+              class="flex flex-wrap gap-2 print:hidden"
             >
-              <div
-                class="flex items-center space-x-2"
+              <span
+                class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700"
               >
-                <svg
-                  class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden"
-                  fill="none"
-                  height="24"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                  width="24"
-                  xmlns="http://www.w3.org/2000/svg"
+                CSC 401 - Compiler Construction
+              </span>
+              <span
+                class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700"
+              >
+                CSC 402 - Distributed Systems
+              </span>
+            </div>
+            <table
+              class="hidden w-full border-collapse border border-slate-400 text-left print:table print:text-[8px]"
+            >
+              <thead>
+                <tr
+                  class="bg-slate-100"
                 >
-                  <rect
-                    height="18"
-                    rx="2"
-                    ry="2"
-                    width="18"
-                    x="3"
-                    y="4"
-                  />
-                  <line
-                    x1="16"
-                    x2="16"
-                    y1="2"
-                    y2="6"
-                  />
-                  <line
-                    x1="8"
-                    x2="8"
-                    y1="2"
-                    y2="6"
-                  />
-                  <line
-                    x1="3"
-                    x2="21"
-                    y1="10"
-                    y2="10"
-                  />
-                </svg>
-                <span
-                  class="font-medium text-sm sm:text-base print:text-xs"
+                  <th
+                    class="border border-slate-400 px-1 py-0.5 font-semibold w-6"
+                  >
+                    #
+                  </th>
+                  <th
+                    class="border border-slate-400 px-1 py-0.5 font-semibold"
+                  >
+                    Unit no.
+                  </th>
+                  <th
+                    class="border border-slate-400 px-1 py-0.5 font-semibold"
+                  >
+                    Course unit
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td
+                    class="border border-slate-400 px-1 py-0.5 align-top"
+                  >
+                    1
+                  </td>
+                  <td
+                    class="border border-slate-400 px-1 py-0.5 align-top font-medium whitespace-nowrap"
+                  >
+                    CSC 401
+                  </td>
+                  <td
+                    class="border border-slate-400 px-1 py-0.5 align-top"
+                  >
+                    Compiler Construction
+                  </td>
+                </tr>
+                <tr>
+                  <td
+                    class="border border-slate-400 px-1 py-0.5 align-top"
+                  >
+                    2
+                  </td>
+                  <td
+                    class="border border-slate-400 px-1 py-0.5 align-top font-medium whitespace-nowrap"
+                  >
+                    CSC 402
+                  </td>
+                  <td
+                    class="border border-slate-400 px-1 py-0.5 align-top"
+                  >
+                    Distributed Systems
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div
+            class="grid grid-cols-1 gap-4 print:hidden"
+          >
+            <div
+              class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <h4
+                class="text-sm sm:text-base font-semibold text-slate-900 mb-3"
+              >
+                Computer Science Theory
+              </h4>
+              <div
+                class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"
+              >
+                <div
+                  class="flex items-center space-x-2"
                 >
-                  Date:
-                </span>
-                <span
-                  class="text-sm sm:text-base print:text-xs"
+                  <svg
+                    class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <rect
+                      height="18"
+                      rx="2"
+                      ry="2"
+                      width="18"
+                      x="3"
+                      y="4"
+                    />
+                    <line
+                      x1="16"
+                      x2="16"
+                      y1="2"
+                      y2="6"
+                    />
+                    <line
+                      x1="8"
+                      x2="8"
+                      y1="2"
+                      y2="6"
+                    />
+                    <line
+                      x1="3"
+                      x2="21"
+                      y1="10"
+                      y2="10"
+                    />
+                  </svg>
+                  <span
+                    class="font-medium text-sm sm:text-base"
+                  >
+                    Date:
+                  </span>
+                  <span
+                    class="text-sm sm:text-base"
+                  >
+                    2026-04-15
+                  </span>
+                </div>
+                <div
+                  class="flex items-center space-x-2"
+                >
+                  <svg
+                    class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                    />
+                    <polyline
+                      points="12 6 12 12 16 14"
+                    />
+                  </svg>
+                  <span
+                    class="font-medium text-sm sm:text-base"
+                  >
+                    Time:
+                  </span>
+                  <span
+                    class="text-sm sm:text-base"
+                  >
+                    10:00 AM
+                  </span>
+                </div>
+                <div
+                  class="flex items-center space-x-2 sm:col-span-2"
+                >
+                  <svg
+                    class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"
+                    />
+                    <circle
+                      cx="12"
+                      cy="10"
+                      r="3"
+                    />
+                  </svg>
+                  <span
+                    class="font-medium text-sm sm:text-base"
+                  >
+                    Venue:
+                  </span>
+                  <span
+                    class="text-sm sm:text-base"
+                  >
+                    Hall A
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <table
+            class="hidden w-full border-collapse border border-slate-400 text-left print:table print:mt-1 print:text-[8px]"
+          >
+            <caption
+              class="sr-only"
+            >
+              Assigned exams
+            </caption>
+            <thead>
+              <tr
+                class="bg-slate-100"
+              >
+                <th
+                  class="border border-slate-400 px-1 py-0.5 font-semibold"
+                >
+                  Exam
+                </th>
+                <th
+                  class="border border-slate-400 px-1 py-0.5 font-semibold whitespace-nowrap"
+                >
+                  Date
+                </th>
+                <th
+                  class="border border-slate-400 px-1 py-0.5 font-semibold whitespace-nowrap"
+                >
+                  Time
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td
+                  class="border border-slate-400 px-1 py-0.5 align-top"
+                >
+                  Computer Science Theory
+                </td>
+                <td
+                  class="border border-slate-400 px-1 py-0.5 align-top whitespace-nowrap"
                 >
                   2026-04-15
-                </span>
-              </div>
-              <div
-                class="flex items-center space-x-2"
-              >
-                <svg
-                  class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden"
-                  fill="none"
-                  height="24"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                  width="24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="10"
-                  />
-                  <polyline
-                    points="12 6 12 12 16 14"
-                  />
-                </svg>
-                <span
-                  class="font-medium text-sm sm:text-base print:text-xs"
-                >
-                  Time:
-                </span>
-                <span
-                  class="text-sm sm:text-base print:text-xs"
+                </td>
+                <td
+                  class="border border-slate-400 px-1 py-0.5 align-top whitespace-nowrap"
                 >
                   10:00 AM
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div
+          class="flex flex-col gap-0 print:gap-2"
+        >
+          <div
+            class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:p-5 print:mb-0 print:rounded print:border-slate-200 print:bg-white print:p-2"
+          >
+            <div
+              class="mb-3 flex items-center justify-between gap-3 print:mb-1.5"
+            >
+              <h4
+                class="text-sm font-semibold uppercase tracking-[0.18em] text-amber-900 print:text-[9px] print:tracking-[0.1em] print:text-slate-800"
+              >
+                General Rules
+              </h4>
+              <span
+                class="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700 print:hidden"
+              >
+                Read Before Entry
+              </span>
+            </div>
+            <ul
+              class="space-y-2 text-sm leading-6 text-amber-900 print:space-y-1 print:text-[9px] print:leading-relaxed print:text-slate-700"
+            >
+              <li
+                class="flex gap-2 print:gap-1.5"
+              >
+                <span
+                  aria-hidden="true"
+                  class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-400 print:mt-0.5 print:h-1 print:w-1"
+                />
+                <span>
+                  No mobile phones are allowed.
                 </span>
+              </li>
+              <li
+                class="flex gap-2 print:gap-1.5"
+              >
+                <span
+                  aria-hidden="true"
+                  class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-400 print:mt-0.5 print:h-1 print:w-1"
+                />
+                <span>
+                  This card is confidential and must be produced to the invigilator when required.
+                </span>
+              </li>
+              <li
+                class="flex gap-2 print:gap-1.5"
+              >
+                <span
+                  aria-hidden="true"
+                  class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-400 print:mt-0.5 print:h-1 print:w-1"
+                />
+                <span>
+                  Your registration number and finance clearance number—not your name—must appear on every answer booklet.
+                </span>
+              </li>
+              <li
+                class="flex gap-2 print:gap-1.5"
+              >
+                <span
+                  aria-hidden="true"
+                  class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-400 print:mt-0.5 print:h-1 print:w-1"
+                />
+                <span>
+                  No malpractice is allowed.
+                </span>
+              </li>
+            </ul>
+          </div>
+          <div
+            class="rounded-lg p-3 sm:p-4 mb-6 sm:mb-8 border-2 print:hidden bg-green-50 border-green-200"
+          >
+            <h4
+              class="font-semibold mb-3 sm:mb-4 text-sm sm:text-base text-green-800"
+            >
+              Fees Status
+            </h4>
+            <div
+              class="space-y-3"
+            >
+              <div
+                class="grid grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm"
+              >
+                <div
+                  class="text-center"
+                >
+                  <p
+                    class="text-gray-600"
+                  >
+                    Expected Fees
+                  </p>
+                  <p
+                    class="font-bold text-gray-900 text-sm sm:text-base"
+                  >
+                    $
+                    3000.00
+                  </p>
+                </div>
+                <div
+                  class="text-center"
+                >
+                  <p
+                    class="text-gray-600"
+                  >
+                    Amount Received
+                  </p>
+                  <p
+                    class="font-bold text-green-600 text-sm sm:text-base"
+                  >
+                    $
+                    3000.00
+                  </p>
+                </div>
+                <div
+                  class="text-center"
+                >
+                  <p
+                    class="text-gray-600"
+                  >
+                    Remaining Balance
+                  </p>
+                  <p
+                    class="font-bold text-sm sm:text-base text-green-600"
+                  >
+                    $
+                    0.00
+                  </p>
+                </div>
               </div>
               <div
-                class="flex items-center space-x-2"
+                class="w-full bg-gray-200 rounded-full h-2"
               >
-                <svg
-                  class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden"
-                  fill="none"
-                  height="24"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                  width="24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"
-                  />
-                  <circle
-                    cx="12"
-                    cy="10"
-                    r="3"
-                  />
-                </svg>
-                <span
-                  class="font-medium text-sm sm:text-base print:text-xs"
-                >
-                  Venue:
-                </span>
-                <span
-                  class="text-sm sm:text-base print:text-xs"
-                >
-                  Hall A
-                </span>
+                <progress
+                  class="payment-progress payment-progress-clear"
+                  max="100"
+                  value="100"
+                />
               </div>
               <div
-                class="flex items-center space-x-2"
+                class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
               >
-                <svg
-                  class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden"
-                  fill="none"
-                  height="24"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                  width="24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"
-                  />
-                  <path
-                    d="M13 5v2"
-                  />
-                  <path
-                    d="M13 17v2"
-                  />
-                  <path
-                    d="M13 11v2"
-                  />
-                </svg>
                 <span
-                  class="font-medium text-sm sm:text-base print:text-xs"
+                  class="text-xs sm:text-sm font-medium text-green-600"
                 >
-                  Seat:
+                  All Clear
                 </span>
                 <span
-                  class="text-sm sm:text-base print:text-xs"
+                  class="text-xs sm:text-sm text-gray-600"
                 >
-                  A-001
+                  100.0
+                  % Paid
                 </span>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-      <div
-        class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:p-5 print:mb-4 print:rounded-lg print:border-slate-200 print:bg-white print:p-3"
-      >
-        <div
-          class="mb-3 flex items-center justify-between gap-3"
-        >
-          <h4
-            class="text-sm font-semibold uppercase tracking-[0.18em] text-amber-900 print:text-xs print:tracking-[0.16em]"
-          >
-            General Examination Rules
-          </h4>
-          <span
-            class="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700 print:border print:border-slate-200 print:bg-slate-50 print:text-slate-600"
-          >
-            Read Before Entry
-          </span>
-        </div>
-        <ul
-          class="space-y-2 text-sm leading-6 text-amber-900 print:space-y-1.5 print:text-[11px] print:leading-5 print:text-slate-800"
-        >
-          <li
-            class="flex gap-2"
-          >
-            <span
-              aria-hidden="true"
-              class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-500"
-            />
-            <span>
-              Arrive at the examination venue at least 30 minutes before the scheduled start time.
-            </span>
-          </li>
-          <li
-            class="flex gap-2"
-          >
-            <span
-              aria-hidden="true"
-              class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-500"
-            />
-            <span>
-              Bring a valid student ID card and this permit for verification before entry.
-            </span>
-          </li>
-          <li
-            class="flex gap-2"
-          >
-            <span
-              aria-hidden="true"
-              class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-500"
-            />
-            <span>
-              Sit only in the seat assigned on the permit or as directed by invigilators.
-            </span>
-          </li>
-          <li
-            class="flex gap-2"
-          >
-            <span
-              aria-hidden="true"
-              class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-500"
-            />
-            <span>
-              Keep phones, smart devices, notes, and other unauthorized materials out of reach during the exam.
-            </span>
-          </li>
-          <li
-            class="flex gap-2"
-          >
-            <span
-              aria-hidden="true"
-              class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-600 print:bg-slate-500"
-            />
-            <span>
-              Follow all invigilator instructions and maintain silence throughout the examination period.
-            </span>
-          </li>
-        </ul>
-      </div>
-      <div
-        class="rounded-lg p-3 sm:p-4 mb-6 sm:mb-8 border-2 print:hidden bg-green-50 border-green-200"
-      >
-        <h4
-          class="font-semibold mb-3 sm:mb-4 text-sm sm:text-base text-green-800"
-        >
-          Fees Status
-        </h4>
-        <div
-          class="space-y-3"
-        >
-          <div
-            class="grid grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm"
-          >
-            <div
-              class="text-center"
+            <p
+              class="text-green-700 mt-3 text-xs sm:text-sm"
             >
-              <p
-                class="text-gray-600"
-              >
-                Expected Fees
-              </p>
-              <p
-                class="font-bold text-gray-900 text-sm sm:text-base"
-              >
-                $
-                3000.00
-              </p>
-            </div>
-            <div
-              class="text-center"
+              All fees have been paid. You are eligible to take the examination.
+            </p>
+            <p
+              class="mt-3 text-xs sm:text-sm text-slate-600"
             >
-              <p
-                class="text-gray-600"
-              >
-                Amount Received
-              </p>
-              <p
-                class="font-bold text-green-600 text-sm sm:text-base"
-              >
-                $
-                3000.00
-              </p>
-            </div>
-            <div
-              class="text-center"
-            >
-              <p
-                class="text-gray-600"
-              >
-                Remaining
-              </p>
-              <p
-                class="text-gray-600"
-              >
-                Remaining Balance
-              </p>
-              <p
-                class="font-bold text-sm sm:text-base text-green-600"
-              >
-                $
-                0.00
-              </p>
-            </div>
+              Prints this month: 
+              0
+              /
+              2
+            </p>
           </div>
           <div
-            class="w-full bg-gray-200 rounded-full h-2"
+            class="text-center mb-8 print:mb-0 print:mt-0 print:flex print:flex-col print:items-center print:justify-center"
           >
-            <progress
-              class="payment-progress payment-progress-clear"
-              max="100"
-              value="100"
-            />
-          </div>
-          <div
-            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
-          >
-            <span
-              class="text-xs sm:text-sm font-medium text-green-600"
+            <h4
+              class="font-semibold text-gray-900 mb-4 print:hidden"
             >
-              All Clear
-            </span>
-            <span
-              class="text-xs sm:text-sm text-gray-600"
+              Verification QR Code
+            </h4>
+            <div
+              class="inline-flex p-3 rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-lg print:p-2 print:shadow-none print:border-slate-300"
             >
-              100.0
-              % Paid
-            </span>
+              <img
+                alt="Verification QR code"
+                class="h-32 w-32 print:h-20 print:w-20"
+                src="data:image/png;base64,permit-qr"
+              />
+            </div>
+            <p
+              class="hidden print:block print:mt-1 print:text-[8px] print:text-slate-500 print:uppercase print:tracking-wider"
+            >
+              Official Scan Tag
+            </p>
           </div>
-        </div>
-        <p
-          class="text-green-700 mt-3 text-xs sm:text-sm"
-        >
-          All fees have been paid. You are eligible to take the examination.
-        </p>
-        <p
-          class="mt-3 text-xs sm:text-sm text-slate-600"
-        >
-          Prints this month: 
-          0
-          /
-          2
-        </p>
-      </div>
-      <div
-        class="text-center mb-8 print:mb-0 print:mt-4"
-      >
-        <h4
-          class="font-semibold text-gray-900 mb-4 print:hidden"
-        >
-          Verification QR Code
-        </h4>
-        <div
-          class="inline-flex p-3 rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-lg print:p-2 print:shadow-none"
-        >
-          <img
-            alt="Verification QR code"
-            class="h-32 w-32 print:h-24 print:w-24"
-            src="data:image/png;base64,permit-qr"
-          />
         </div>
       </div>
       <div

@@ -23,6 +23,14 @@ export interface FinancialUpdateValues {
   totalFees?: number
 }
 
+export type BulkCurriculumSyncFailure = { id: string; reason: string }
+
+export type BulkCurriculumSyncResult = {
+  updated: number
+  failed: BulkCurriculumSyncFailure[]
+  totalStudents: number
+}
+
 export interface DataAdapter {
   provider: string
   isConfigured: boolean
@@ -33,6 +41,8 @@ export interface DataAdapter {
   fetchTrashedStudentProfiles: () => Promise<TrashedStudentProfile[]>
   fetchAdminActivityLogs: () => Promise<AdminActivityLog[]>
   fetchAdminActivityLogsPage: (query?: { page?: number; pageSize?: number }) => Promise<AdminActivityLogPage>
+  deleteAdminActivityLog: (logId: string) => Promise<void>
+  purgePermitActivityLogs: () => Promise<number>
   fetchSystemFeeSettings: () => Promise<SystemFeeSettings>
   updateSystemFeeSettings: (values: SystemFeeSettings) => Promise<SystemFeeSettings>
   createStudentProfile: (values: CreateStudentInput, adminId: string) => Promise<StudentProfile>
@@ -42,6 +52,8 @@ export interface DataAdapter {
   clearStudentBalance: (studentId: string, adminId: string) => Promise<void>
   deleteStudentProfile: (studentId: string, adminId: string) => Promise<void>
   restoreStudentProfile: (trashId: string, adminId: string) => Promise<StudentProfile>
+  permanentlyDeleteTrashedStudent: (trashId: string) => Promise<void>
+  permanentlyPurgeAllTrashedStudents: () => Promise<number>
   grantStudentPermitPrintAccess: (studentId: string, additionalPrints: number, adminId: string) => Promise<StudentProfile>
   recordPermitActivity: (studentId: string, action: PermitActivityAction) => Promise<void>
   fetchPermitActivityHistory: () => Promise<PermitActivityRecord[]>
@@ -49,4 +61,5 @@ export interface DataAdapter {
   fetchSupportRequests: () => Promise<SupportRequest[]>
   createSupportRequest: (studentId: string, values: CreateSupportRequestInput) => Promise<SupportRequest>
   updateSupportRequest: (requestId: string, values: SupportRequestUpdateInput) => Promise<SupportRequest>
+  bulkSyncCurriculum: () => Promise<BulkCurriculumSyncResult>
 }

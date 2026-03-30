@@ -1,9 +1,24 @@
 import { Calendar, Clock, Download, LogOut, MapPin, Printer, RefreshCcw, User } from 'lucide-react'
 import { useCallback } from 'react'
 import { generalExamRules } from '../config/examRules'
-import { institutionLogo, institutionName, examPermitConfig } from '../config/branding'
+import { institutionLogo as defaultLogo, institutionName as defaultName, examPermitConfig } from '../config/branding'
 import type { StudentProfile } from '../types'
-import BrandMark from './BrandMark'
+
+/** Split stored course unit strings into code + title (no venue). Supports "CODE: Title" or "CODE - Title". */
+function parseCourseUnitRow(unit: string, index: number): { serial: number; code: string; title: string } {
+  const serial = index + 1
+  const colon = unit.indexOf(':')
+  if (colon > 0) {
+    const code = unit.slice(0, colon).trim()
+    const title = unit.slice(colon + 1).trim()
+    return { serial, code: code || '—', title: title || '—' }
+  }
+  const dash = unit.match(/^([A-Za-z]{2,6}\s*\d+[A-Za-z0-9.\-]*)\s*-\s*(.+)$/)
+  if (dash) {
+    return { serial, code: dash[1].trim(), title: dash[2].trim() }
+  }
+  return { serial, code: '—', title: unit }
+}
 
 export const FALLBACK_PROFILE_IMAGE = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="160" height="160" fill="%23e2e8f0"/><circle cx="80" cy="58" r="28" fill="%2394a3b8"/><path d="M36 132c8-24 28-36 44-36s36 12 44 36" fill="%2394a3b8"/></svg>'
 
@@ -16,6 +31,14 @@ type PermitCardProps = {
   onDownload: () => void
 }
 
+type PermitCardFieldKey = 'photo' | 'department' | 'semester' | 'course'
+
+type StoredPermitCardDesign = {
+  logo?: string
+  name?: string
+  fields?: Partial<Record<PermitCardFieldKey, boolean>>
+}
+
 export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOut, onPrint, onDownload }: PermitCardProps) {
   // Notify backend on permit print/download
   const notifyPermitEvent = useCallback(async (eventType: 'print' | 'download') => {
@@ -25,7 +48,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ eventType }),
       })
-    } catch (err) {
+    } catch {
       // Ignore errors for notification
     }
   }, [studentData.id])
@@ -37,6 +60,29 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
     ? 'Please clear all outstanding fees before printing or downloading.'
     : studentData.printAccessMessage || 'You have reached the monthly permit print limit. Contact administration for access.'
 
+  // Permit design settings (customizable)
+  const defaultStoredDesign: Required<StoredPermitCardDesign> & { fields: Record<PermitCardFieldKey, boolean> } = {
+    logo: '',
+    name: '',
+    fields: { photo: true, department: true, semester: true, course: true },
+  }
+  let permitDesign: StoredPermitCardDesign = defaultStoredDesign
+  try {
+    const raw = localStorage.getItem('permitDesign')
+    if (raw) {
+      const parsed = JSON.parse(raw) as StoredPermitCardDesign
+      permitDesign = {
+        ...defaultStoredDesign,
+        ...parsed,
+        fields: { ...defaultStoredDesign.fields, ...parsed.fields },
+      }
+    }
+  } catch {
+    /* keep defaults */
+  }
+  const logo = permitDesign.logo || defaultLogo
+  const name = permitDesign.name || defaultName
+  const showField = (field: PermitCardFieldKey) => permitDesign.fields?.[field] !== false
   const profileImage = studentData.profileImage?.trim() ? studentData.profileImage : FALLBACK_PROFILE_IMAGE
 
   // Permit validity: valid from today to exam date or a set period (e.g., 30 days from issue)
@@ -74,49 +120,41 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
         </div>
 
         <div className="permit-sheet bg-amber-50 rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border border-amber-200 relative">
-                    {/* Watermark for print/download view */}
-                    <div className="hidden print:block pointer-events-none select-none" style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                      zIndex: 0,
-                      opacity: 0.08,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '5rem',
-                      fontWeight: 900,
-                      textTransform: 'uppercase',
-                      color: '#0f5132',
-                      letterSpacing: '0.2em',
-                      userSelect: 'none',
-                      pointerEvents: 'none',
-                    }}>
-                      {institutionName}
-                    </div>
+          {/* Watermark for print/download view */}
+          <div className="hidden print:block pointer-events-none select-none" style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            zIndex: 0,
+            opacity: 0.08,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '5rem',
+            fontWeight: 900,
+            textTransform: 'uppercase',
+            color: '#0f5132',
+            letterSpacing: '0.2em',
+            userSelect: 'none',
+            pointerEvents: 'none',
+          }}>
+            {name}
+          </div>
           <div className="text-center mb-6 sm:mb-8 border-b border-slate-200 pb-5 print:hidden">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-2">Official Examination Access Card</p>
-            <BrandMark
-              align="center"
-              titleClassName="text-2xl sm:text-3xl font-bold text-gray-900"
-              subtitleClassName="text-sm sm:text-base text-gray-600"
-            />
+            {logo && <img src={logo} alt="Permit Logo" className="h-12 mx-auto mb-2" />}
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{name}</div>
           </div>
 
-          {/* Print-only permit header with KIU logo */}
+          {/* Print-only permit header with custom logo */}
           <div className="mb-5 hidden rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-center print:block print:mb-4">
             <div className="flex flex-col items-center gap-2">
-              <img
-                src={institutionLogo}
-                alt={institutionName}
-                className="h-14 w-14 object-contain"
-                draggable={false}
-              />
+              {logo && <img src={logo} alt="Permit Logo" className="h-14 w-14 object-contain" draggable={false} />}
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-emerald-700">Official Examination Permit</p>
-                <p className="mt-0.5 text-sm font-bold text-emerald-900">{institutionName}</p>
+                <p className="mt-0.5 text-sm font-bold text-emerald-900">{name}</p>
               </div>
             </div>
           </div>
@@ -124,19 +162,24 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
           <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 sm:gap-8 mb-6 sm:mb-8 print:grid-cols-1 print:gap-3 print:mb-4">
             <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4 print:flex-row print:items-center print:justify-center print:space-y-0 print:space-x-3">
               {/* Passport-size photo: 35×45 mm portrait ratio */}
-              <img
-                src={profileImage}
-                alt="Profile"
-                className="w-[70px] h-[90px] sm:w-[88px] sm:h-[113px] rounded object-cover object-top border border-slate-300 shadow-sm print:w-[70px] print:h-[90px] print:rounded-sm print:border print:border-slate-400"
-                onError={(event) => {
-                  event.currentTarget.onerror = null
-                  event.currentTarget.src = FALLBACK_PROFILE_IMAGE
-                }}
-              />
+              {showField('photo') && (
+                <img
+                  src={profileImage}
+                  alt="Profile"
+                  className="w-[70px] h-[90px] sm:w-[88px] sm:h-[113px] rounded object-cover object-top border border-slate-300 shadow-sm print:w-[70px] print:h-[90px] print:rounded-sm print:border print:border-slate-400"
+                  onError={(event) => {
+                    event.currentTarget.onerror = null
+                    event.currentTarget.src = FALLBACK_PROFILE_IMAGE
+                  }}
+                />
+              )}
               <div className="text-center sm:text-left print:text-left">
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-900 print:text-base">{studentData.name}</h2>
                 <p className="text-sm sm:text-base text-gray-600 print:hidden">{studentData.studentId}</p>
                 <p className="text-sm sm:text-base text-gray-600 print:hidden">{studentData.email}</p>
+                {showField('department') && <p className="text-sm text-gray-600 print:hidden">{studentData.department}</p>}
+                {showField('semester') && <p className="text-sm text-gray-600 print:hidden">{studentData.semester}</p>}
+                {showField('course') && <p className="text-sm text-gray-600 print:hidden">{studentData.course}</p>}
               </div>
             </div>
 
@@ -179,29 +222,30 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
             </div>
           </div>
 
-          <div className="mb-5 hidden rounded-xl border border-slate-200 bg-white px-4 py-3 print:block print:mb-4">
-            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-700">
+          <div className="mb-5 hidden rounded-xl border border-slate-200 bg-white px-4 py-3 print:block print:mb-2 print:px-3 print:py-2">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-slate-700 print:text-[9px]">
+              <p><span className="font-semibold">Student ID:</span> {studentData.studentId}</p>
               <p><span className="font-semibold">Program:</span> {studentData.program ?? studentData.course}</p>
               <p><span className="font-semibold">College:</span> {studentData.college ?? 'Not assigned'}</p>
               <p><span className="font-semibold">Department:</span> {studentData.department ?? 'Not assigned'}</p>
               <p><span className="font-semibold">Semester:</span> {studentData.semester ?? 'Not assigned'}</p>
               <p><span className="font-semibold">Category:</span> {studentData.studentCategory === 'international' ? 'International' : 'Local'}</p>
-              <p><span className="font-semibold">Phone:</span> {studentData.phoneNumber ?? 'Not assigned'}</p>
+              <p className="col-span-2"><span className="font-semibold">Phone:</span> {studentData.phoneNumber ?? 'Not assigned'}</p>
             </div>
           </div>
 
-          <div className="hidden print:flex print:items-center print:justify-center print:mb-4">
-            <div className={`rounded-full border px-4 py-2 text-sm font-semibold ${studentData.feesBalance === 0 ? 'border-green-300 bg-green-50 text-green-700' : 'border-red-300 bg-red-50 text-red-700'}`}>
+          <div className="hidden print:flex print:items-center print:justify-center print:mb-2">
+            <div className={`rounded-full border px-3 py-1 text-[10px] font-semibold ${studentData.feesBalance === 0 ? 'border-green-300 bg-green-50 text-green-700' : 'border-red-300 bg-red-50 text-red-700'}`}>
               Cleared Status: {studentData.feesBalance === 0 ? 'Cleared' : 'Not Cleared'}
             </div>
           </div>
 
           {/* Permit validity period (print only) */}
-          <div className="hidden print:block print:mb-2 text-center text-[10px] text-slate-700 font-semibold tracking-wider">
+          <div className="hidden print:block print:mb-1.5 text-center text-[9px] text-slate-700 font-semibold tracking-wide">
             Permit Valid: {issueDate.toLocaleDateString()} — {expiryDate.toLocaleDateString()}
           </div>
-          {/* Print grid for booklet layout */}
-          <div className="print:grid print:grid-cols-[1.2fr_1fr] print:gap-x-6 print:items-start">
+          {/* Print: two columns on A4; course units as table (no venue); exams compact table without venue */}
+          <div className="print:grid print:grid-cols-[1.15fr_0.85fr] print:gap-x-4 print:items-start print:[page-break-inside:avoid]">
             {/* Column 1: Exams */}
             <div className="bg-gray-50 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8 print:bg-transparent print:p-0 print:mb-0">
               <div className="flex items-center justify-between gap-4 mb-4 print:hidden">
@@ -209,42 +253,84 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                 <span className="text-xs sm:text-sm text-slate-500">{studentData.exams.length} scheduled</span>
               </div>
               {studentData.courseUnits && studentData.courseUnits.length > 0 && (
-                <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:mb-2 print:rounded-lg print:p-2 print:shadow-none">
-                  <h4 className="mb-2 text-sm font-semibold text-slate-900 print:text-[11px] print:mb-1">Registered Course Units</h4>
-                  <div className="flex flex-wrap gap-2 print:gap-1">
+                <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:mb-1.5 print:rounded-md print:p-1.5 print:shadow-none">
+                  <h4 className="mb-2 text-sm font-semibold text-slate-900 print:text-[10px] print:mb-1">Registered Course Units</h4>
+                  <div className="flex flex-wrap gap-2 print:hidden">
                     {studentData.courseUnits.map((unit) => (
-                      <span key={unit} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700 print:bg-slate-50 print:text-[9px] print:px-1.5 print:py-0.5">
+                      <span key={unit} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
                         {unit}
                       </span>
                     ))}
                   </div>
+                  <table className="hidden w-full border-collapse border border-slate-400 text-left print:table print:text-[8px]">
+                    <thead>
+                      <tr className="bg-slate-100">
+                        <th className="border border-slate-400 px-1 py-0.5 font-semibold w-6">#</th>
+                        <th className="border border-slate-400 px-1 py-0.5 font-semibold">Unit no.</th>
+                        <th className="border border-slate-400 px-1 py-0.5 font-semibold">Course unit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {studentData.courseUnits.map((unit, i) => {
+                        const row = parseCourseUnitRow(unit, i)
+                        return (
+                          <tr key={`${i}-${unit}`}>
+                            <td className="border border-slate-400 px-1 py-0.5 align-top">{row.serial}</td>
+                            <td className="border border-slate-400 px-1 py-0.5 align-top font-medium whitespace-nowrap">{row.code}</td>
+                            <td className="border border-slate-400 px-1 py-0.5 align-top">{row.title}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
               {studentData.exams.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4 print:gap-1.5">
-                  {studentData.exams.map((exam) => (
-                    <div key={exam.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:rounded print:p-2 print:shadow-none print:border-slate-300">
-                      <h4 className="text-sm sm:text-base font-semibold text-slate-900 mb-3 print:text-[11px] print:mb-1.5 print:leading-tight">{exam.title}</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 print:grid-cols-2 print:gap-1">
-                        <div className="flex items-center space-x-2 print:space-x-1">
-                          <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden" />
-                          <span className="font-medium text-sm sm:text-base print:text-[9px]">Date:</span>
-                          <span className="text-sm sm:text-base print:text-[9px]">{exam.examDate}</span>
-                        </div>
-                        <div className="flex items-center space-x-2 print:space-x-1">
-                          <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden" />
-                          <span className="font-medium text-sm sm:text-base print:text-[9px]">Time:</span>
-                          <span className="text-sm sm:text-base print:text-[9px]">{exam.examTime}</span>
-                        </div>
-                        <div className="flex items-center space-x-2 print:space-x-1">
-                          <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0 print:hidden" />
-                          <span className="font-medium text-sm sm:text-base print:text-[9px]">Venue:</span>
-                          <span className="text-sm sm:text-base print:text-[9px]">{exam.venue}</span>
+                <>
+                  <div className="grid grid-cols-1 gap-4 print:hidden">
+                    {studentData.exams.map((exam) => (
+                      <div key={exam.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <h4 className="text-sm sm:text-base font-semibold text-slate-900 mb-3">{exam.title}</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0" />
+                            <span className="font-medium text-sm sm:text-base">Date:</span>
+                            <span className="text-sm sm:text-base">{exam.examDate}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0" />
+                            <span className="font-medium text-sm sm:text-base">Time:</span>
+                            <span className="text-sm sm:text-base">{exam.examTime}</span>
+                          </div>
+                          <div className="flex items-center space-x-2 sm:col-span-2">
+                            <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0" />
+                            <span className="font-medium text-sm sm:text-base">Venue:</span>
+                            <span className="text-sm sm:text-base">{exam.venue}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                  <table className="hidden w-full border-collapse border border-slate-400 text-left print:table print:mt-1 print:text-[8px]">
+                    <caption className="sr-only">Assigned exams</caption>
+                    <thead>
+                      <tr className="bg-slate-100">
+                        <th className="border border-slate-400 px-1 py-0.5 font-semibold">Exam</th>
+                        <th className="border border-slate-400 px-1 py-0.5 font-semibold whitespace-nowrap">Date</th>
+                        <th className="border border-slate-400 px-1 py-0.5 font-semibold whitespace-nowrap">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {studentData.exams.map((exam) => (
+                        <tr key={exam.id}>
+                          <td className="border border-slate-400 px-1 py-0.5 align-top">{exam.title}</td>
+                          <td className="border border-slate-400 px-1 py-0.5 align-top whitespace-nowrap">{exam.examDate}</td>
+                          <td className="border border-slate-400 px-1 py-0.5 align-top whitespace-nowrap">{exam.examTime}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
               ) : (
                 <p className="text-sm text-slate-600 print:text-[10px]">No exams have been assigned to your account yet.</p>
               )}

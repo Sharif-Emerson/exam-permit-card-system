@@ -52,11 +52,11 @@ describe('PermitCard', () => {
     )
 
     expect(screen.getByText('John Doe')).toBeTruthy()
-    expect(screen.getByText('Computer Science Theory')).toBeTruthy()
+    expect(screen.getAllByText('Computer Science Theory').length).toBeGreaterThan(0)
     expect(screen.getAllByText(/college of computing/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/international/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/\+256700123456/i).length).toBeGreaterThan(0)
-    expect(screen.getByText('General Examination Rules')).toBeTruthy()
+    expect(screen.getByText('General Rules')).toBeTruthy()
     for (const rule of generalExamRules) {
       expect(screen.getByText(rule)).toBeTruthy()
     }

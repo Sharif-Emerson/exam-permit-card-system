@@ -153,17 +153,18 @@ body {
 	}
 
 	@page {
-		size: auto;
-		margin: 12mm;
+		size: A4 portrait;
+		margin: 8mm;
 	}
 
 	.permit-sheet {
-		max-width: 88mm;
+		max-width: 100%;
+		width: 100%;
 		margin: 0 auto;
 		box-shadow: none;
 		border: 1px solid rgb(253 224 71);
-		border-radius: 16px;
-		padding: 12px;
+		border-radius: 12px;
+		padding: 10px;
 		overflow: visible;
 		background: rgb(254 252 232);
 	}

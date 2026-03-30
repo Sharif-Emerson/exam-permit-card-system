@@ -19,11 +19,12 @@ import type {
   SystemFeeSettings,
   SupportRequest,
   SupportRequestUpdateInput,
+  UniversityDeadline,
 } from '../../types'
 import { requestWithApiFallback } from '../rest/request'
 import { getStoredAuthToken } from '../rest/tokenStorage'
 import { ensureStudentProfile, mapProfile } from '../shared/profileMapper'
-import type { DataAdapter, FinancialUpdateValues } from './types'
+import type { BulkCurriculumSyncResult, DataAdapter, FinancialUpdateValues } from './types'
 
 function getConfigError() {
   return apiBaseUrl ? null : 'REST API is not configured. Add VITE_API_BASE_URL to your .env file.'
@@ -104,17 +105,45 @@ function toDatabaseProfileRow(payload: unknown): DatabaseProfileRow {
   }
 }
 
+function normalizeUniversityDeadline(raw: unknown): UniversityDeadline | null {
+  if (!raw || typeof raw !== 'object') {
+    return null
+  }
+
+  const r = raw as Record<string, unknown>
+  const id = typeof r.id === 'string' ? r.id.trim() : ''
+  if (!id) {
+    return null
+  }
+
+  const type = r.type === 'danger' || r.type === 'warning' || r.type === 'info' ? r.type : 'info'
+  const dueRaw = r.dueAt ?? r.due_at
+  const dueAt = typeof dueRaw === 'string' && dueRaw.trim() ? dueRaw.trim() : undefined
+
+  return {
+    id,
+    title: typeof r.title === 'string' ? r.title : '',
+    subtitle: typeof r.subtitle === 'string' ? r.subtitle : typeof r.description === 'string' ? r.description : '',
+    dateLabel: typeof r.dateLabel === 'string' ? r.dateLabel : typeof r.date_label === 'string' ? r.date_label : '',
+    type,
+    ...(dueAt ? { dueAt } : {}),
+  }
+}
+
 function toSystemFeeSettings(payload: unknown): SystemFeeSettings {
   if (!payload || typeof payload !== 'object') {
     throw new Error('The API returned invalid fee settings.')
   }
 
   const record = payload as Record<string, unknown>
+  const rawDeadlines = record.deadlines
 
   return {
     localStudentFee: Number(record.local_student_fee ?? record.localStudentFee ?? 0),
     internationalStudentFee: Number(record.international_student_fee ?? record.internationalStudentFee ?? 0),
-    deadlines: Array.isArray(record.deadlines) ? record.deadlines : undefined,
+    deadlines: Array.isArray(rawDeadlines)
+      ? rawDeadlines.map(normalizeUniversityDeadline).filter((d): d is UniversityDeadline => d !== null)
+      : undefined,
   }
 }
 
@@ -362,6 +391,16 @@ export const restDataAdapter: DataAdapter = {
     const payload = await request(`/admin-activity-logs${params.size > 0 ? `?${params.toString()}` : ''}`, { method: 'GET' })
     return toAdminActivityLogPage(payload)
   },
+  async deleteAdminActivityLog(logId: string): Promise<void> {
+    await request(`/admin-activity-logs/${encodeURIComponent(logId)}`, { method: 'DELETE' })
+  },
+  async purgePermitActivityLogs(): Promise<number> {
+    const payload = await request('/admin-activity-logs/all-permit-events', { method: 'DELETE' })
+    if (payload && typeof payload === 'object' && 'deleted' in payload) {
+      return Number((payload as Record<string, unknown>).deleted ?? 0)
+    }
+    return 0
+  },
   async fetchSystemFeeSettings(): Promise<SystemFeeSettings> {
     const payload = await request('/system-settings', { method: 'GET' })
     return toSystemFeeSettings(payload)
@@ -493,6 +532,16 @@ export const restDataAdapter: DataAdapter = {
 
     return ensureStudentProfile(mapProfile(toDatabaseProfileRow(result)))
   },
+  async permanentlyDeleteTrashedStudent(trashId: string): Promise<void> {
+    await request(`/profiles-trash/${encodeURIComponent(trashId)}`, { method: 'DELETE' })
+  },
+  async permanentlyPurgeAllTrashedStudents(): Promise<number> {
+    const payload = await request('/profiles-trash?purge=all', { method: 'DELETE' })
+    if (payload && typeof payload === 'object' && 'deleted' in payload) {
+      return Number((payload as Record<string, unknown>).deleted ?? 0)
+    }
+    return 0
+  },
   async grantStudentPermitPrintAccess(studentId: string, additionalPrints: number, _adminId: string): Promise<StudentProfile> {
     const result = await request(`/profiles/${studentId}/permit-print-grants`, {
       method: 'POST',
@@ -534,5 +583,29 @@ export const restDataAdapter: DataAdapter = {
     })
 
     return toSupportRequest(payload)
+  },
+  async bulkSyncCurriculum(): Promise<BulkCurriculumSyncResult> {
+    const payload = await request('/admin/bulk-sync-curriculum', {
+      method: 'POST',
+      body: '{}',
+    })
+
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('The bulk sync API returned an invalid response.')
+    }
+
+    const record = payload as Record<string, unknown>
+    const updated = typeof record.updated === 'number' ? record.updated : 0
+    const totalStudents = typeof record.totalStudents === 'number' ? record.totalStudents : 0
+    const failedRaw = record.failed
+    const failed = Array.isArray(failedRaw)
+      ? failedRaw.filter((item): item is { id: string; reason: string } => {
+        return Boolean(item && typeof item === 'object'
+          && typeof (item as Record<string, unknown>).id === 'string'
+          && typeof (item as Record<string, unknown>).reason === 'string')
+      })
+      : []
+
+    return { updated, failed, totalStudents }
   },
 }

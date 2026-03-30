@@ -50,6 +50,14 @@ export async function fetchAdminActivityLogsPage(query?: { page?: number; pageSi
   return activeDataAdapter.fetchAdminActivityLogsPage(query)
 }
 
+export async function deleteAdminActivityLog(logId: string): Promise<void> {
+  return activeDataAdapter.deleteAdminActivityLog(logId)
+}
+
+export async function purgePermitActivityLogs(): Promise<number> {
+  return activeDataAdapter.purgePermitActivityLogs()
+}
+
 export async function fetchSystemFeeSettings(): Promise<SystemFeeSettings> {
   return activeDataAdapter.fetchSystemFeeSettings()
 }
@@ -84,6 +92,14 @@ export async function deleteStudentProfile(studentId: string, adminId: string) {
 
 export async function restoreStudentProfile(trashId: string, adminId: string): Promise<StudentProfile> {
   return activeDataAdapter.restoreStudentProfile(trashId, adminId)
+}
+
+export async function permanentlyDeleteTrashedStudent(trashId: string): Promise<void> {
+  return activeDataAdapter.permanentlyDeleteTrashedStudent(trashId)
+}
+
+export async function permanentlyPurgeAllTrashedStudents(): Promise<number> {
+  return activeDataAdapter.permanentlyPurgeAllTrashedStudents()
 }
 
 export async function grantStudentPermitPrintAccess(studentId: string, additionalPrints: number, adminId: string): Promise<StudentProfile> {
@@ -145,4 +161,8 @@ export async function importStudentFinancials(updates: FinancialImportUpdate[], 
   }
 
   return { updatedCount, createdCount, createdStudents, skippedRows }
+}
+
+export async function bulkSyncCurriculum() {
+  return activeDataAdapter.bulkSyncCurriculum()
 }

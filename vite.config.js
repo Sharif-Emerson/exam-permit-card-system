@@ -16,7 +16,9 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (requestPath) => requestPath.replace(/^\/api/, ''),
         },
-        '/admin': {
+        // Do not proxy bare `/admin` — that is the React Router path; refreshing must hit the SPA.
+        // Only proxy this API route (backend: POST /admin/bulk-sync-curriculum).
+        '/admin/bulk-sync-curriculum': {
           target: devProxyTarget,
           changeOrigin: true,
         },

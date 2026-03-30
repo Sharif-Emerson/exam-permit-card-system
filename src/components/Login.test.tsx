@@ -34,6 +34,6 @@ describe('Login', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     expect(signIn).toHaveBeenCalledWith('student@example.com', 'password123')
-    expect(screen.getAllByText(institutionName)).toHaveLength(2)
+    expect(screen.getAllByText(institutionName)).toHaveLength(1)
   })
 })

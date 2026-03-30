@@ -1,7 +1,6 @@
 export const generalExamRules = [
-  'Arrive at the examination venue at least 30 minutes before the scheduled start time.',
-  'Bring a valid student ID card and this permit for verification before entry.',
-  'Sit only in the seat assigned on the permit or as directed by invigilators.',
-  'Keep phones, smart devices, notes, and other unauthorized materials out of reach during the exam.',
-  'Follow all invigilator instructions and maintain silence throughout the examination period.',
+  'No mobile phones are allowed.',
+  'This card is confidential and must be produced to the invigilator when required.',
+  'Your registration number and finance clearance number—not your name—must appear on every answer booklet.',
+  'No malpractice is allowed.',
 ]

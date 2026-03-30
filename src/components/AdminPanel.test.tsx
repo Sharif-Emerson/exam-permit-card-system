@@ -50,6 +50,19 @@ const {
   downloadPermitActivityCsv: vi.fn(),
 }))
 
+vi.mock('../hooks/useUnsavedChanges', () => ({
+  useUnsavedChanges: () => ({
+    hasUnsavedChanges: false,
+    setHasUnsavedChanges: vi.fn(),
+    savePendingChanges: vi.fn().mockResolvedValue(true),
+    registerSaveHandler: vi.fn(),
+    unregisterSaveHandler: vi.fn(),
+    registerDiscardHandler: vi.fn(),
+    unregisterDiscardHandler: vi.fn(),
+    forceShowDialog: vi.fn(),
+  }),
+}))
+
 function createStudentPage(items: Array<Record<string, unknown>>) {
   const clearedStudents = items.filter((item) => Number(item.feesBalance ?? 0) === 0).length
 
@@ -93,6 +106,14 @@ function createAdminUser(overrides?: Partial<AuthUser>): AuthUser {
     ],
     ...overrides,
   }
+}
+
+function withinEditStudentDialog() {
+  return within(screen.getByRole('dialog', { name: /edit student profile/i }))
+}
+
+function withinCreateStudentDialog() {
+  return within(screen.getByRole('dialog', { name: /add new student/i }))
 }
 
 describe('AdminPanel', () => {
@@ -198,7 +219,9 @@ describe('AdminPanel', () => {
       expect(fetchStudentProfilesPage).toHaveBeenCalled()
     })
 
-    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null
+    await user.click(screen.getByRole('button', { name: /open bulk import/i }))
+
+    const fileInput = container.querySelector('#admin-financial-import-input') as HTMLInputElement | null
     expect(fileInput).not.toBeNull()
 
     const file = new File(['student_id,amount_paid,total_fees'], 'payments.csv', { type: 'text/csv' })
@@ -289,7 +312,9 @@ describe('AdminPanel', () => {
       expect(fetchStudentProfilesPage).toHaveBeenCalled()
     })
 
-    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null
+    await user.click(screen.getByRole('button', { name: /open bulk import/i }))
+
+    const fileInput = container.querySelector('#admin-financial-import-input') as HTMLInputElement | null
     expect(fileInput).not.toBeNull()
 
     const file = new File(['student_name,student_id,email,course,amount_paid,total_fees'], 'new-students.csv', { type: 'text/csv' })
@@ -810,16 +835,17 @@ describe('AdminPanel', () => {
     await user.click(screen.getByRole('button', { name: /edit profile for john doe/i }))
     expect(await screen.findByRole('heading', { name: /edit student profile/i })).toBeTruthy()
 
-    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'John Doe Updated' } })
-    fireEvent.change(screen.getByLabelText(/registration no\./i), { target: { value: 'STU001-NEW' } })
-    fireEvent.change(screen.getByLabelText(/^course$/i), { target: { value: 'Software Engineering' } })
-    fireEvent.change(screen.getByLabelText(/program/i), { target: { value: 'BSc Software Engineering' } })
-    fireEvent.change(screen.getByLabelText(/college/i), { target: { value: 'College of Computing and Digital Innovation' } })
-    fireEvent.change(screen.getByLabelText(/department/i), { target: { value: 'Department of Software Engineering' } })
-    fireEvent.change(screen.getByLabelText(/semester/i), { target: { value: 'Semester 2 2026/2027' } })
-    fireEvent.change(screen.getByLabelText(/course units/i), { target: { value: 'SWE 401 Secure Coding\nSWE 403 DevOps Engineering' } })
-    fireEvent.change(screen.getByLabelText(/total fees/i), { target: { value: '3200' } })
-    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    const editDlg = withinEditStudentDialog()
+    fireEvent.change(editDlg.getByLabelText(/full name/i), { target: { value: 'John Doe Updated' } })
+    fireEvent.change(editDlg.getByLabelText(/registration no\./i), { target: { value: 'STU001-NEW' } })
+    fireEvent.change(editDlg.getByLabelText(/^course$/i), { target: { value: 'Software Engineering' } })
+    fireEvent.change(editDlg.getByLabelText(/^program$/i), { target: { value: 'BSc Software Engineering' } })
+    fireEvent.change(editDlg.getByLabelText(/^college$/i), { target: { value: 'College of Computing and Digital Innovation' } })
+    fireEvent.change(editDlg.getByLabelText(/^department$/i), { target: { value: 'Department of Software Engineering' } })
+    fireEvent.change(editDlg.getByLabelText(/^semester$/i), { target: { value: 'Semester 2 2026/2027' } })
+    fireEvent.change(editDlg.getByLabelText(/course units/i), { target: { value: 'SWE 401 Secure Coding\nSWE 403 DevOps Engineering' } })
+    fireEvent.change(editDlg.getByLabelText(/total fees/i), { target: { value: '3200' } })
+    await user.click(editDlg.getByRole('button', { name: /save changes/i }))
 
     await waitFor(() => {
       expect(adminUpdateStudentProfile).toHaveBeenCalledWith(
@@ -970,29 +996,30 @@ describe('AdminPanel', () => {
     await user.click(screen.getByRole('button', { name: /add student/i }))
     expect(await screen.findByRole('heading', { name: /add new student/i })).toBeTruthy()
 
-    fireEvent.change(screen.getByLabelText(/^full name$/i), { target: { value: 'New Student' } })
-    fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: 'newstudent@example.com' } })
-    await user.click(screen.getByRole('button', { name: /generate/i }))
-    const generatedPassword = (screen.getByLabelText(/initial password/i) as HTMLInputElement).value
+    const createDlg = withinCreateStudentDialog()
+    fireEvent.change(createDlg.getByLabelText(/^full name$/i), { target: { value: 'New Student' } })
+    fireEvent.change(createDlg.getByLabelText(/^email$/i), { target: { value: 'newstudent@example.com' } })
+    await user.click(createDlg.getByRole('button', { name: /generate/i }))
+    const generatedPassword = (createDlg.getByLabelText(/initial password/i) as HTMLInputElement).value
     expect(generatedPassword).toMatch(/^Permit-/)
-    fireEvent.change(screen.getByLabelText(/registration no\./i), { target: { value: 'STU099' } })
-    fireEvent.change(screen.getByLabelText(/^phone number$/i), { target: { value: '+256700111222' } })
-    fireEvent.change(screen.getByLabelText(/^course$/i), { target: { value: 'Computer Science' } })
-    fireEvent.change(screen.getByLabelText(/^program$/i), { target: { value: 'BSc Computer Science' } })
-    fireEvent.change(screen.getByLabelText(/^college$/i), { target: { value: 'College of Computing' } })
-    fireEvent.change(screen.getByLabelText(/^department$/i), { target: { value: 'Computer Science' } })
-    fireEvent.change(screen.getByLabelText(/^semester$/i), { target: { value: 'Semester 1 2026/2027' } })
-    fireEvent.change(screen.getByLabelText(/student category/i), { target: { value: 'international' } })
-    fireEvent.change(screen.getByLabelText(/amount paid/i), { target: { value: '1000' } })
-    fireEvent.change(screen.getByLabelText(/profile photo url/i), { target: { value: 'https://example.com/photo.jpg' } })
-    fireEvent.change(screen.getByLabelText(/^exam date$/i), { target: { value: '2026-11-04' } })
-    fireEvent.change(screen.getByLabelText(/^exam time$/i), { target: { value: '9:00 AM' } })
-    fireEvent.change(screen.getByLabelText(/^venue$/i), { target: { value: 'Main Hall' } })
-    fireEvent.change(screen.getByLabelText(/seat number/i), { target: { value: 'B-12' } })
-    fireEvent.change(screen.getByLabelText(/course units/i), { target: { value: 'CSC 101\nMAT 110' } })
-    fireEvent.change(screen.getByLabelText(/permit instructions/i), { target: { value: 'Bring your ID card.' } })
+    fireEvent.change(createDlg.getByLabelText(/registration no\./i), { target: { value: 'STU099' } })
+    fireEvent.change(createDlg.getByLabelText(/^phone number$/i), { target: { value: '+256700111222' } })
+    fireEvent.change(createDlg.getByLabelText(/^course$/i), { target: { value: 'Computer Science' } })
+    fireEvent.change(createDlg.getByLabelText(/^program$/i), { target: { value: 'BSc Computer Science' } })
+    fireEvent.change(createDlg.getByLabelText(/^college$/i), { target: { value: 'College of Computing' } })
+    fireEvent.change(createDlg.getByLabelText(/^department$/i), { target: { value: 'Computer Science' } })
+    fireEvent.change(createDlg.getByLabelText(/^semester$/i), { target: { value: 'Semester 1 2026/2027' } })
+    fireEvent.change(createDlg.getByLabelText(/student category/i), { target: { value: 'international' } })
+    fireEvent.change(createDlg.getByLabelText(/amount paid/i), { target: { value: '1000' } })
+    fireEvent.change(createDlg.getByLabelText(/profile photo url/i), { target: { value: 'https://example.com/photo.jpg' } })
+    fireEvent.change(createDlg.getByLabelText(/^exam date$/i), { target: { value: '2026-11-04' } })
+    fireEvent.change(createDlg.getByLabelText(/^exam time$/i), { target: { value: '9:00 AM' } })
+    fireEvent.change(createDlg.getByLabelText(/^venue$/i), { target: { value: 'Main Hall' } })
+    fireEvent.change(createDlg.getByLabelText(/seat number/i), { target: { value: 'B-12' } })
+    fireEvent.change(createDlg.getByLabelText(/course units/i), { target: { value: 'CSC 101\nMAT 110' } })
+    fireEvent.change(createDlg.getByLabelText(/permit instructions/i), { target: { value: 'Bring your ID card.' } })
 
-    await user.click(screen.getByRole('button', { name: /create student/i }))
+    await user.click(createDlg.getByRole('button', { name: /create student/i }))
 
     await waitFor(() => {
       expect(createStudentProfile).toHaveBeenCalledWith(
@@ -1104,7 +1131,8 @@ describe('AdminPanel', () => {
     })
 
     await user.click(screen.getByTitle(/edit student profile/i))
-    await user.click(screen.getByRole('button', { name: /remove student/i }))
+    const removeDlg = withinEditStudentDialog()
+    await user.click(removeDlg.getByRole('button', { name: /remove student/i }))
     await user.click(screen.getByRole('button', { name: /move to trash/i }))
 
     await waitFor(() => {
@@ -1900,9 +1928,9 @@ describe('AdminPanel', () => {
       expect(fetchStudentProfilesPage).toHaveBeenCalled()
     })
 
-    expect(screen.getByTitle(/save received amount/i)).toBeDisabled()
-    expect(screen.getByTitle(/mark fully paid/i)).toBeDisabled()
-    expect(screen.getByTitle(/edit student profile/i)).toBeDisabled()
+    expect(screen.getAllByTitle(/save received amount/i)[0]).toBeDisabled()
+    expect(screen.getAllByTitle(/mark fully paid/i)[0]).toBeDisabled()
+    expect(screen.getAllByTitle(/edit student profile/i)[0]).toBeDisabled()
     expect(screen.queryByRole('button', { name: /^bulk import$/i })).toBeNull()
 
     await userEvent.setup().click(screen.getByRole('button', { name: /^reports$/i }))
@@ -2008,6 +2036,7 @@ describe('AdminPanel', () => {
       expect(updateSystemFeeSettings).toHaveBeenCalledWith({
         localStudentFee: 3500,
         internationalStudentFee: 7200,
+        deadlines: [],
       })
       expect(fetchStudentProfilesPage).toHaveBeenCalledTimes(2)
     })

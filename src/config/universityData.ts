@@ -38,6 +38,19 @@ export const KIU_COLLEGES = [
   'School of Law',
 ]
 
+/** Default degree program used for curriculum sync when a student has department set but program/course do not match KIU_CURRICULUM keys. */
+export const KIU_DEPARTMENT_DEFAULT_PROGRAM: Record<string, string> = {
+  'Department of Computer Science': 'BSc Computer Science',
+  'Department of Information Technology': 'BSc Information Technology',
+  'Department of Engineering': 'BSc Electrical Engineering',
+  'School of Law': 'Bachelor of Laws (LLB)',
+  'School of Medicine': 'MBChB (Medicine and Surgery)',
+  'School of Business': 'BBA (Business Administration)',
+  'School of Nursing': 'BSc Nursing Science',
+  'School of Pharmacy': 'Bachelor of Pharmacy',
+  'Department of Public Health': 'BSc Public Health',
+}
+
 export const KIU_SEMESTERS = [
   'Year 1 Semester 1',
   'Year 1 Semester 2',

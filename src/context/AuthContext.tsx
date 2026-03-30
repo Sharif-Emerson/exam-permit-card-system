@@ -119,24 +119,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(email: string, password: string) {
     setLoading(true)
-
-    const session = await activeAuthAdapter.signIn(email, password)
-    const nextUser = await loadUserProfile(session.userId, session.user)
-    setLoading(false)
-    return nextUser
+    try {
+      const session = await activeAuthAdapter.signIn(email, password)
+      const nextUser = await loadUserProfile(session.userId, session.user)
+      return nextUser
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function signOut() {
     setLoading(true)
-    if (!activeAuthAdapter.isConfigured) {
-      setUser(null)
-      setLoading(false)
-      return
-    }
+    try {
+      if (!activeAuthAdapter.isConfigured) {
+        setUser(null)
+        return
+      }
 
-    await activeAuthAdapter.signOut()
-    setUser(null)
-    setLoading(false)
+      await activeAuthAdapter.signOut()
+      setUser(null)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function refreshUser() {

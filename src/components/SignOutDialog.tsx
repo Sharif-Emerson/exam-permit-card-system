@@ -1,4 +1,5 @@
 import { LogOut, X } from 'lucide-react'
+import { DIALOG_Z } from '../constants/dialogLayers'
 
 type SignOutDialogProps = {
   onConfirm: () => void
@@ -9,14 +10,14 @@ type SignOutDialogProps = {
 export default function SignOutDialog({ onConfirm, onCancel, signingOut }: SignOutDialogProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
+      className={`fixed inset-0 ${DIALOG_Z.confirmBackdrop} flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm`}
       style={{ animation: 'kiu-fade-in 0.2s ease-out both' }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="signout-title"
     >
       <div
-        className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900"
+        className={`relative ${DIALOG_Z.confirmContent} w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900`}
         style={{ animation: 'kiu-dialog-up 0.25s ease-out both' }}
       >
         {/* Green header */}

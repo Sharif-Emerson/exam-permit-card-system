@@ -34,7 +34,7 @@ import { publicApiBaseUrl } from '../config/provider'
 import { examPermitConfig } from '../config/branding'
 import PermitCard from './PermitCard'
 import { createSupportRequest, fetchPermitActivityHistory, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, fetchSystemFeeSettings, recordPermitActivity, updateStudentAccount } from '../services/profileService'
-import type { PermitActivityRecord, StudentProfile, SupportContact, SupportRequest } from '../types'
+import type { PermitActivityRecord, StudentProfile, SupportContact, SupportRequest, UniversityDeadline } from '../types'
 import { FALLBACK_PROFILE_IMAGE } from './PermitCard'
 import SignOutDialog from './SignOutDialog'
 import Select from 'react-select'
@@ -224,12 +224,68 @@ function buildNotifications(student: StudentProfile, history: PermitApplicationR
     ...history.slice(0, 3).map((item): NotificationItem => ({
       id: item.id,
       title: `Application ${item.status}`,
-      message: item.remarks,
+      message: item.remarks || 'No remarks on file for this application.',
       tone: item.status === 'approved' ? 'green' : item.status === 'rejected' ? 'red' : 'yellow',
       createdAt: item.createdAt,
     })),
     ...baseNotifications,
   ]
+}
+
+function readStudentNotificationReadSet(userId: string): Set<string> {
+  if (typeof window === 'undefined') {
+    return new Set()
+  }
+
+  try {
+    const raw = localStorage.getItem(`student-notifications-read:${userId}`)
+    if (!raw) {
+      return new Set()
+    }
+
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) {
+      return new Set()
+    }
+
+    return new Set(parsed.filter((x): x is string => typeof x === 'string'))
+  } catch {
+    return new Set()
+  }
+}
+
+function persistStudentNotificationReadIds(userId: string, ids: Set<string>) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  localStorage.setItem(`student-notifications-read:${userId}`, JSON.stringify([...ids]))
+}
+
+function formatDeadlineCountdown(dueAt?: string): string | null {
+  if (!dueAt?.trim()) {
+    return null
+  }
+
+  const end = new Date(dueAt).getTime()
+  if (Number.isNaN(end)) {
+    return null
+  }
+
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  const dayMs = 24 * 60 * 60 * 1000
+  const days = Math.ceil((end - startOfToday.getTime()) / dayMs)
+  if (days > 1) {
+    return `${days} days left`
+  }
+  if (days === 1) {
+    return '1 day left'
+  }
+  if (days === 0) {
+    return 'Due today'
+  }
+  return 'Past due'
 }
 
 function formatDateTime(value: string) {
@@ -319,7 +375,8 @@ export default function Dashboard() {
   const [activeSection, setActiveSection] = useState<PortalSection>('overview')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [deadlines, setDeadlines] = useState<any[]>([]) // Dynamic deadlines
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => new Set())
+  const [deadlines, setDeadlines] = useState<UniversityDeadline[]>([])
   const [applicationHistory, setApplicationHistory] = useState<PermitApplicationRecord[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>('all')
@@ -453,7 +510,7 @@ export default function Dashboard() {
       }
 
       setStudentData(profile.value)
-      if (settings.status === 'fulfilled' && settings.value.deadlines) {
+      if (settings.status === 'fulfilled' && Array.isArray(settings.value.deadlines)) {
         setDeadlines(settings.value.deadlines)
       }
 
@@ -540,6 +597,14 @@ export default function Dashboard() {
     }
 
   }, [user, syncStudentProfile])
+
+  useEffect(() => {
+    if (!user?.id || user.role !== 'student') {
+      return
+    }
+
+    setReadNotificationIds(readStudentNotificationReadSet(user.id))
+  }, [user?.id, user.role])
 
   useEffect(() => {
     if (!user) {
@@ -843,10 +908,19 @@ export default function Dashboard() {
     return applicationHistory.filter((record) => {
       const matchesStatus = statusFilter === 'all' || record.status === statusFilter
       const matchesSemester = semesterFilter === 'all' || record.semester === semesterFilter
+      const remarks = (record.remarks ?? '').toLowerCase()
+      const semester = (record.semester ?? '').toLowerCase()
+      const statusLabel = record.status.toLowerCase()
+      const haystack = [
+        semester,
+        remarks,
+        record.id.toLowerCase(),
+        statusLabel,
+        ...(record.courseUnits ?? []).map((unit) => unit.toLowerCase()),
+      ].join(' ')
       const matchesQuery = !normalizedQuery
-        || record.semester.toLowerCase().includes(normalizedQuery)
-        || record.remarks.toLowerCase().includes(normalizedQuery)
-        || record.courseUnits.some((unit) => unit.toLowerCase().includes(normalizedQuery))
+        || haystack.includes(normalizedQuery)
+        || haystack.split(/\s+/).some((token) => token.includes(normalizedQuery))
 
       return matchesStatus && matchesSemester && matchesQuery
     })
@@ -878,7 +952,10 @@ export default function Dashboard() {
     : studentData.feesBalance > 0
       ? 'Please clear all outstanding fees before printing or downloading your permit.'
       : studentData.printAccessMessage || 'You have reached the monthly permit print limit. Contact administration for access.'
-  const unreadNotifications = notifications.length
+  const unreadNotifications = useMemo(
+    () => notifications.filter((n) => !readNotificationIds.has(n.id)).length,
+    [notifications, readNotificationIds],
+  )
   const currentSession = applicationHistory[0]?.semester || `${deriveAcademicSession(studentData?.examDate)} ${deriveSemesterLabel(studentData?.examDate)}`
 
   if (loading) {
@@ -1089,17 +1166,35 @@ export default function Dashboard() {
 
                   {showNotifications && (
                     <div className="absolute right-0 top-14 z-30 w-[22rem] rounded-3xl border border-white/70 bg-white/95 p-4 shadow-2xl shadow-slate-300/30 backdrop-blur dark:border-slate-700 dark:bg-slate-950/95">
-                      <div className="mb-3 flex items-center justify-between">
+                      <div className="mb-3 flex items-center justify-between gap-2">
                         <h2 className="text-sm font-semibold">Notifications</h2>
-                        <button
-                          type="button"
-                          title="Close notifications"
-                          aria-label="Close notifications"
-                          onClick={() => setShowNotifications(false)}
-                          className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {notifications.length > 0 && user?.id ? (
+                            <button
+                              type="button"
+                              className="rounded-lg px-2 py-1 text-[11px] font-medium text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-950/40"
+                              onClick={() => {
+                                const next = new Set(readNotificationIds)
+                                for (const n of notifications) {
+                                  next.add(n.id)
+                                }
+                                setReadNotificationIds(next)
+                                persistStudentNotificationReadIds(user.id, next)
+                              }}
+                            >
+                              Mark all read
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            title="Close notifications"
+                            aria-label="Close notifications"
+                            onClick={() => setShowNotifications(false)}
+                            className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                       <div className="space-y-3">
                         {notifications.length === 0 && (
@@ -1107,13 +1202,29 @@ export default function Dashboard() {
                             No notifications yet.
                           </div>
                         )}
-                        {notifications.map((notification) => (
-                          <div key={notification.id} className={`rounded-2xl border p-3 ${getNotificationToneClasses(notification.tone)}`}>
-                            <p className="text-sm font-semibold">{notification.title}</p>
-                            <p className="mt-1 text-xs leading-5">{notification.message}</p>
-                            <p className="mt-2 text-[11px] opacity-80">{formatDateTime(notification.createdAt)}</p>
-                          </div>
-                        ))}
+                        {notifications.map((notification) => {
+                          const isRead = readNotificationIds.has(notification.id)
+                          return (
+                            <button
+                              key={notification.id}
+                              type="button"
+                              onClick={() => {
+                                if (!user?.id || isRead) {
+                                  return
+                                }
+                                const next = new Set(readNotificationIds)
+                                next.add(notification.id)
+                                setReadNotificationIds(next)
+                                persistStudentNotificationReadIds(user.id, next)
+                              }}
+                              className={`w-full rounded-2xl border p-3 text-left transition ${getNotificationToneClasses(notification.tone)} ${isRead ? 'opacity-60' : ''}`}
+                            >
+                              <p className="text-sm font-semibold">{notification.title}</p>
+                              <p className="mt-1 text-xs leading-5">{notification.message}</p>
+                              <p className="mt-2 text-[11px] opacity-80">{formatDateTime(notification.createdAt)}</p>
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
                   )}
@@ -2025,17 +2136,23 @@ export default function Dashboard() {
                         </div>
                         <div className="space-y-4">
                           {deadlines && deadlines.length > 0 ? (
-                            deadlines.map((dl: any, idx: number) => (
-                              <div key={idx} className="flex items-center justify-between border-l-2 border-orange-500 pl-3">
-                                <div>
-                                  <p className="text-sm font-medium text-slate-900 dark:text-white">{dl.title}</p>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400">{dl.description}</p>
+                            deadlines.map((dl) => {
+                              const countdown = formatDeadlineCountdown(dl.dueAt)
+                              return (
+                                <div key={dl.id} className="flex items-center justify-between border-l-2 border-orange-500 pl-3 gap-3">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-slate-900 dark:text-white">{dl.title}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">{dl.subtitle}</p>
+                                    {countdown ? (
+                                      <p className="mt-1 text-[11px] font-semibold text-orange-600 dark:text-orange-400">{countdown}</p>
+                                    ) : null}
+                                  </div>
+                                  <span className="flex-shrink-0 text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/40 dark:text-orange-300">
+                                    {dl.dateLabel}
+                                  </span>
                                 </div>
-                                <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/40 dark:text-orange-300">
-                                  {dl.dateLabel}
-                                </span>
-                              </div>
-                            ))
+                              )
+                            })
                           ) : (
                             <>
                               <div className="flex items-center justify-between border-l-2 border-orange-500 pl-3">
