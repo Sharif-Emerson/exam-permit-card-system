@@ -147,6 +147,11 @@ function toSystemFeeSettings(payload: unknown): SystemFeeSettings {
   return {
     localStudentFee: Number(record.local_student_fee ?? record.localStudentFee ?? 0),
     internationalStudentFee: Number(record.international_student_fee ?? record.internationalStudentFee ?? 0),
+    currencyCode: typeof record.currency_code === 'string'
+      ? record.currency_code
+      : typeof record.currencyCode === 'string'
+        ? record.currencyCode
+        : 'USD',
     deadlines: Array.isArray(rawDeadlines)
       ? rawDeadlines.map(normalizeUniversityDeadline).filter((d): d is UniversityDeadline => d !== null)
       : undefined,
@@ -446,6 +451,7 @@ export const restDataAdapter: DataAdapter = {
       body: JSON.stringify({
         local_student_fee: Number(values.localStudentFee.toFixed(2)),
         international_student_fee: Number(values.internationalStudentFee.toFixed(2)),
+        currency_code: (values.currencyCode ?? 'USD').trim().toUpperCase(),
         deadlines: values.deadlines,
       }),
     })

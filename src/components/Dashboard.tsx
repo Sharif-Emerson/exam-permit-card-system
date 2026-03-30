@@ -93,6 +93,24 @@ function getHistoryStorageKey(userId: string) {
   return `student-portal-history:${userId}`
 }
 
+function normalizeCurrencyCode(value: string | null | undefined) {
+  const normalized = String(value ?? '').trim().toUpperCase()
+  return /^[A-Z]{3}$/.test(normalized) ? normalized : 'USD'
+}
+
+function formatMoney(value: number, currencyCode: string) {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: normalizeCurrencyCode(currencyCode),
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+  } catch {
+    return `${normalizeCurrencyCode(currencyCode)} ${value.toFixed(2)}`
+  }
+}
+
 function readApplicationHistory(userId: string): PermitApplicationRecord[] {
   if (typeof window === 'undefined') {
     return []
@@ -377,6 +395,7 @@ export default function Dashboard() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => new Set())
   const [deadlines, setDeadlines] = useState<UniversityDeadline[]>([])
+  const [feeCurrencyCode, setFeeCurrencyCode] = useState('USD')
   const [applicationHistory, setApplicationHistory] = useState<PermitApplicationRecord[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>('all')
@@ -428,6 +447,7 @@ export default function Dashboard() {
   const feesBalance = studentData?.feesBalance || 0
   const paymentProgress = totalFees > 0 ? Math.min(Math.round((amountPaid / totalFees) * 100), 100) : 0
   const isFullyCleared = feesBalance <= 0 && amountPaid > 0
+  const activeFeeCurrency = useMemo(() => normalizeCurrencyCode(feeCurrencyCode), [feeCurrencyCode])
 
   const portalSections = [
     { key: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" /> },
@@ -510,8 +530,14 @@ export default function Dashboard() {
       }
 
       setStudentData(profile.value)
-      if (settings.status === 'fulfilled' && Array.isArray(settings.value.deadlines)) {
-        setDeadlines(settings.value.deadlines)
+      if (settings.status === 'fulfilled') {
+        const feeSettings = settings.value
+        if (Array.isArray(feeSettings.deadlines)) {
+          setDeadlines(feeSettings.deadlines)
+        }
+        if (typeof feeSettings.currencyCode === 'string' && feeSettings.currencyCode.trim()) {
+          setFeeCurrencyCode(feeSettings.currencyCode.trim().toUpperCase())
+        }
       }
 
       if (syncDrafts && profile.status === 'fulfilled' && profile.value) {
@@ -1418,9 +1444,9 @@ export default function Dashboard() {
                             <div className="rounded-3xl bg-white/70 p-4 dark:bg-slate-950/70">
                               <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Fee Clearance</p>
                               <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                                <p>Total Fees: ${studentData.totalFees.toFixed(2)}</p>
-                                <p>Amount Paid: ${studentData.amountPaid.toFixed(2)}</p>
-                                <p>Balance: ${studentData.feesBalance.toFixed(2)}</p>
+                                <p>Total Fees: {formatMoney(studentData.totalFees, activeFeeCurrency)}</p>
+                                <p>Amount Paid: {formatMoney(studentData.amountPaid, activeFeeCurrency)}</p>
+                                <p>Balance: {formatMoney(studentData.feesBalance, activeFeeCurrency)}</p>
                                 <p className={permitOutputLocked ? 'text-red-600 dark:text-red-300' : 'text-green-700 dark:text-green-300'}>
                                   {permitOutputLocked ? permitOutputMessage : 'Eligible for printing'}
                                 </p>
@@ -2080,14 +2106,14 @@ export default function Dashboard() {
                             <div>
                               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Current Balance</p>
                               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                                UGX {feesBalance.toLocaleString()}
+                                {formatMoney(feesBalance, activeFeeCurrency)}
                               </h2>
                             </div>
                           </div>
                           <div className="mt-6 flex gap-3">
                             <button
                               type="button"
-                              onClick={() => alert(`Please visit the KIU Finance Office to process your UGX ${feesBalance.toLocaleString()} payment.`)}
+                              onClick={() => alert(`Please visit the KIU Finance Office to process your ${formatMoney(feesBalance, activeFeeCurrency)} payment.`)}
                               className="flex-1 rounded-full bg-emerald-500 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600 shadow-sm"
                             >
                               Pay Now
@@ -2112,7 +2138,7 @@ export default function Dashboard() {
                             <PieChart className="h-5 w-5 text-blue-500" />
                           </div>
                           <div className="mt-2 text-center sm:text-left">
-                            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">UGX {amountPaid.toLocaleString()}</h2>
+                            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">{formatMoney(amountPaid, activeFeeCurrency)}</h2>
                             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center sm:justify-start gap-1">
                               {feesBalance <= 0 ? (
                                 <><CheckCircle2 className="h-3 w-3 text-emerald-500" /> Fully cleared for previous sessions</>
@@ -2202,14 +2228,14 @@ export default function Dashboard() {
                                 date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
                                 desc: feesBalance === 0 ? 'Full Tuition Settlement' : 'Tuition Installment',
                                 method: 'System Sync',
-                                amount: `UGX ${amountPaid.toLocaleString()}`,
+                                amount: formatMoney(amountPaid, activeFeeCurrency),
                                 status: 'Completed'
                               },
-                              ...(amountPaid > 1000000 ? [{
+                              ...(amountPaid > 1000 ? [{
                                 date: 'Aug 20, 2023',
                                 desc: 'Registration Fee',
                                 method: 'Visa Card',
-                                amount: 'UGX 150,000',
+                                amount: formatMoney(Math.min(500, Math.max(0, amountPaid * 0.05)), activeFeeCurrency),
                                 status: 'Completed'
                               }] : [])
                             ] : []).map((txn, idx) => (

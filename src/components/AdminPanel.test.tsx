@@ -132,10 +132,12 @@ describe('AdminPanel', () => {
     fetchSystemFeeSettings.mockResolvedValue({
       localStudentFee: 3000,
       internationalStudentFee: 6000,
+      currencyCode: 'USD',
     })
     updateSystemFeeSettings.mockResolvedValue({
       localStudentFee: 3500,
       internationalStudentFee: 7000,
+      currencyCode: 'USD',
     })
   })
 
@@ -925,6 +927,7 @@ describe('AdminPanel', () => {
     fetchSystemFeeSettings.mockResolvedValue({
       localStudentFee: 4500,
       internationalStudentFee: 9000,
+      currencyCode: 'USD',
     })
     createStudentProfile.mockResolvedValue({
       id: 'student-99',
@@ -2058,7 +2061,7 @@ describe('AdminPanel', () => {
     })
 
     await user.click(screen.getByRole('button', { name: /students/i }))
-    expect(await screen.findByText('$3000.00')).toBeTruthy()
+    expect(await screen.findByText(/\$\s*3,?000\.00/)).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: /^settings$/i }))
     await user.clear(screen.getByLabelText(/local student fee/i))
@@ -2068,18 +2071,21 @@ describe('AdminPanel', () => {
     await user.click(screen.getByRole('button', { name: /save fee structure/i }))
 
     await waitFor(() => {
-      expect(updateSystemFeeSettings).toHaveBeenCalledWith({
-        localStudentFee: 3500,
-        internationalStudentFee: 7200,
-        deadlines: [],
-      })
+      expect(updateSystemFeeSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          localStudentFee: 3500,
+          internationalStudentFee: 7200,
+          deadlines: [],
+          currencyCode: 'USD',
+        }),
+      )
       expect(fetchStudentProfilesPage).toHaveBeenCalledTimes(2)
     })
 
     expect(await screen.findByText(/fee structure settings updated successfully/i)).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: /students/i }))
-    expect(await screen.findByText('$3500.00')).toBeTruthy()
+    expect(await screen.findByText(/\$\s*3,?500\.00/)).toBeTruthy()
   }, 20000)
 
   it('lets admins update their own account credentials from settings', async () => {

@@ -272,6 +272,7 @@ export interface UniversityDeadline {
 export interface SystemFeeSettings {
   localStudentFee: number
   internationalStudentFee: number
+  currencyCode?: string
   deadlines?: UniversityDeadline[]
 }
 

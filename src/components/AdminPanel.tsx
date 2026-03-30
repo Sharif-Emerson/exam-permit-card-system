@@ -62,6 +62,7 @@ const ACTIVITY_PAGE_SIZE = 12
 const DEFAULT_SYSTEM_FEE_SETTINGS: SystemFeeSettings = {
   localStudentFee: 3000,
   internationalStudentFee: 6000,
+  currencyCode: 'USD',
 }
 
 type EditDraft = Omit<AdminProfileUpdateInput, 'totalFees' | 'courseUnits'> & {
@@ -86,6 +87,7 @@ type CreatedStudentWelcome = {
 type FeeSettingsDraft = {
   localStudentFee: string
   internationalStudentFee: string
+  currencyCode: string
   deadlines: UniversityDeadline[]
 }
 
@@ -316,7 +318,26 @@ function createFeeSettingsDraft(feeSettings: SystemFeeSettings): FeeSettingsDraf
   return {
     localStudentFee: formatFeeDraftValue(feeSettings.localStudentFee),
     internationalStudentFee: formatFeeDraftValue(feeSettings.internationalStudentFee),
+    currencyCode: String(feeSettings.currencyCode ?? 'USD').trim().toUpperCase(),
     deadlines: [...(feeSettings.deadlines ?? [])],
+  }
+}
+
+function normalizeCurrencyCode(value: string | null | undefined) {
+  const normalized = String(value ?? '').trim().toUpperCase()
+  return /^[A-Z]{3}$/.test(normalized) ? normalized : 'USD'
+}
+
+function formatMoney(value: number, currencyCode: string) {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: normalizeCurrencyCode(currencyCode),
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+  } catch {
+    return `${normalizeCurrencyCode(currencyCode)} ${value.toFixed(2)}`
   }
 }
 
@@ -508,6 +529,10 @@ export default function AdminPanel() {
   const [showCreateStudent, setShowCreateStudent] = useState(false)
   const [systemFeeSettings, setSystemFeeSettings] = useState<SystemFeeSettings>(DEFAULT_SYSTEM_FEE_SETTINGS)
   const [feeSettingsDraft, setFeeSettingsDraft] = useState<FeeSettingsDraft>(() => createFeeSettingsDraft(DEFAULT_SYSTEM_FEE_SETTINGS))
+  const activeCurrencyCode = useMemo(
+    () => normalizeCurrencyCode(systemFeeSettings.currencyCode),
+    [systemFeeSettings.currencyCode],
+  )
   const [editDraft, setEditDraft] = useState<EditDraft>({
     name: '', email: '', studentId: '', studentCategory: 'local', phoneNumber: '', profileImage: '', course: '', program: '', college: '', department: '', semester: '', courseUnitsText: '', totalFees: '',
   })
@@ -789,7 +814,7 @@ export default function AdminPanel() {
       const updatedProfile = await fetchStudentProfileById(student.id)
       setStudents((prev) => prev.map((s) => (s.id === student.id ? updatedProfile : s)))
       setSuccessMessage(
-        `Posted $${paymentIncrement.toFixed(2)} for ${student.name} (e.g. new bank slip). Cumulative amount received: $${nextAmountPaid.toFixed(2)} of $${student.totalFees.toFixed(2)} expected.`,
+        `Posted ${formatMoney(paymentIncrement, activeCurrencyCode)} for ${student.name} (e.g. new bank slip). Cumulative amount received: ${formatMoney(nextAmountPaid, activeCurrencyCode)} of ${formatMoney(student.totalFees, activeCurrencyCode)} expected.`,
       )
     } catch (saveError) {
       const nextError = saveError instanceof Error ? saveError.message : 'Unable to save payment changes'
@@ -797,7 +822,7 @@ export default function AdminPanel() {
     } finally {
       setSavingId(null)
     }
-  }, [user, canManageFinancials, paymentDrafts, loadStudents])
+  }, [user, canManageFinancials, paymentDrafts, loadStudents, activeCurrencyCode])
 
   const handleSaveEdit = useCallback(async (event: { preventDefault: () => void }): Promise<boolean> => {
     event.preventDefault()
@@ -2120,11 +2145,19 @@ export default function AdminPanel() {
 
     const localStudentFee = parseCurrencyDraft(feeSettingsDraft.localStudentFee)
     const internationalStudentFee = parseCurrencyDraft(feeSettingsDraft.internationalStudentFee)
+    const rawCurrency = String(feeSettingsDraft.currencyCode ?? '').trim().toUpperCase()
 
     if (Number.isNaN(localStudentFee) || localStudentFee < 0 || Number.isNaN(internationalStudentFee) || internationalStudentFee < 0) {
-      setError('Both local and international student fees must be valid positive numbers.')
+      setError('Both local and international student fees must be valid numbers greater than or equal to 0. Example: 1250000 or 1,250,000.')
       return
     }
+
+    if (!/^[A-Z]{3}$/.test(rawCurrency)) {
+      setError('Currency must be a valid 3-letter ISO code (for example: USD, UGX, EUR).')
+      return
+    }
+
+    const nextCurrencyCode = rawCurrency
 
     try {
       setSavingFeeStructure(true)
@@ -2133,6 +2166,7 @@ export default function AdminPanel() {
       const nextFeeSettings = await updateSystemFeeSettings({
         localStudentFee,
         internationalStudentFee,
+        currencyCode: nextCurrencyCode,
         deadlines: [...(systemFeeSettings.deadlines ?? [])],
       })
       setSystemFeeSettings(nextFeeSettings)
@@ -2166,6 +2200,7 @@ export default function AdminPanel() {
       const nextFeeSettings = await updateSystemFeeSettings({
         localStudentFee: systemFeeSettings.localStudentFee,
         internationalStudentFee: systemFeeSettings.internationalStudentFee,
+        currencyCode: normalizeCurrencyCode(systemFeeSettings.currencyCode),
         deadlines: feeSettingsDraft.deadlines,
       })
       setSystemFeeSettings(nextFeeSettings)
@@ -2962,7 +2997,7 @@ export default function AdminPanel() {
                             <p className="text-xs text-gray-400">{student.studentId} • {student.department ?? student.course}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-semibold text-red-600">${student.feesBalance.toFixed(2)}</p>
+                            <p className="text-sm font-semibold text-red-600">{formatMoney(student.feesBalance, activeCurrencyCode)}</p>
                             <p className="text-xs text-gray-400">Remaining balance</p>
                           </div>
                         </div>
@@ -3292,11 +3327,11 @@ export default function AdminPanel() {
                                 <div>{student.course || '-'}</div>
                                 <div className="text-xs text-gray-400">{student.semester ?? 'No semester set'}</div>
                               </td>
-                              <td className="px-5 py-3 text-gray-700">${student.totalFees.toFixed(2)}</td>
-                              <td className="px-5 py-3 font-medium text-green-700">${student.amountPaid.toFixed(2)}</td>
+                              <td className="px-5 py-3 text-gray-700">{formatMoney(student.totalFees, activeCurrencyCode)}</td>
+                              <td className="px-5 py-3 font-medium text-green-700">{formatMoney(student.amountPaid, activeCurrencyCode)}</td>
                               <td className="px-5 py-3">
                                 <span className={`font-semibold ${student.feesBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                  ${student.feesBalance.toFixed(2)}
+                                  {formatMoney(student.feesBalance, activeCurrencyCode)}
                                 </span>
                               </td>
                               <td className="px-5 py-3">
@@ -3329,7 +3364,7 @@ export default function AdminPanel() {
                                       setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
                                     }
                                     aria-label={`Bank slip or payment amount to add for ${student.name}`}
-                                    title={`Amount on this slip only — adds to cumulative total (already recorded: $${student.amountPaid.toFixed(2)})`}
+                                    title={`Amount on this slip only — adds to cumulative total (already recorded: ${formatMoney(student.amountPaid, activeCurrencyCode)})`}
                                     placeholder="Slip amount"
                                     className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
                                   />
@@ -3872,10 +3907,10 @@ export default function AdminPanel() {
                                   <td className="px-3 py-2 text-gray-700">{row.matcher}</td>
                                   <td className="px-3 py-2 text-gray-700">{row.studentName ?? '-'}</td>
                                   <td className="px-3 py-2 text-gray-700">
-                                    {typeof row.amountPaid === 'number' ? `$${row.amountPaid.toFixed(2)}` : '-'}
+                                    {typeof row.amountPaid === 'number' ? formatMoney(row.amountPaid, activeCurrencyCode) : '-'}
                                   </td>
                                   <td className="px-3 py-2 text-gray-700">
-                                    {typeof row.totalFees === 'number' ? `$${row.totalFees.toFixed(2)}` : '-'}
+                                    {typeof row.totalFees === 'number' ? formatMoney(row.totalFees, activeCurrencyCode) : '-'}
                                   </td>
                                   <td className="px-3 py-2">
                                     <span className={`rounded px-2.5 py-1 text-xs font-medium ${
@@ -3997,7 +4032,7 @@ export default function AdminPanel() {
                                   <td className="px-3 py-2 text-gray-700">{row.email ?? '-'}</td>
                                   <td className="px-3 py-2 text-gray-700">{row.course ?? '-'}</td>
                                   <td className="px-3 py-2 text-gray-700">
-                                    {typeof row.totalFees === 'number' ? `$${row.totalFees.toFixed(2)}` : '-'}
+                                    {typeof row.totalFees === 'number' ? formatMoney(row.totalFees, activeCurrencyCode) : '-'}
                                   </td>
                                   <td className="px-3 py-2">
                                     <span
@@ -4461,7 +4496,7 @@ export default function AdminPanel() {
                           ) : (
                             <div className="flex flex-col items-center gap-1 text-amber-400">
                               <Shield className="h-10 w-10" />
-                              <span className="text-[10px] font-medium">Remaining: ${student.feesBalance.toFixed(2)}</span>
+                              <span className="text-[10px] font-medium">Remaining: {formatMoney(student.feesBalance, activeCurrencyCode)}</span>
                             </div>
                           )}
                         </div>
@@ -4480,7 +4515,7 @@ export default function AdminPanel() {
                                 setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
                               }
                               aria-label={`Bank slip or payment amount to add for ${student.name}`}
-                              title={`Amount on this slip only — adds to cumulative total (already recorded: $${student.amountPaid.toFixed(2)})`}
+                              title={`Amount on this slip only — adds to cumulative total (already recorded: ${formatMoney(student.amountPaid, activeCurrencyCode)})`}
                               placeholder="Slip amount"
                               className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
                             />
@@ -4538,8 +4573,8 @@ export default function AdminPanel() {
 
                         <div className="mb-3">
                           <div className="mb-1 flex justify-between text-xs text-gray-500">
-                            <span>Received: ${student.amountPaid.toFixed(2)}</span>
-                            <span>Expected: ${student.totalFees.toFixed(2)}</span>
+                            <span>Received: {formatMoney(student.amountPaid, activeCurrencyCode)}</span>
+                            <span>Expected: {formatMoney(student.totalFees, activeCurrencyCode)}</span>
                           </div>
                           <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
                             <progress
@@ -4651,6 +4686,30 @@ export default function AdminPanel() {
                             onChange={(event) => setFeeSettingsDraft((current) => ({ ...current, internationalStudentFee: event.target.value }))}
                             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                           />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label htmlFor="fee-settings-currency" className="mb-2 block text-sm font-medium text-gray-700">Fee currency (ISO 4217)</label>
+                          <input
+                            id="fee-settings-currency"
+                            type="text"
+                            maxLength={3}
+                            value={feeSettingsDraft.currencyCode}
+                            onChange={(event) => setFeeSettingsDraft((current) => ({ ...current, currencyCode: event.target.value.toUpperCase() }))}
+                            list="admin-fee-currency-suggestions"
+                            placeholder="USD"
+                            className="w-full max-w-xs rounded-lg border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                          />
+                          <datalist id="admin-fee-currency-suggestions">
+                            <option value="USD" />
+                            <option value="UGX" />
+                            <option value="EUR" />
+                            <option value="GBP" />
+                            <option value="KES" />
+                            <option value="TZS" />
+                            <option value="RWF" />
+                            <option value="ZAR" />
+                          </datalist>
+                          <p className="mt-1 text-xs text-gray-500">Used for fee labels and money formatting across the admin and student portals.</p>
                         </div>
                       </div>
                       <p className="text-xs text-gray-500">Saves default fees only. Deadline changes use the button below.</p>
@@ -5097,7 +5156,7 @@ export default function AdminPanel() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="edit-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">Expected Total Fees ($)</label>
+                  <label htmlFor="edit-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">Expected Total Fees ({activeCurrencyCode})</label>
                   <input
                     id="edit-student-total-fees"
                     type="number"
@@ -5553,7 +5612,7 @@ export default function AdminPanel() {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="create-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">Expected Total Fees ($)</label>
+                  <label htmlFor="create-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">Expected Total Fees ({activeCurrencyCode})</label>
                   <input
                     id="create-student-total-fees"
                     type="number"
@@ -5567,7 +5626,7 @@ export default function AdminPanel() {
                   <p className="mt-1 text-xs text-gray-400">Defaults come from the fee structure set for {createDraft.studentCategory === 'international' ? 'international' : 'local'} students.</p>
                 </div>
                 <div>
-                  <label htmlFor="create-student-amount-paid" className="mb-1 block text-xs font-medium text-gray-700">Amount Paid ($)</label>
+                  <label htmlFor="create-student-amount-paid" className="mb-1 block text-xs font-medium text-gray-700">Amount Paid ({activeCurrencyCode})</label>
                   <input
                     id="create-student-amount-paid"
                     type="number"

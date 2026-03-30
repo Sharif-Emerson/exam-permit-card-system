@@ -130,7 +130,6 @@ function isValidCurrencyAmount(value) {
   return typeof value === 'number'
     && Number.isFinite(value)
     && value >= 0
-    && value <= 1_000_000
 }
 
 function isValidSupportStatus(value) {
@@ -820,6 +819,7 @@ app.get('/system-settings', authenticate, (request, response) => {
   if (request.userRole !== 'admin') {
     response.json({
       deadlines: Array.isArray(settings.deadlines) ? settings.deadlines : [],
+      currency_code: settings.currency_code,
     })
     return
   }
@@ -830,15 +830,27 @@ app.get('/system-settings', authenticate, (request, response) => {
 app.put('/system-settings', authenticate, requireAdminPermission('manage_financials', 'You do not have permission to update fee settings.'), (request, response) => {
   const localStudentFee = parseNumber(request.body.local_student_fee)
   const internationalStudentFee = parseNumber(request.body.international_student_fee)
+  const rawCurrencyCode = typeof request.body.currency_code === 'string'
+    ? request.body.currency_code.trim().toUpperCase()
+    : null
 
   if (!isValidCurrencyAmount(localStudentFee) || !isValidCurrencyAmount(internationalStudentFee)) {
-    response.status(400).json({ message: 'Both local and international student fees must be valid non-negative amounts.' })
+    response.status(400).json({ message: 'Both local and international student fees must be valid numbers greater than or equal to 0. Commas are allowed (for example: 1,250,000).' })
+    return
+  }
+
+  if (rawCurrencyCode !== null && !/^[A-Z]{3}$/.test(rawCurrencyCode)) {
+    response.status(400).json({ message: 'Currency must be a valid 3-letter ISO code (for example: USD, UGX, EUR).' })
     return
   }
 
   const payload = {
     local_student_fee: localStudentFee,
     international_student_fee: internationalStudentFee,
+  }
+
+  if (rawCurrencyCode) {
+    payload.currency_code = rawCurrencyCode
   }
 
   if (Array.isArray(request.body.deadlines)) {

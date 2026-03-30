@@ -55,6 +55,7 @@ const { signOut, refreshUser, fetchStudentProfileById, updateStudentAccount, fet
   fetchSystemFeeSettings: vi.fn().mockResolvedValue({
     localStudentFee: 3000,
     internationalStudentFee: 5000,
+    currencyCode: 'USD',
   }),
 }))
 

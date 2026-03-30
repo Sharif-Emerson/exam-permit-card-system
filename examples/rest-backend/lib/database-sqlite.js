@@ -31,6 +31,7 @@ db.exec('PRAGMA foreign_keys = ON;')
 const defaultSystemFeeSettings = Object.freeze({
   local_student_fee: 3000,
   international_student_fee: 6000,
+  currency_code: 'USD',
 })
 const trashRetentionDays = Math.max(Number(process.env.TRASH_RETENTION_DAYS ?? '30') || 30, 1)
 
@@ -138,6 +139,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     local_student_fee REAL NOT NULL DEFAULT 3000,
     international_student_fee REAL NOT NULL DEFAULT 6000,
+    currency_code TEXT NOT NULL DEFAULT 'USD',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
@@ -195,6 +197,7 @@ ensureColumn('profiles', 'department TEXT')
 ensureColumn('profiles', 'semester TEXT')
 ensureColumn('profiles', "course_units_json TEXT NOT NULL DEFAULT '[]'")
 ensureColumn('system_settings', "deadlines_json TEXT NOT NULL DEFAULT '[]'")
+ensureColumn('system_settings', "currency_code TEXT NOT NULL DEFAULT 'USD'")
 ensureColumn('admin_activity_logs', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
 ensureColumn('admin_activity_logs', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
 
@@ -298,6 +301,11 @@ function normalizePhoneNumber(value) {
   return normalized.replace(/\D/g, '')
 }
 
+function normalizeCurrencyCode(value) {
+  const normalized = String(value ?? '').trim().toUpperCase()
+  return /^[A-Z]{3}$/.test(normalized) ? normalized : defaultSystemFeeSettings.currency_code
+}
+
 function ensureSystemSettingsRow() {
   const existing = db.prepare('SELECT id FROM system_settings WHERE id = ?').get('default')
 
@@ -307,12 +315,13 @@ function ensureSystemSettingsRow() {
 
   const timestamp = nowIso()
   db.prepare(`
-    INSERT INTO system_settings (id, local_student_fee, international_student_fee, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO system_settings (id, local_student_fee, international_student_fee, currency_code, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
   `).run(
     'default',
     defaultSystemFeeSettings.local_student_fee,
     defaultSystemFeeSettings.international_student_fee,
+    defaultSystemFeeSettings.currency_code,
     timestamp,
     timestamp,
   )
@@ -325,6 +334,7 @@ function mapSystemSettings(row) {
   return {
     local_student_fee: normalizeNumber(row?.local_student_fee ?? defaultSystemFeeSettings.local_student_fee),
     international_student_fee: normalizeNumber(row?.international_student_fee ?? defaultSystemFeeSettings.international_student_fee),
+    currency_code: normalizeCurrencyCode(row?.currency_code),
     deadlines,
   }
 }
@@ -696,8 +706,8 @@ async function seedDatabaseIfNeeded() {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `)
   const insertSystemSettings = db.prepare(`
-    INSERT INTO system_settings (id, local_student_fee, international_student_fee, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO system_settings (id, local_student_fee, international_student_fee, currency_code, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
   `)
 
   const timestamp = nowIso()
@@ -771,6 +781,7 @@ async function seedDatabaseIfNeeded() {
       'default',
       normalizeNumber(seededSystemSettings.local_student_fee ?? defaultSystemFeeSettings.local_student_fee),
       normalizeNumber(seededSystemSettings.international_student_fee ?? defaultSystemFeeSettings.international_student_fee),
+      normalizeCurrencyCode(seededSystemSettings.currency_code),
       timestamp,
       timestamp,
     )
@@ -896,6 +907,9 @@ export function updateSystemSettings(updates) {
   const nextInternationalStudentFee = typeof updates.international_student_fee === 'number'
     ? normalizeNumber(updates.international_student_fee)
     : normalizeNumber(existing.international_student_fee)
+  const nextCurrencyCode = typeof updates.currency_code === 'string'
+    ? normalizeCurrencyCode(updates.currency_code)
+    : normalizeCurrencyCode(existing.currency_code)
 
   const prevLocal = normalizeNumber(existing.local_student_fee)
   const prevIntl = normalizeNumber(existing.international_student_fee)
@@ -914,9 +928,9 @@ export function updateSystemSettings(updates) {
   try {
     db.prepare(`
       UPDATE system_settings
-      SET local_student_fee = ?, international_student_fee = ?, deadlines_json = ?, updated_at = ?
+      SET local_student_fee = ?, international_student_fee = ?, currency_code = ?, deadlines_json = ?, updated_at = ?
       WHERE id = ?
-    `).run(nextLocalStudentFee, nextInternationalStudentFee, nextDeadlinesJson, updatedAt, 'default')
+    `).run(nextLocalStudentFee, nextInternationalStudentFee, nextCurrencyCode, nextDeadlinesJson, updatedAt, 'default')
 
     if (feesChanged) {
       db.prepare(`
