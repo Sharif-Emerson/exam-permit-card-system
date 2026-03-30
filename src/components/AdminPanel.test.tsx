@@ -975,26 +975,17 @@ describe('AdminPanel', () => {
     expect(await screen.findByRole('heading', { name: /add new student/i })).toBeTruthy()
 
     const createDlg = withinCreateStudentDialog()
-    fireEvent.change(createDlg.getByLabelText(/^full name$/i), { target: { value: 'New Student' } })
-    fireEvent.change(createDlg.getByLabelText(/^email$/i), { target: { value: 'newstudent@example.com' } })
+    fireEvent.change(createDlg.getByLabelText(/^username$/i), { target: { value: 'New Student' } })
     await user.click(createDlg.getByRole('button', { name: /generate/i }))
     const generatedPassword = (createDlg.getByLabelText(/initial password/i) as HTMLInputElement).value
     expect(generatedPassword).toMatch(/^Permit-/)
     fireEvent.change(createDlg.getByLabelText(/registration no\./i), { target: { value: 'STU099' } })
-    fireEvent.change(createDlg.getByLabelText(/^phone number$/i), { target: { value: '+256700111222' } })
-    fireEvent.change(createDlg.getByLabelText(/^course$/i), { target: { value: 'Computer Science' } })
-    fireEvent.change(createDlg.getByLabelText(/^program$/i), { target: { value: 'BSc Computer Science' } })
-    fireEvent.change(createDlg.getByLabelText(/^college$/i), { target: { value: 'College of Computing' } })
-    fireEvent.change(createDlg.getByLabelText(/^department$/i), { target: { value: 'Computer Science' } })
-    fireEvent.change(createDlg.getByLabelText(/^semester$/i), { target: { value: 'Semester 1 2026/2027' } })
-    fireEvent.change(createDlg.getByLabelText(/student category/i), { target: { value: 'international' } })
-    fireEvent.change(createDlg.getByLabelText(/amount paid/i), { target: { value: '1000' } })
-    fireEvent.change(createDlg.getByPlaceholderText('https://example.com/student-photo.jpg'), { target: { value: 'https://example.com/photo.jpg' } })
-    fireEvent.change(createDlg.getByLabelText(/^exam date$/i), { target: { value: '2026-11-04' } })
-    fireEvent.change(createDlg.getByLabelText(/^exam time$/i), { target: { value: '9:00 AM' } })
-    fireEvent.change(createDlg.getByLabelText(/^venue$/i), { target: { value: 'Main Hall' } })
-    fireEvent.change(createDlg.getByLabelText(/course units/i), { target: { value: 'CSC 101\nMAT 110' } })
-    fireEvent.change(createDlg.getByLabelText(/permit instructions/i), { target: { value: 'Bring your ID card.' } })
+    const programSelect = createDlg.getByLabelText(/^program$/i) as HTMLSelectElement
+    const departmentSelect = createDlg.getByLabelText(/^department$/i) as HTMLSelectElement
+    const selectedProgram = programSelect.options[1]?.value ?? ''
+    const selectedDepartment = departmentSelect.options[1]?.value ?? ''
+    fireEvent.change(programSelect, { target: { value: selectedProgram } })
+    fireEvent.change(departmentSelect, { target: { value: selectedDepartment } })
 
     await user.click(createDlg.getByRole('button', { name: /create student/i }))
 
@@ -1002,25 +993,17 @@ describe('AdminPanel', () => {
       expect(createStudentProfile).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'New Student',
-          email: 'newstudent@example.com',
+          email: expect.stringContaining('@kiu.examcard.com'),
           password: generatedPassword,
           studentId: 'STU099',
-          studentCategory: 'international',
-          phoneNumber: '+256700111222',
-          course: 'BSc Computer Science',
-          program: 'BSc Computer Science',
-          college: '',
-          department: '',
-          semester: '',
-          courseUnits: ['CSC 101', 'MAT 110'],
-          profileImage: 'https://example.com/photo.jpg',
-          totalFees: 9000,
-          amountPaid: 1000,
-          instructions: 'Bring your ID card.',
-          examDate: '2026-11-04',
-          examTime: '9:00 AM',
-          venue: 'Main Hall',
-          seatNumber: '',
+          studentCategory: 'local',
+          course: selectedProgram || selectedDepartment || 'General Studies',
+          program: selectedProgram,
+          department: selectedDepartment,
+          enrollmentStatus: 'active',
+          totalFees: expect.any(Number),
+          amountPaid: 0,
+          courseUnits: [],
           exams: [],
         }),
         'admin-1',

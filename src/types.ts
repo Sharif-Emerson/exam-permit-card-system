@@ -1,6 +1,7 @@
 export type Role = 'admin' | 'student'
 export type AdminScope = 'super-admin' | 'registrar' | 'finance' | 'operations'
 export type StudentCategory = 'local' | 'international'
+export type EnrollmentStatus = 'active' | 'on_leave' | 'graduated'
 export type AdminPermission =
   | 'view_students'
   | 'manage_student_profiles'
@@ -26,6 +27,7 @@ export interface DatabaseProfileRow {
   name: string
   student_id: string | null
   student_category?: StudentCategory | null
+  enrollment_status?: EnrollmentStatus | null
   phone_number?: string | null
   course: string | null
   program?: string | null
@@ -59,6 +61,7 @@ export interface StudentProfile {
   name: string
   studentId: string
   studentCategory: StudentCategory
+  enrollmentStatus?: EnrollmentStatus
   phoneNumber?: string
   course: string
   program?: string
@@ -216,6 +219,7 @@ export interface CreateStudentInput {
   password: string
   studentId: string
   studentCategory: StudentCategory
+  enrollmentStatus?: EnrollmentStatus
   phoneNumber?: string
   course: string
   program?: string

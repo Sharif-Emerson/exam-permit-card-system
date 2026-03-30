@@ -59,6 +59,7 @@ const DEFAULT_ADMIN_PERMIT_DESIGN: AdminPermitDesignState = {
 
 const STUDENT_PAGE_SIZE = 24
 const ACTIVITY_PAGE_SIZE = 12
+const SYSTEM_STUDENT_EMAIL_DOMAIN = 'kiu.examcard.com'
 const DEFAULT_SYSTEM_FEE_SETTINGS: SystemFeeSettings = {
   localStudentFee: 3000,
   internationalStudentFee: 6000,
@@ -359,6 +360,30 @@ function programFromDepartment(department: string | null | undefined): string {
   return ''
 }
 
+type DepartmentColorStyle = {
+  cardBorder: string
+  cardTint: string
+  pill: string
+}
+
+const DEPARTMENT_COLOR_STYLES: DepartmentColorStyle[] = [
+  { cardBorder: 'border-blue-200', cardTint: 'bg-blue-50/30', pill: 'bg-blue-100 text-blue-700' },
+  { cardBorder: 'border-violet-200', cardTint: 'bg-violet-50/30', pill: 'bg-violet-100 text-violet-700' },
+  { cardBorder: 'border-cyan-200', cardTint: 'bg-cyan-50/30', pill: 'bg-cyan-100 text-cyan-700' },
+  { cardBorder: 'border-pink-200', cardTint: 'bg-pink-50/30', pill: 'bg-pink-100 text-pink-700' },
+  { cardBorder: 'border-indigo-200', cardTint: 'bg-indigo-50/30', pill: 'bg-indigo-100 text-indigo-700' },
+  { cardBorder: 'border-teal-200', cardTint: 'bg-teal-50/30', pill: 'bg-teal-100 text-teal-700' },
+]
+
+function getDepartmentColorStyle(department: string | null | undefined): DepartmentColorStyle {
+  const key = String(department ?? '').trim()
+  if (!key) {
+    return { cardBorder: 'border-slate-200', cardTint: 'bg-slate-50/30', pill: 'bg-slate-100 text-slate-700' }
+  }
+  const hash = [...key].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 0)
+  return DEPARTMENT_COLOR_STYLES[hash % DEPARTMENT_COLOR_STYLES.length]
+}
+
 function inferProgramAndCourseForEdit(student: StudentProfile): { program: string; course: string } {
   const rawProgram = (student.program ?? '').trim()
   const rawCourse = (student.course ?? '').trim()
@@ -409,6 +434,7 @@ function createEmptyStudentDraft(feeSettings: SystemFeeSettings = DEFAULT_SYSTEM
     email: '',
     password: '',
     studentId: '',
+    enrollmentStatus: 'active',
     studentCategory,
     phoneNumber: '',
     course: '',
@@ -427,6 +453,16 @@ function createEmptyStudentDraft(feeSettings: SystemFeeSettings = DEFAULT_SYSTEM
     seatNumber: '',
     exams: [],
   }
+}
+
+function buildSystemStudentEmail(name: string) {
+  const normalized = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/^\.+|\.+$/g, '')
+  const localPart = normalized || `student.${Date.now()}`
+  return `${localPart}@${SYSTEM_STUDENT_EMAIL_DOMAIN}`
 }
 
 function parseCourseUnitsText(value: string) {
@@ -892,19 +928,13 @@ export default function AdminPanel() {
       return false
     }
 
-    const totalFeesNum = parseCurrencyDraft(createDraft.totalFees)
-    const amountPaidNum = parseCurrencyDraft(createDraft.amountPaid)
-    const courseUnits = parseCourseUnitsText(createDraft.courseUnitsText)
-
-    if (Number.isNaN(totalFeesNum) || totalFeesNum < 0) {
-      setError('Expected total fees must be a valid positive number.')
-      return false
-    }
-
-    if (Number.isNaN(amountPaidNum) || amountPaidNum < 0) {
-      setError('Amount paid must be a valid positive number.')
-      return false
-    }
+    const resolvedProgram = (createDraft.program ?? '').trim()
+    const resolvedDepartment = (createDraft.department ?? '').trim()
+    const resolvedCourse = resolvedProgram || resolvedDepartment || 'General Studies'
+    const generatedEmail = buildSystemStudentEmail(createDraft.name)
+    const totalFeesNum = getFeeForStudentCategory(systemFeeSettings, createDraft.studentCategory)
+    const amountPaidNum = 0
+    const courseUnits: string[] = []
 
     try {
       setSavingCreate(true)
@@ -914,26 +944,27 @@ export default function AdminPanel() {
       const assignedPassword = createDraft.password
       const createdProfile = await createStudentProfile({
         name: createDraft.name,
-        email: createDraft.email,
+        email: generatedEmail,
+        enrollmentStatus: createDraft.enrollmentStatus ?? 'active',
         password: assignedPassword,
         studentId: createDraft.studentId,
         studentCategory: createDraft.studentCategory,
         phoneNumber: createDraft.phoneNumber,
-        course: createDraft.course,
-        program: createDraft.program,
-        college: createDraft.college,
-        department: createDraft.department,
-        semester: createDraft.semester,
+        course: resolvedCourse,
+        program: resolvedProgram,
+        college: undefined,
+        department: resolvedDepartment,
+        semester: undefined,
         courseUnits,
-        profileImage: createDraft.profileImage || null,
+        profileImage: null,
         totalFees: totalFeesNum,
         amountPaid: amountPaidNum,
-        instructions: createDraft.instructions,
-        examDate: createDraft.examDate,
-        examTime: createDraft.examTime,
-        venue: createDraft.venue,
-        seatNumber: createDraft.seatNumber,
-        exams: createDraft.exams,
+        instructions: undefined,
+        examDate: undefined,
+        examTime: undefined,
+        venue: undefined,
+        seatNumber: undefined,
+        exams: [],
       }, user.id)
       const createdStudentMatcher = createdProfile.studentId || createdProfile.email || createdProfile.name
       setActiveSection('students')
@@ -948,7 +979,7 @@ export default function AdminPanel() {
       setSuccessMessage(`Student profile created for ${createDraft.name}.`)
       setCreatedStudentWelcome({
         name: createDraft.name,
-        email: createDraft.email,
+        email: generatedEmail,
         studentId: createDraft.studentId,
         password: assignedPassword,
         generatedPassword: createPasswordGenerated,
@@ -1198,6 +1229,24 @@ export default function AdminPanel() {
     filteredStudents = filteredStudents.filter((student) => student.college === filterCollege)
   }
   const hasActiveStudentFilters = Boolean(searchQuery.trim()) || filterStatus !== 'all' || showPrintedOnly || filterDepartment || filterProgram || filterCourse || filterCollege
+  const permitDepartmentOptions = useMemo(
+    () => Array.from(new Set(students.map((student) => (student.department ?? '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [students],
+  )
+  const permitProgramOptions = useMemo(
+    () => Array.from(new Set(students.map((student) => (student.program ?? '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [students],
+  )
+  const permitCourseOptions = useMemo(() => {
+    const fromStudents = students
+      .filter((student) => !filterProgram || (student.program ?? '').trim() === filterProgram)
+      .map((student) => (student.course ?? '').trim())
+      .filter(Boolean)
+    const fromCurriculum = filterProgram && KIU_CURRICULUM[filterProgram]?.defaultCourse
+      ? [KIU_CURRICULUM[filterProgram].defaultCourse]
+      : []
+    return Array.from(new Set([...fromStudents, ...fromCurriculum])).sort((a, b) => a.localeCompare(b))
+  }, [students, filterProgram])
   const activeStudentFilterLabels = [
     searchQuery.trim() ? `Search: ${searchQuery.trim()}` : null,
     filterStatus === 'paid' ? 'Status: Cleared only' : null,
@@ -4094,6 +4143,17 @@ export default function AdminPanel() {
                         Use <code className="rounded bg-gray-100 px-1 text-xs">password</code> (8–128 characters) or, instead of <code className="rounded bg-gray-100 px-1 text-xs">password</code>, a <code className="rounded bg-gray-100 px-1 text-xs">password_hash</code> string beginning with <code className="rounded bg-gray-100 px-1 text-xs">scrypt:</code>.
                       </p>
                     </div>
+                    <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-900">
+                      <p className="font-semibold">SIS connector setup (ready for your endpoint)</p>
+                      <p className="mt-1">
+                        The backend now supports staged SIS configuration through environment variables:
+                        <code className="mx-1 rounded bg-white px-1">SIS_BASE_URL</code>,
+                        <code className="mx-1 rounded bg-white px-1">SIS_STUDENTS_PATH</code>,
+                        <code className="mx-1 rounded bg-white px-1">SIS_AUTH_TYPE</code>, and
+                        <code className="mx-1 rounded bg-white px-1">SIS_API_KEY</code>.
+                        Health endpoints are available at <code className="mx-1 rounded bg-white px-1">GET /sis/status</code> and <code className="mx-1 rounded bg-white px-1">POST /sis/sync</code>.
+                      </p>
+                    </div>
                     <h2 className="pt-2 text-lg font-semibold text-gray-900">University sign-in (OIDC)</h2>
                     <p className="text-sm text-gray-600">
                       When the backend is configured with <code className="rounded bg-gray-100 px-1 text-xs">OIDC_ISSUER</code>, <code className="rounded bg-gray-100 px-1 text-xs">OIDC_CLIENT_ID</code>,{' '}
@@ -4360,33 +4420,47 @@ export default function AdminPanel() {
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="text-xs font-medium text-gray-700">
                     Department:
-                    <input
-                      type="text"
+                    <select
                       value={filterDepartment}
-                      onChange={e => setFilterDepartment(e.target.value)}
-                      placeholder="Filter by department"
+                      onChange={(e) => setFilterDepartment(e.target.value)}
                       className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
-                    />
+                    >
+                      <option value="">All departments</option>
+                      {permitDepartmentOptions.map((department) => (
+                        <option key={department} value={department}>{department}</option>
+                      ))}
+                    </select>
                   </label>
                   <label className="text-xs font-medium text-gray-700">
                     Program:
-                    <input
-                      type="text"
+                    <select
                       value={filterProgram}
-                      onChange={e => setFilterProgram(e.target.value)}
-                      placeholder="Filter by program"
+                      onChange={(e) => {
+                        const nextProgram = e.target.value
+                        setFilterProgram(nextProgram)
+                        const alignedCourse = nextProgram ? (KIU_CURRICULUM[nextProgram]?.defaultCourse ?? '') : ''
+                        setFilterCourse(alignedCourse)
+                      }}
                       className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
-                    />
+                    >
+                      <option value="">All programs</option>
+                      {permitProgramOptions.map((program) => (
+                        <option key={program} value={program}>{program}</option>
+                      ))}
+                    </select>
                   </label>
                   <label className="text-xs font-medium text-gray-700">
                     Course:
-                    <input
-                      type="text"
+                    <select
                       value={filterCourse}
-                      onChange={e => setFilterCourse(e.target.value)}
-                      placeholder="Filter by course"
+                      onChange={(e) => setFilterCourse(e.target.value)}
                       className="ml-2 rounded border border-gray-300 px-2 py-1 text-xs"
-                    />
+                    >
+                      <option value="">All courses</option>
+                      {permitCourseOptions.map((course) => (
+                        <option key={course} value={course}>{course}</option>
+                      ))}
+                    </select>
                   </label>
                   <label className="text-xs font-medium text-gray-700">
                     College:
@@ -4447,17 +4521,25 @@ export default function AdminPanel() {
 
                 {/* Card grid */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {students.map((student) => {
+                  {filteredStudents.map((student) => {
                     const summary = getStudentPrintSummary(student.id)
                     const cleared = student.feesBalance === 0
+                    const departmentStyle = getDepartmentColorStyle(student.department)
+                    const departmentLabel = (student.department ?? '').trim() || 'Unassigned'
 
                     return (
                       <div
                         key={student.id}
                         className={`rounded-xl border bg-white p-5 shadow-sm ${
                           cleared ? 'border-emerald-200' : 'border-amber-200'
-                        }`}
+                        } ${departmentStyle.cardBorder} ${departmentStyle.cardTint}`}
+                        title={`Department: ${departmentLabel}`}
                       >
+                        <div className="mb-2 flex justify-end">
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${departmentStyle.pill}`}>
+                            {departmentLabel}
+                          </span>
+                        </div>
                         <div className="mb-3 flex items-start justify-between gap-2">
                           <div className="flex min-w-0 items-start gap-3">
                             <input
@@ -4617,7 +4699,7 @@ export default function AdminPanel() {
                       </div>
                     )
                   })}
-                  {students.length === 0 && (
+                  {filteredStudents.length === 0 && (
                     <div className="col-span-3 rounded-xl border border-dashed border-gray-300 py-12 text-center text-sm text-gray-400">
                       No students found.
                     </div>
@@ -5414,7 +5496,7 @@ export default function AdminPanel() {
             <form onSubmit={(event) => void handleCreateStudent(event)} className="space-y-4 px-6 py-5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="create-student-name" className="mb-1 block text-xs font-medium text-gray-700">Full Name</label>
+                  <label htmlFor="create-student-name" className="mb-1 block text-xs font-medium text-gray-700">Username</label>
                   <input
                     id="create-student-name"
                     type="text"
@@ -5427,13 +5509,13 @@ export default function AdminPanel() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="create-student-email" className="mb-1 block text-xs font-medium text-gray-700">Email</label>
+                  <label htmlFor="create-student-email" className="mb-1 block text-xs font-medium text-gray-700">Email (auto-generated)</label>
                   <input
                     id="create-student-email"
                     type="email"
                     required
-                    value={createDraft.email}
-                    onChange={(event) => setCreateDraft((current) => ({ ...current, email: event.target.value }))}
+                    readOnly
+                    value={buildSystemStudentEmail(createDraft.name)}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   />
                 </div>
@@ -5477,6 +5559,47 @@ export default function AdminPanel() {
                     placeholder="e.g. STU-001"
                   />
                 </div>
+                <div>
+                  <label htmlFor="create-student-enrollment-status" className="mb-1 block text-xs font-medium text-gray-700">Enrollment Status</label>
+                  <select
+                    id="create-student-enrollment-status"
+                    value={createDraft.enrollmentStatus ?? 'active'}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, enrollmentStatus: event.target.value as 'active' | 'on_leave' | 'graduated' }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="active">Active</option>
+                    <option value="on_leave">On Leave</option>
+                    <option value="graduated">Graduated</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="create-student-program-core" className="mb-1 block text-xs font-medium text-gray-700">Program</label>
+                  <select
+                    id="create-student-program-core"
+                    required
+                    value={createDraft.program ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, program: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="">Select Program</option>
+                    {KIU_COURSES.map((program) => <option key={program} value={program}>{program}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="create-student-department-core" className="mb-1 block text-xs font-medium text-gray-700">Department</label>
+                  <select
+                    id="create-student-department-core"
+                    required
+                    value={createDraft.department ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, department: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="">Select Department</option>
+                    {KIU_DEPARTMENTS.map((department) => <option key={department} value={department}>{department}</option>)}
+                  </select>
+                </div>
+                {false && (
+                <>
                 <div>
                   <label htmlFor="create-student-phone" className="mb-1 block text-xs font-medium text-gray-700">Phone Number</label>
                   <input
@@ -5712,7 +5835,11 @@ export default function AdminPanel() {
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   />
                 </div>
+                </>
+                )}
               </div>
+              {false && (
+              <>
               <div>
                 <label htmlFor="create-student-course-units" className="mb-1 block text-xs font-medium text-gray-700">Course Units</label>
                 <textarea
@@ -5812,6 +5939,8 @@ export default function AdminPanel() {
                   placeholder="Optional instructions shown on the permit"
                 />
               </div>
+              </>
+              )}
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"

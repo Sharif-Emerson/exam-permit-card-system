@@ -63,6 +63,7 @@ db.exec(`
     name TEXT NOT NULL,
     student_id TEXT,
     student_category TEXT NOT NULL DEFAULT 'local' CHECK (student_category IN ('local', 'international')),
+    enrollment_status TEXT NOT NULL DEFAULT 'active' CHECK (enrollment_status IN ('active', 'on_leave', 'graduated')),
     course TEXT,
     program TEXT,
     college TEXT,
@@ -187,6 +188,7 @@ ensureColumn('profiles', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
 ensureColumn('profiles', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
 ensureColumn('profiles', 'phone_number TEXT')
 ensureColumn('profiles', "student_category TEXT NOT NULL DEFAULT 'local'")
+ensureColumn('profiles', "enrollment_status TEXT NOT NULL DEFAULT 'active' CHECK (enrollment_status IN ('active', 'on_leave', 'graduated'))")
 ensureColumn('profiles', 'permit_token TEXT')
 ensureColumn('profiles', 'permit_print_grant_month TEXT')
 ensureColumn('profiles', 'permit_print_grants_remaining INTEGER NOT NULL DEFAULT 0')
@@ -279,6 +281,10 @@ function parseJsonValue(value, fallbackValue) {
 
 function normalizeStudentCategory(value) {
   return value === 'international' ? 'international' : 'local'
+}
+
+function normalizeEnrollmentStatus(value) {
+  return value === 'on_leave' || value === 'graduated' ? value : 'active'
 }
 
 function normalizeNumber(value) {
@@ -695,11 +701,11 @@ async function seedDatabaseIfNeeded() {
   `)
   const insertProfile = db.prepare(`
     INSERT INTO profiles (
-      id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, course, program, college,
+      id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, enrollment_status, course, program, college,
       department, semester, course_units_json, exam_date, exam_time, venue, seat_number,
       instructions, profile_image, permit_token, exams_json, total_fees, amount_paid, created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   const insertLog = db.prepare(`
     INSERT INTO admin_activity_logs (id, admin_id, target_profile_id, action, details, campus_id, campus_name, created_at)
@@ -753,6 +759,7 @@ async function seedDatabaseIfNeeded() {
         profile.campus_name ?? 'Main Campus',
         profile.student_id ?? null,
         normalizeStudentCategory(profile.student_category),
+        normalizeEnrollmentStatus(profile.enrollment_status),
         profile.course ?? null,
         profile.program ?? profile.course ?? null,
         profile.college ?? null,
@@ -1205,11 +1212,11 @@ export function createStudentProfile(input) {
 
     db.prepare(`
       INSERT INTO profiles (
-        id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, course, program, college,
+        id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, enrollment_status, course, program, college,
         department, semester, course_units_json, exam_date, exam_time, venue, seat_number,
         instructions, profile_image, permit_token, exams_json, total_fees, amount_paid, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       profileId,
       nextEmail,
@@ -1220,6 +1227,7 @@ export function createStudentProfile(input) {
       nextCampusName,
       nextStudentId,
       nextStudentCategory,
+      normalizeEnrollmentStatus(input.enrollment_status),
       nextCourse,
       nextProgram,
       nextCollege,
@@ -1338,6 +1346,7 @@ export function adminUpdateStudentProfile(profileId, updates) {
   const nextPhoneNumber = 'phone_number' in updates ? (normalizePhoneNumber(updates.phone_number) || null) : userRow.phone_number
   const nextStudentId = 'student_id' in updates ? (updates.student_id ?? null) : profileRow.student_id
   const nextStudentCategory = 'student_category' in updates ? normalizeStudentCategory(updates.student_category) : normalizeStudentCategory(profileRow.student_category)
+  const nextEnrollmentStatus = 'enrollment_status' in updates ? normalizeEnrollmentStatus(updates.enrollment_status) : normalizeEnrollmentStatus(profileRow.enrollment_status)
   const nextCourse = 'course' in updates ? (updates.course ?? null) : profileRow.course
   const nextProgram = 'program' in updates ? (updates.program ?? null) : profileRow.program
   const nextCollege = 'college' in updates ? (updates.college ?? null) : profileRow.college
@@ -1375,9 +1384,9 @@ export function adminUpdateStudentProfile(profileId, updates) {
 
     db.prepare(`
       UPDATE profiles
-      SET email = ?, phone_number = ?, name = ?, student_id = ?, student_category = ?, course = ?, program = ?, college = ?, department = ?, semester = ?, course_units_json = ?, profile_image = ?, total_fees = ?, exams_json = ?, updated_at = ?
+      SET email = ?, phone_number = ?, name = ?, student_id = ?, student_category = ?, enrollment_status = ?, course = ?, program = ?, college = ?, department = ?, semester = ?, course_units_json = ?, profile_image = ?, total_fees = ?, exams_json = ?, updated_at = ?
       WHERE id = ?
-    `).run(nextEmail, nextPhoneNumber, nextName, nextStudentId, nextStudentCategory, nextCourse, nextProgram, nextCollege, nextDepartment, nextSemester, nextCourseUnitsJson, nextProfileImage, nextTotalFees, nextExamsJson, updatedAt, profileId)
+    `).run(nextEmail, nextPhoneNumber, nextName, nextStudentId, nextStudentCategory, nextEnrollmentStatus, nextCourse, nextProgram, nextCollege, nextDepartment, nextSemester, nextCourseUnitsJson, nextProfileImage, nextTotalFees, nextExamsJson, updatedAt, profileId)
 
     if (examsToReplace) {
       replaceProfileExams(profileId, examsToReplace)
@@ -1668,11 +1677,11 @@ export function restoreStudentProfile(trashId, restoredByAdminId = null) {
 
     db.prepare(`
       INSERT INTO profiles (
-        id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, course, program, college,
+        id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, enrollment_status, course, program, college,
         department, semester, course_units_json, exam_date, exam_time, venue, seat_number, instructions, profile_image,
         permit_token, permit_print_grant_month, permit_print_grants_remaining, exams_json, total_fees, amount_paid, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       profileRow.id,
       profileRow.email,
@@ -1683,6 +1692,7 @@ export function restoreStudentProfile(trashId, restoredByAdminId = null) {
       profileRow.campus_name ?? 'Main Campus',
       profileRow.student_id ?? null,
       normalizeStudentCategory(profileRow.student_category),
+      normalizeEnrollmentStatus(profileRow.enrollment_status),
       profileRow.course ?? null,
       profileRow.program ?? null,
       profileRow.college ?? null,

@@ -78,6 +78,11 @@ function toDatabaseProfileRow(payload: unknown): DatabaseProfileRow {
     name: String(record.name ?? ''),
     student_id: record.student_id == null ? (record.studentId == null ? null : String(record.studentId)) : String(record.student_id),
     student_category: record.student_category === 'international' || record.studentCategory === 'international' ? 'international' : 'local',
+    enrollment_status: record.enrollment_status === 'on_leave' || record.enrollmentStatus === 'on_leave'
+      ? 'on_leave'
+      : record.enrollment_status === 'graduated' || record.enrollmentStatus === 'graduated'
+        ? 'graduated'
+        : 'active',
     phone_number: record.phone_number == null ? (record.phoneNumber == null ? null : String(record.phoneNumber)) : String(record.phone_number),
     course: record.course == null ? null : String(record.course),
     program: record.program == null ? null : String(record.program),
@@ -465,6 +470,7 @@ export const restDataAdapter: DataAdapter = {
       password: values.password,
       student_id: values.studentId,
       student_category: values.studentCategory,
+      enrollment_status: values.enrollmentStatus ?? 'active',
       course: values.course,
       total_fees: Number(values.totalFees.toFixed(2)),
       amount_paid: Number((values.amountPaid ?? 0).toFixed(2)),

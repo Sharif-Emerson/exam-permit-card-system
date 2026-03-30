@@ -47,6 +47,7 @@ import {
 } from './lib/database.js'
 import { sendEmail, sendSms } from './lib/notification.js'
 import * as oidcFlow from './lib/oidc-flow.js'
+import { getSisStatus, previewSisConnection } from './lib/sis-client.js'
 // Default session TTL for login tokens (in hours)
 const sessionTtlHours = 24
 
@@ -115,6 +116,7 @@ function isLoopbackOrigin(origin) {
 
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i
+const SYSTEM_STUDENT_EMAIL_DOMAIN = (process.env.SYSTEM_STUDENT_EMAIL_DOMAIN ?? 'kiu.examcard.com').trim().toLowerCase()
 
 function isValidEmailAddress(value) {
   return typeof value === 'string' && value.length <= 254 && emailPattern.test(value)
@@ -195,6 +197,45 @@ function parseStudentCategory(value) {
   }
 
   return null
+}
+
+function parseEnrollmentStatus(value) {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const normalizedValue = value.trim().toLowerCase()
+
+  if (normalizedValue === 'active' || normalizedValue === 'on_leave' || normalizedValue === 'graduated') {
+    return normalizedValue
+  }
+
+  return null
+}
+
+function buildSystemStudentEmailLocalPart(name) {
+  const normalized = String(name ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/^\.+|\.+$/g, '')
+  return normalized || 'student'
+}
+
+function generateUniqueSystemStudentEmail(name) {
+  const baseLocalPart = buildSystemStudentEmailLocalPart(name)
+  let counter = 0
+
+  while (counter < 5000) {
+    const localPart = counter === 0 ? baseLocalPart : `${baseLocalPart}.${counter}`
+    const candidate = `${localPart}@${SYSTEM_STUDENT_EMAIL_DOMAIN}`
+    if (!getUserByEmail(candidate)) {
+      return candidate
+    }
+    counter += 1
+  }
+
+  return `${baseLocalPart}.${Date.now()}@${SYSTEM_STUDENT_EMAIL_DOMAIN}`
 }
 
 function resolveUserByIdentifier(identifier) {
@@ -813,6 +854,35 @@ app.get('/health', (_request, response) => {
   response.json({ ok: true, database: getConfiguredDbPath() })
 })
 
+app.get('/sis/status', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to view SIS integration status.'), (_request, response) => {
+  response.json(getSisStatus())
+})
+
+app.post('/sis/sync', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to run SIS sync.'), async (_request, response) => {
+  const status = getSisStatus()
+  if (!status.enabled) {
+    response.status(503).json({
+      message: 'SIS connector is not configured yet. Set SIS_BASE_URL and SIS_API_KEY in the backend environment.',
+      status,
+    })
+    return
+  }
+
+  const preview = await previewSisConnection()
+  if (!preview.ok) {
+    response.status(502).json({
+      message: 'SIS endpoint is configured but not reachable yet.',
+      preview,
+    })
+    return
+  }
+
+  response.status(202).json({
+    message: 'SIS connection is active. Full field mapping/import execution will be finalized once your SIS endpoint contract is provided.',
+    preview,
+  })
+})
+
 app.get('/system-settings', authenticate, (request, response) => {
   const settings = getSystemSettings()
 
@@ -941,11 +1011,12 @@ app.post('/auth/reset-password', (request, response) => {
 
 app.post('/profiles', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to manage student profiles.'), (request, response) => {
   const name = typeof request.body.name === 'string' ? request.body.name.trim() : ''
-  const email = typeof request.body.email === 'string' ? request.body.email.trim().toLowerCase() : ''
+  const email = generateUniqueSystemStudentEmail(name)
   const password = typeof request.body.password === 'string' ? request.body.password.trim() : ''
   const passwordHash = typeof request.body.password_hash === 'string' ? request.body.password_hash.trim() : ''
   const studentId = typeof request.body.student_id === 'string' ? request.body.student_id.trim() : ''
   const studentCategory = parseStudentCategory(request.body.student_category)
+  const enrollmentStatus = parseEnrollmentStatus(request.body.enrollment_status)
   const phoneNumber = typeof request.body.phone_number === 'string' ? normalizePhoneNumber(request.body.phone_number) : ''
   const course = typeof request.body.course === 'string' ? request.body.course.trim() : ''
   const program = typeof request.body.program === 'string' ? request.body.program.trim() : ''
@@ -974,7 +1045,7 @@ app.post('/profiles', authenticate, requireAdminPermission('manage_student_profi
   }
 
   if (!isValidEmailAddress(email)) {
-    response.status(400).json({ message: 'A valid email address is required.' })
+    response.status(400).json({ message: 'Unable to generate a valid student email address.' })
     return
   }
 
@@ -996,6 +1067,11 @@ app.post('/profiles', authenticate, requireAdminPermission('manage_student_profi
 
   if (studentCategory === null) {
     response.status(400).json({ message: 'Student category must be either local or international.' })
+    return
+  }
+
+  if (enrollmentStatus === null) {
+    response.status(400).json({ message: 'Enrollment status must be active, on_leave, or graduated.' })
     return
   }
 
@@ -1070,6 +1146,7 @@ app.post('/profiles', authenticate, requireAdminPermission('manage_student_profi
       ...(hasValidPasswordHash ? { password_hash: passwordHash } : { password }),
       student_id: studentId,
       student_category: resolvedStudentCategory,
+      enrollment_status: enrollmentStatus ?? 'active',
       phone_number: phoneNumber || null,
       course,
       program: program || null,
