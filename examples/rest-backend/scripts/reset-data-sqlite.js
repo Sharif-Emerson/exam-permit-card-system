@@ -74,7 +74,7 @@ async function readExistingAdmins(dbFilePath) {
 		}
 
 		if (!hasColumn(db, 'users', 'admin_scope')) {
-			ensureColumn(db, 'users', "admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations'))")
+			ensureColumn(db, 'users', "admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations', 'assistant-admin'))")
 		}
 
 		if (!hasColumn(db, 'users', 'campus_id')) {
@@ -199,7 +199,7 @@ async function reseedDatabase(preservedAdmins = new Map()) {
 	ensureColumn(db, 'users', 'phone_number TEXT')
 	ensureColumn(db, 'users', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
 	ensureColumn(db, 'users', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
-	ensureColumn(db, 'users', "admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations'))")
+	ensureColumn(db, 'users', "admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations', 'assistant-admin'))")
 	ensureColumn(db, 'admin_activity_logs', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
 	ensureColumn(db, 'admin_activity_logs', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
 

@@ -1,4 +1,5 @@
 import express from 'express'
+import rateLimit from 'express-rate-limit'
 
 import cors from 'cors'
 import multer from 'multer'
@@ -10,6 +11,7 @@ import './lib/load-env.js'
 import {
   createStudentProfile,
   createSupportRequest,
+  addSupportRequestMessage,
   deleteAdminActivityLogById,
   deletePermitActivityLogs,
   deleteStudentProfile,
@@ -29,11 +31,17 @@ import {
   listActivityLogs,
   listActivityLogsPage,
   listProfiles,
+  listAssistantAdmins,
+  createAssistantAdmin,
+  updateAssistantAdmin,
   listProfilesPage,
   listTrashedStudentProfiles,
   permanentlyDeleteTrashedProfile,
   permanentlyPurgeAllTrashedProfiles,
   listSupportRequests,
+  listSemesterRegistrations,
+  createSemesterRegistration,
+  updateSemesterRegistrationStatus,
   resetUserPassword,
   restoreStudentProfile,
   revokeSession,
@@ -48,8 +56,34 @@ import {
 import { sendEmail, sendSms } from './lib/notification.js'
 import * as oidcFlow from './lib/oidc-flow.js'
 import { getSisStatus, previewSisConnection } from './lib/sis-client.js'
+import { isPermitIntegrityEnabled, verifyPermitPayload } from './lib/permit-integrity.js'
 // Default session TTL for login tokens (in hours)
 const sessionTtlHours = 24
+
+const authWindowMs = 15 * 60 * 1000
+const loginLimiter = rateLimit({
+  windowMs: authWindowMs,
+  max: Math.max(5, Number(process.env.RATE_LIMIT_LOGIN_MAX ?? (process.env.NODE_ENV === 'production' ? 40 : 300))),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many login attempts. Please try again later.' },
+})
+
+const resetPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: Math.max(3, Number(process.env.RATE_LIMIT_RESET_PASSWORD_MAX ?? 10)),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many password reset attempts. Try again later.' },
+})
+
+const permitPublicLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: Math.max(20, Number(process.env.RATE_LIMIT_PERMIT_PUBLIC_MAX ?? 180)),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many permit requests. Please try again shortly.' },
+})
 
 
 
@@ -114,6 +148,37 @@ function isLoopbackOrigin(origin) {
   }
 }
 
+async function notifyStudentOnAdminSupportReply(requestRecord, adminMessage) {
+  if (!requestRecord?.studentEmail || !adminMessage?.trim()) {
+    return
+  }
+  const subject = `Support update: ${requestRecord.subject || 'Your request'}`
+  const text = [
+    `Hello ${requestRecord.studentName || 'Student'},`,
+    '',
+    'An administrator replied to your support request.',
+    '',
+    `Subject: ${requestRecord.subject || 'Support request'}`,
+    `Reply: ${adminMessage.trim()}`,
+    '',
+    'Please log in to the portal to continue the conversation.',
+  ].join('\n')
+  try {
+    await sendEmail(requestRecord.studentEmail, subject, text)
+  } catch (error) {
+    console.warn('[support-notify] Email failed:', error instanceof Error ? error.message : error)
+  }
+  try {
+    const studentProfile = getProfileById(requestRecord.studentId)
+    const phone = typeof studentProfile?.phoneNumber === 'string' ? studentProfile.phoneNumber.trim() : ''
+    if (phone) {
+      await sendSms(phone, `Admin replied to "${requestRecord.subject || 'support request'}": ${adminMessage.trim().slice(0, 120)}`)
+    }
+  } catch (error) {
+    console.warn('[support-notify] SMS failed:', error instanceof Error ? error.message : error)
+  }
+}
+
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i
 const SYSTEM_STUDENT_EMAIL_DOMAIN = (process.env.SYSTEM_STUDENT_EMAIL_DOMAIN ?? 'kiu.examcard.com').trim().toLowerCase()
@@ -157,6 +222,20 @@ function normalizePhoneNumber(value) {
 function isValidPhoneNumber(value) {
   const normalized = normalizePhoneNumber(value)
   return normalized.length >= 10 && normalized.length <= 16
+}
+
+function isStrongPassword(value) {
+  if (typeof value !== 'string') {
+    return false
+  }
+  const password = value.trim()
+  if (password.length < 8 || password.length > 128) {
+    return false
+  }
+  return /[a-z]/.test(password)
+    && /[A-Z]/.test(password)
+    && /\d/.test(password)
+    && /[^A-Za-z0-9]/.test(password)
 }
 
 function normalizeHeader(value) {
@@ -369,7 +448,6 @@ function mapRowsToFinancialImports(rows) {
         college: normalizedRow.college ? String(normalizedRow.college).trim() : undefined,
         department: normalizedRow.department ? String(normalizedRow.department).trim() : undefined,
         semester: normalizedRow.semester ? String(normalizedRow.semester).trim() : undefined,
-        password: normalizedRow.password ? String(normalizedRow.password).trim() : undefined,
         courseUnits: parseList(normalizedRow.courseunits ?? normalizedRow.units),
         instructions: normalizedRow.instructions ? String(normalizedRow.instructions).trim() : undefined,
         examDate: normalizedRow.examdate ? String(normalizedRow.examdate).trim() : undefined,
@@ -378,7 +456,6 @@ function mapRowsToFinancialImports(rows) {
         seatNumber: normalizedRow.seatnumber ? String(normalizedRow.seatnumber).trim() : undefined,
         amountPaid: parseNumber(normalizedRow.amountpaid ?? normalizedRow.paid ?? normalizedRow.amount),
         totalFees: parseNumber(normalizedRow.totalfees ?? normalizedRow.fees ?? normalizedRow.total),
-        password_hash: normalizedRow.passwordhash ? String(normalizedRow.passwordhash).trim() : undefined,
       }
     })
     .filter((row) => {
@@ -389,10 +466,6 @@ function mapRowsToFinancialImports(rows) {
 }
 
 function getImportedStudentPassword(row) {
-  if (typeof row.password === 'string' && row.password.trim()) {
-    return row.password.trim()
-  }
-
   const seedSource = row.studentId ?? row.email?.split('@')[0] ?? `row${row.rowNumber}`
   const normalizedSeed = seedSource.replace(/[^a-z0-9]/gi, '').slice(-24) || `row${row.rowNumber}`
   return `Permit-${normalizedSeed}`
@@ -442,15 +515,6 @@ function buildImportedStudentInput(row, requestUser = null) {
       campus_name: requestUser?.campusName ?? 'Main Campus',
   }
 
-  if (typeof row.password_hash === 'string' && row.password_hash.startsWith('scrypt:')) {
-    return {
-      createStudent: {
-        ...baseStudent,
-        password_hash: row.password_hash.trim(),
-      },
-    }
-  }
-
   return {
     createStudent: {
       ...baseStudent,
@@ -493,8 +557,6 @@ function mapRowsToStudentProvisionRows(dataRows, headerRow) {
         college: normalizedRow.college ? String(normalizedRow.college).trim() : undefined,
         department: normalizedRow.department ? String(normalizedRow.department).trim() : undefined,
         semester: normalizedRow.semester ? String(normalizedRow.semester).trim() : undefined,
-        password: normalizedRow.password ? String(normalizedRow.password).trim() : undefined,
-        password_hash: normalizedRow.passwordhash ? String(normalizedRow.passwordhash).trim() : undefined,
         courseUnits: parseList(normalizedRow.courseunits ?? normalizedRow.units),
         totalFees: parseNumber(normalizedRow.totalfees ?? normalizedRow.fees ?? normalizedRow.total),
         amountPaid: parseNumber(normalizedRow.amountpaid ?? normalizedRow.paid ?? normalizedRow.amount),
@@ -574,11 +636,7 @@ function resolveStudentProvisionPreview(rows, defaultTotalFees, requestUser) {
     return {
       ...enriched,
       status: 'create',
-      reason: imported.createStudent.password_hash
-        ? 'New account with provided scrypt password hash.'
-        : enriched.password?.trim()
-          ? 'New account with password from spreadsheet.'
-          : `New account with generated password ${imported.createStudent.password}.`,
+      reason: `New account with generated temporary password ${imported.createStudent.password}.`,
     }
   })
 }
@@ -627,9 +685,6 @@ function normalizeBatchStudentPayload(entry) {
   const totalFeesRaw = parseNumber(entry.total_fees ?? entry.totalFees)
   const settings = getSystemSettings()
   const total_fees = typeof totalFeesRaw === 'number' ? totalFeesRaw : settings.local_student_fee
-  const password_hash = typeof entry.password_hash === 'string' ? entry.password_hash.trim() : ''
-  const password = typeof entry.password === 'string' ? entry.password.trim() : ''
-
   const base = {
     name,
     email,
@@ -649,15 +704,12 @@ function normalizeBatchStudentPayload(entry) {
     campus_name: String(process.env.DEFAULT_CAMPUS_NAME ?? 'Main Campus').trim() || 'Main Campus',
   }
 
-  if (password_hash.startsWith('scrypt:')) {
-    return { createStudent: { ...base, password_hash } }
+  return {
+    createStudent: {
+      ...base,
+      password: getImportedStudentPassword({ studentId: student_id, email, rowNumber: 0 }),
+    },
   }
-
-  if (password.length >= 8 && password.length <= 128) {
-    return { createStudent: { ...base, password } }
-  }
-
-  return { error: 'Each student must include password (8–128 chars) or password_hash (scrypt:… from your identity system).' }
 }
 
 async function parseSpreadsheetRows(buffer, originalName) {
@@ -747,7 +799,7 @@ function resolveAdminScope(user) {
   }
 
   if (user.id === 'admin-4') {
-    return 'operations'
+    return 'assistant-admin'
   }
 
   return 'super-admin'
@@ -765,6 +817,22 @@ function getAdminPermissions(user) {
     'write_audit_logs',
   ]
 
+  if (scope === 'assistant-admin') {
+    const assistantRole = user.assistant_role === 'support_help' ? 'support_help' : 'department_prints'
+    if (assistantRole === 'support_help') {
+      return [
+        'view_students',
+        'manage_support_requests',
+      ]
+    }
+    return [
+      'view_students',
+      'manage_student_profiles',
+      'view_audit_logs',
+      'export_reports',
+    ]
+  }
+
   if (scope === 'super-admin' || scope === 'registrar' || scope === 'finance' || scope === 'operations') {
     return fullAdminPermissions
   }
@@ -780,6 +848,7 @@ function createAuthenticatedUser(user) {
   return {
     ...user,
     scope: resolveAdminScope(user),
+    assistantRole: user.assistant_role === 'support_help' ? 'support_help' : (user.assistant_role === 'department_prints' ? 'department_prints' : undefined),
     permissions: getAdminPermissions(user),
   }
 }
@@ -802,10 +871,82 @@ function requireAdminPermission(permission, message = 'You do not have access to
 
 function canAccessProfile(profile, request) {
   if (request.userRole === 'admin') {
+    if (request.adminScope === 'assistant-admin') {
+      if (profile.role === 'admin') {
+        return request.userId === profile.id
+      }
+      const allowedDepartments = getAssistantAllowedDepartments(request.user)
+      if (allowedDepartments.length === 0) {
+        return false
+      }
+      const profileDepartment = String(profile.department ?? profile.department_name ?? '').trim().toLowerCase()
+      return allowedDepartments.includes(profileDepartment)
+    }
     return true
   }
 
   return request.userId === profile.id
+}
+
+function getAssistantAllowedDepartments(user) {
+  if (!user || user.role !== 'admin') {
+    return []
+  }
+  const dbAssigned = typeof user.assistant_departments_json === 'string' ? user.assistant_departments_json : ''
+  if (dbAssigned.trim()) {
+    try {
+      const parsed = JSON.parse(dbAssigned)
+      if (Array.isArray(parsed)) {
+        const values = parsed.map((item) => String(item ?? '').trim().toLowerCase()).filter(Boolean)
+        if (values.length > 0) {
+          return values
+        }
+      }
+    } catch {
+      // fallback to env mapping below
+    }
+  }
+
+  const mappingRaw = String(process.env.ASSISTANT_ADMIN_DEPARTMENTS ?? '').trim()
+  if (!mappingRaw) {
+    return []
+  }
+  const emailKey = String(user.email ?? '').trim().toLowerCase()
+  if (!emailKey) {
+    return []
+  }
+  const entries = mappingRaw.split(',').map((entry) => entry.trim()).filter(Boolean)
+  for (const entry of entries) {
+    const [emailPart, departmentsPart] = entry.split('=')
+    if (!emailPart || !departmentsPart) {
+      continue
+    }
+    if (emailPart.trim().toLowerCase() !== emailKey) {
+      continue
+    }
+    return departmentsPart
+      .split('|')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean)
+  }
+  return []
+}
+
+function requireAssistantDepartmentAccess(request, response, profile) {
+  if (request.userRole !== 'admin' || request.adminScope !== 'assistant-admin') {
+    return true
+  }
+  const allowedDepartments = getAssistantAllowedDepartments(request.user)
+  if (allowedDepartments.length === 0) {
+    response.status(403).json({ message: 'Assistant admin has no assigned departments. Ask super admin to assign departments.' })
+    return false
+  }
+  const profileDepartment = String(profile?.department ?? '').trim().toLowerCase()
+  if (!profileDepartment || !allowedDepartments.includes(profileDepartment)) {
+    response.status(403).json({ message: 'You can only manage students in your assigned department(s).' })
+    return false
+  }
+  return true
 }
 
 function resolveImportPreview(rows) {
@@ -825,9 +966,7 @@ function resolveImportPreview(rows) {
           studentName: importedStudent.createStudent.name,
           studentRecordId: null,
           status: 'create',
-          reason: row.password?.trim()
-            ? 'New student account will be created with the provided password.'
-            : `New student account will be created with temporary password ${importedStudent.createStudent.password}.`,
+          reason: `New student account will be created with temporary password ${importedStudent.createStudent.password}.`,
         }
       }
 
@@ -851,7 +990,20 @@ function resolveImportPreview(rows) {
 }
 
 app.get('/health', (_request, response) => {
-  response.json({ ok: true, database: getConfiguredDbPath() })
+  try {
+    getSystemSettings()
+    response.json({
+      ok: true,
+      database: { path: getConfiguredDbPath(), reachable: true },
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    response.status(503).json({
+      ok: false,
+      database: { path: getConfiguredDbPath(), reachable: false },
+      message: error instanceof Error ? error.message : 'Database check failed.',
+    })
+  }
 })
 
 app.get('/sis/status', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to view SIS integration status.'), (_request, response) => {
@@ -941,7 +1093,42 @@ app.put('/system-settings', authenticate, requireAdminPermission('manage_financi
   response.json(updatedSettings)
 })
 
-app.get('/permits/:token', (request, response) => {
+app.get('/permits/verify/:token', permitPublicLimiter, (request, response) => {
+  const permit = getPermitByToken(request.params.token)
+
+  if (!permit) {
+    response.status(404).json({ ok: false, message: 'Permit not found or no longer valid.' })
+    return
+  }
+
+  const provided = typeof request.query.integrity === 'string' ? request.query.integrity.trim() : ''
+  const integrityVerified = Boolean(
+    provided
+    && permit.integrity
+    && verifyPermitPayload({
+      permitToken: permit.permitToken,
+      profileId: permit.profileId,
+      cleared: permit.cleared,
+      updatedAt: permit.updatedAt,
+    }, provided),
+  )
+
+  response.json({
+    ok: true,
+    studentName: permit.studentName,
+    profileId: permit.profileId,
+    cleared: permit.cleared,
+    integrityEnabled: isPermitIntegrityEnabled(),
+    integritySupplied: Boolean(provided),
+    integrityVerified,
+    examCount: Array.isArray(permit.exams) ? permit.exams.length : 0,
+    message: permit.cleared
+      ? 'This permit record shows fee clearance in the system.'
+      : 'Fees are not fully cleared for this student in the system.',
+  })
+})
+
+app.get('/permits/:token', permitPublicLimiter, (request, response) => {
   const permit = getPermitByToken(request.params.token)
 
   if (!permit) {
@@ -952,7 +1139,7 @@ app.get('/permits/:token', (request, response) => {
   response.json(permit)
 })
 
-app.post('/auth/login', (request, response) => {
+app.post('/auth/login', loginLimiter, (request, response) => {
   const identifier = typeof request.body?.identifier === 'string' ? request.body.identifier.trim() : ''
   const password = typeof request.body?.password === 'string' ? request.body.password : ''
 
@@ -967,6 +1154,19 @@ app.post('/auth/login', (request, response) => {
   if (!user || !passwordMatches) {
     response.status(401).json({ message: 'Invalid login credentials.' })
     return
+  }
+
+  if (user.role === 'admin' && user.admin_scope === 'assistant-admin') {
+    insertActivityLog({
+      adminId: user.id,
+      targetProfileId: user.id,
+      action: 'assistant_admin_login',
+      details: {
+        scope: user.admin_scope ?? 'assistant-admin',
+        assistantRole: user.assistant_role ?? null,
+        identifierUsed: identifier,
+      },
+    })
   }
 
   response.json({
@@ -984,7 +1184,7 @@ app.post('/auth/login', (request, response) => {
   })
 })
 
-app.post('/auth/reset-password', (request, response) => {
+app.post('/auth/reset-password', resetPasswordLimiter, (request, response) => {
   const identifier = typeof request.body?.identifier === 'string' ? request.body.identifier.trim() : ''
   const verification = typeof request.body?.verification === 'string' ? request.body.verification.trim() : ''
   const newPassword = typeof request.body?.newPassword === 'string' ? request.body.newPassword.trim() : ''
@@ -1016,6 +1216,9 @@ app.post('/profiles', authenticate, requireAdminPermission('manage_student_profi
   const passwordHash = typeof request.body.password_hash === 'string' ? request.body.password_hash.trim() : ''
   const studentId = typeof request.body.student_id === 'string' ? request.body.student_id.trim() : ''
   const studentCategory = parseStudentCategory(request.body.student_category)
+  const gender = request.body.gender === 'male' || request.body.gender === 'female' || request.body.gender === 'other'
+    ? request.body.gender
+    : null
   const enrollmentStatus = parseEnrollmentStatus(request.body.enrollment_status)
   const phoneNumber = typeof request.body.phone_number === 'string' ? normalizePhoneNumber(request.body.phone_number) : ''
   const course = typeof request.body.course === 'string' ? request.body.course.trim() : ''
@@ -1063,6 +1266,14 @@ app.post('/profiles', authenticate, requireAdminPermission('manage_student_profi
   if (!course || course.length > 120) {
     response.status(400).json({ message: 'Course is required and must be 120 characters or fewer.' })
     return
+  }
+
+  if (request.adminScope === 'assistant-admin') {
+    const allowedDepartments = getAssistantAllowedDepartments(request.user)
+    if (allowedDepartments.length === 0 || !department || !allowedDepartments.includes(department.toLowerCase())) {
+      response.status(403).json({ message: 'Assistant admin can only create students in assigned department(s).' })
+      return
+    }
   }
 
   if (studentCategory === null) {
@@ -1146,6 +1357,7 @@ app.post('/profiles', authenticate, requireAdminPermission('manage_student_profi
       ...(hasValidPasswordHash ? { password_hash: passwordHash } : { password }),
       student_id: studentId,
       student_category: resolvedStudentCategory,
+      gender,
       enrollment_status: enrollmentStatus ?? 'active',
       phone_number: phoneNumber || null,
       course,
@@ -1196,11 +1408,17 @@ app.patch('/profiles/:id/admin', authenticate, requireAdminPermission('manage_st
     response.status(404).json({ message: 'Profile not found.' })
     return
   }
+  if (!requireAssistantDepartmentAccess(request, response, profile)) {
+    return
+  }
 
   const name = typeof request.body.name === 'string' ? request.body.name.trim() : undefined
   const email = typeof request.body.email === 'string' ? request.body.email.trim().toLowerCase() : undefined
   const studentId = typeof request.body.student_id === 'string' ? request.body.student_id.trim() : undefined
   const studentCategory = parseStudentCategory(request.body.student_category)
+  const gender = request.body.gender === 'male' || request.body.gender === 'female' || request.body.gender === 'other'
+    ? request.body.gender
+    : undefined
   const phoneNumber = typeof request.body.phone_number === 'string' ? normalizePhoneNumber(request.body.phone_number) : undefined
   const course = typeof request.body.course === 'string' ? request.body.course.trim() : undefined
   const program = typeof request.body.program === 'string' ? request.body.program.trim() : undefined
@@ -1289,6 +1507,7 @@ app.patch('/profiles/:id/admin', authenticate, requireAdminPermission('manage_st
   if (typeof email !== 'undefined') updates.email = email
   if (typeof studentId !== 'undefined') updates.student_id = studentId || null
   if (typeof studentCategory !== 'undefined') updates.student_category = studentCategory
+  if (typeof gender !== 'undefined') updates.gender = gender
   if (typeof phoneNumber !== 'undefined') updates.phone_number = phoneNumber || null
   if (typeof course !== 'undefined') updates.course = course || null
   if (typeof program !== 'undefined') updates.program = program || null
@@ -1351,13 +1570,30 @@ app.get('/profiles/:id', authenticate, (request, response) => {
 })
 
 app.get('/profiles', authenticate, requireAdminPermission('view_students', 'You do not have permission to view student records.'), (request, response) => {
-  const { role, search, status, page, pageSize } = request.query
+  const { role, search, status, page, pageSize, department, program, course, college } = request.query
+  const assistantDepartments = request.adminScope === 'assistant-admin' ? getAssistantAllowedDepartments(request.user) : []
+  const requestedDepartment = typeof department === 'string' ? department.trim() : ''
+
+  if (request.adminScope === 'assistant-admin' && assistantDepartments.length === 0) {
+    response.json({ data: [], meta: { page: 1, pageSize: 25, totalItems: 0, totalPages: 1 }, summary: { totalStudents: 0, clearedStudents: 0, outstandingStudents: 0 } })
+    return
+  }
+  if (request.adminScope === 'assistant-admin' && requestedDepartment && !assistantDepartments.includes(requestedDepartment.toLowerCase())) {
+    response.status(403).json({ message: 'You can only view students from your assigned department(s).' })
+    return
+  }
 
   if (typeof page !== 'undefined' || typeof pageSize !== 'undefined' || typeof search === 'string' || typeof status === 'string') {
     const result = listProfilesPage({
       role: typeof role === 'string' ? role : undefined,
       search: typeof search === 'string' ? search : undefined,
       status: status === 'paid' || status === 'outstanding' ? status : 'all',
+      department: request.adminScope === 'assistant-admin'
+        ? (requestedDepartment || assistantDepartments[0] || '')
+        : (typeof department === 'string' ? department : undefined),
+      program: typeof program === 'string' ? program : undefined,
+      course: typeof course === 'string' ? course : undefined,
+      college: typeof college === 'string' ? college : undefined,
       page: typeof page === 'string' ? Number(page) : undefined,
       pageSize: typeof pageSize === 'string' ? Number(pageSize) : undefined,
     })
@@ -1408,6 +1644,7 @@ app.patch('/profiles/:id/account', authenticate, (request, response) => {
     : request.body.profileImage === null
       ? null
       : undefined
+  const isFirstLoginRequired = profile.role === 'student' && Number(profile.first_login_required ?? 0) === 1
 
   if (profile.role === 'student') {
     if (typeof name === 'string' && name !== profile.name) {
@@ -1439,6 +1676,18 @@ app.patch('/profiles/:id/account', authenticate, (request, response) => {
   if (typeof password === 'string' && password.trim() && (password.trim().length < 8 || password.trim().length > 128)) {
     response.status(400).json({ message: 'Password must be between 8 and 128 characters long.' })
     return
+  }
+
+  if (isFirstLoginRequired) {
+    if (!phoneNumber || !isValidPhoneNumber(phoneNumber)) {
+      response.status(400).json({ message: 'Please add your phone number to continue.' })
+      return
+    }
+
+    if (!password || !isStrongPassword(password)) {
+      response.status(400).json({ message: 'Set a strong password with uppercase, lowercase, number, and special character.' })
+      return
+    }
   }
 
   if (typeof profileImage === 'string' && !isValidProfileImage(profileImage)) {
@@ -1489,6 +1738,9 @@ app.patch('/profiles/:id/financials', authenticate, requireAdminPermission('mana
 
   if (!profile) {
     response.status(404).json({ message: 'Profile not found.' })
+    return
+  }
+  if (!requireAssistantDepartmentAccess(request, response, profile)) {
     return
   }
 
@@ -1616,6 +1868,9 @@ app.delete('/profiles/:id', authenticate, requireAdminPermission('manage_student
     response.status(400).json({ message: 'Only student profiles can be deleted from this workspace.' })
     return
   }
+  if (!requireAssistantDepartmentAccess(request, response, profile)) {
+    return
+  }
 
   const deletedProfile = deleteStudentProfile(request.params.id, request.userId)
 
@@ -1647,6 +1902,14 @@ app.post('/profiles/:id/permit-print-grants', authenticate, requireAdminPermissi
     return
   }
 
+  const profile = getProfileById(request.params.id)
+  if (!profile) {
+    response.status(404).json({ message: 'Student profile not found.' })
+    return
+  }
+  if (!requireAssistantDepartmentAccess(request, response, profile)) {
+    return
+  }
   const updatedProfile = grantStudentPermitPrintAccess(request.params.id, additionalPrints ?? 1)
 
   if (!updatedProfile) {
@@ -1909,6 +2172,23 @@ app.post('/permit-activity', authenticate, (request, response) => {
     return
   }
 
+  const amountPaid = Number(profile?.amount_paid ?? 0)
+  const totalFees = Number(profile?.total_fees ?? 0)
+  if (amountPaid + 0.005 < totalFees) {
+    response.status(403).json({ message: 'Clear all outstanding fees before printing or downloading your permit.' })
+    return
+  }
+
+  const enrollmentStatus = profile?.enrollment_status ?? 'active'
+  if (enrollmentStatus === 'on_leave' || enrollmentStatus === 'graduated') {
+    response.status(403).json({
+      message: enrollmentStatus === 'graduated'
+        ? 'Graduated students cannot print exam permits through this portal. Contact the registry if you need assistance.'
+        : 'Your enrollment is on leave. Contact the registry before printing or downloading a permit.',
+    })
+    return
+  }
+
   insertActivityLog({
     adminId: request.userId,
     targetProfileId: request.userId,
@@ -2028,13 +2308,92 @@ app.get('/support-contacts', authenticate, (_request, response) => {
           ? 'registrar'
           : profile.id === 'admin-3'
             ? 'finance'
-            : 'operations',
+            : profile.id === 'admin-4'
+              ? 'assistant-admin'
+              : 'operations',
     }))
 
   response.json({ data })
 })
 
-app.post('/support-requests', authenticate, (request, response) => {
+app.get('/admin/assistants', authenticate, requireAdminPermission('view_students', 'You do not have permission to view assistants.'), (request, response) => {
+  if (request.adminScope !== 'super-admin') {
+    response.status(403).json({ message: 'Only super admin can manage assistant admins.' })
+    return
+  }
+  response.json({ data: listAssistantAdmins() })
+})
+
+app.post('/admin/assistants', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to create assistant admins.'), (request, response) => {
+  if (request.adminScope !== 'super-admin') {
+    response.status(403).json({ message: 'Only super admin can create assistant admins.' })
+    return
+  }
+  const name = typeof request.body?.name === 'string' ? request.body.name.trim() : ''
+  const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : ''
+  const phoneNumber = typeof request.body?.phoneNumber === 'string' ? normalizePhoneNumber(request.body.phoneNumber) : ''
+  const password = typeof request.body?.password === 'string' ? request.body.password.trim() : ''
+  const role = request.body?.role === 'support_help' ? 'support_help' : 'department_prints'
+  const departments = Array.isArray(request.body?.departments) ? request.body.departments.map((item) => String(item ?? '').trim()).filter(Boolean) : []
+
+  if (name.length < 2 || name.length > 120) {
+    response.status(400).json({ message: 'Assistant name must be between 2 and 120 characters.' })
+    return
+  }
+  if (!isValidEmailAddress(email)) {
+    response.status(400).json({ message: 'A valid assistant email is required.' })
+    return
+  }
+  if (!password || password.length < 8 || password.length > 128) {
+    response.status(400).json({ message: 'Assistant temporary password must be 8-128 characters.' })
+    return
+  }
+  if (phoneNumber && !isValidPhoneNumber(phoneNumber)) {
+    response.status(400).json({ message: 'Phone number is invalid.' })
+    return
+  }
+  if (role === 'department_prints' && departments.length === 0) {
+    response.status(400).json({ message: 'Assign at least one department for department print assistants.' })
+    return
+  }
+
+  try {
+    const created = createAssistantAdmin({
+      name,
+      email,
+      phone_number: phoneNumber || null,
+      password,
+      role,
+      departments,
+      campus_id: request.user?.campusId ?? 'main-campus',
+      campus_name: request.user?.campusName ?? 'Main Campus',
+    })
+    response.status(201).json(created)
+  } catch (error) {
+    response.status(400).json({ message: error instanceof Error ? error.message : 'Unable to create assistant admin.' })
+  }
+})
+
+app.patch('/admin/assistants/:id', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to update assistant admins.'), (request, response) => {
+  if (request.adminScope !== 'super-admin') {
+    response.status(403).json({ message: 'Only super admin can update assistant admins.' })
+    return
+  }
+  const role = request.body?.role === 'support_help' ? 'support_help' : 'department_prints'
+  const departments = Array.isArray(request.body?.departments) ? request.body.departments.map((item) => String(item ?? '').trim()).filter(Boolean) : []
+  if (role === 'department_prints' && departments.length === 0) {
+    response.status(400).json({ message: 'Assign at least one department for department print assistants.' })
+    return
+  }
+  const updated = updateAssistantAdmin(request.params.id, { role, departments })
+  if (!updated) {
+    response.status(404).json({ message: 'Assistant admin not found.' })
+    return
+  }
+  response.json(updated)
+})
+
+app.post('/support-requests', authenticate, upload.single('attachment'), async (request, response) => {
   if (request.userRole !== 'student') {
     response.status(403).json({ message: 'Only student accounts can create support requests.' })
     return
@@ -2042,18 +2401,49 @@ app.post('/support-requests', authenticate, (request, response) => {
 
   const subject = typeof request.body?.subject === 'string' ? request.body.subject.trim() : ''
   const message = typeof request.body?.message === 'string' ? request.body.message.trim() : ''
+  const attachment = request.file ?? null
 
   if (subject.length < 4 || subject.length > 120) {
     response.status(400).json({ message: 'Subject must be between 4 and 120 characters long.' })
     return
   }
 
-  if (message.length < 10 || message.length > 2000) {
+  if (!attachment && (message.length < 10 || message.length > 2000)) {
     response.status(400).json({ message: 'Message must be between 10 and 2000 characters long.' })
     return
   }
+  if (attachment && (message.length < 2 || message.length > 2000)) {
+    response.status(400).json({ message: 'Message must be between 2 and 2000 characters long when attaching a file.' })
+    return
+  }
+  if (attachment && attachment.size > 10 * 1024 * 1024) {
+    response.status(400).json({ message: 'Attachment size must be 10MB or less.' })
+    return
+  }
 
-  const created = createSupportRequest(request.userId, { subject, message })
+  let attachmentUrl = null
+  let attachmentName = null
+  let attachmentMimeType = null
+  let attachmentSizeBytes = null
+  if (attachment) {
+    const safeName = attachment.originalname.replace(/[^\w.\-]/g, '_')
+    const fileName = `support_${Date.now()}_${Math.floor(Math.random() * 10000)}_${safeName}`
+    const filePath = path.join(uploadsDir, fileName)
+    await fs.writeFile(filePath, attachment.buffer)
+    attachmentUrl = `/uploads/${fileName}`
+    attachmentName = attachment.originalname
+    attachmentMimeType = attachment.mimetype || 'application/octet-stream'
+    attachmentSizeBytes = attachment.size
+  }
+
+  const created = createSupportRequest(request.userId, {
+    subject,
+    message,
+    attachmentName,
+    attachmentUrl,
+    attachmentMimeType,
+    attachmentSizeBytes,
+  })
 
   if (!created) {
     response.status(404).json({ message: 'Student profile not found.' })
@@ -2063,7 +2453,7 @@ app.post('/support-requests', authenticate, (request, response) => {
   response.status(201).json(created)
 })
 
-app.patch('/support-requests/:id', authenticate, requireAdminPermission('manage_support_requests', 'You do not have permission to manage support requests.'), (request, response) => {
+app.patch('/support-requests/:id', authenticate, requireAdminPermission('manage_support_requests', 'You do not have permission to manage support requests.'), async (request, response) => {
   const status = typeof request.body?.status === 'string' ? request.body.status : undefined
   const adminReply = typeof request.body?.adminReply === 'string' ? request.body.adminReply.trim() : undefined
 
@@ -2088,6 +2478,182 @@ app.patch('/support-requests/:id', authenticate, requireAdminPermission('manage_
     response.status(404).json({ message: 'Support request not found.' })
     return
   }
+
+  insertActivityLog({
+    adminId: request.userId,
+    targetProfileId: updated.studentId,
+    action: 'admin_update_support_request',
+    details: {
+      requestId: updated.id,
+      status: updated.status,
+      hasAdminReply: Boolean(adminReply && adminReply.trim()),
+    },
+  })
+
+  if (typeof adminReply === 'string' && adminReply.trim()) {
+    await notifyStudentOnAdminSupportReply(updated, adminReply)
+  }
+
+  response.json(updated)
+})
+
+app.post('/support-requests/:id/messages', authenticate, upload.single('attachment'), async (request, response) => {
+  const message = typeof request.body?.message === 'string' ? request.body.message.trim() : ''
+  const attachment = request.file ?? null
+
+  if (!attachment && (message.length < 2 || message.length > 2000)) {
+    response.status(400).json({ message: 'Message must be between 2 and 2000 characters long, or include an attachment.' })
+    return
+  }
+  if (attachment && message.length > 2000) {
+    response.status(400).json({ message: 'Message must be 2000 characters or fewer.' })
+    return
+  }
+  if (attachment && attachment.size > 10 * 1024 * 1024) {
+    response.status(400).json({ message: 'Attachment size must be 10MB or less.' })
+    return
+  }
+
+  let attachmentUrl = null
+  let attachmentName = null
+  let attachmentMimeType = null
+  let attachmentSizeBytes = null
+  if (attachment) {
+    const safeName = attachment.originalname.replace(/[^\w.\-]/g, '_')
+    const fileName = `support_${Date.now()}_${Math.floor(Math.random() * 10000)}_${safeName}`
+    const filePath = path.join(uploadsDir, fileName)
+    await fs.writeFile(filePath, attachment.buffer)
+    attachmentUrl = `/uploads/${fileName}`
+    attachmentName = attachment.originalname
+    attachmentMimeType = attachment.mimetype || 'application/octet-stream'
+    attachmentSizeBytes = attachment.size
+  }
+
+  if (request.userRole === 'admin') {
+    if (!request.adminPermissions.includes('manage_support_requests')) {
+      response.status(403).json({ message: 'You do not have permission to reply to support requests.' })
+      return
+    }
+    const updated = addSupportRequestMessage(request.params.id, {
+      senderRole: 'admin',
+      senderId: request.userId,
+      message,
+      attachmentName,
+      attachmentUrl,
+      attachmentMimeType,
+      attachmentSizeBytes,
+    })
+    if (!updated) {
+      response.status(404).json({ message: 'Support request not found.' })
+      return
+    }
+    insertActivityLog({
+      adminId: request.userId,
+      targetProfileId: updated.studentId,
+      action: 'admin_send_support_message',
+      details: {
+        requestId: updated.id,
+        hasAttachment: Boolean(attachmentUrl),
+      },
+    })
+    await notifyStudentOnAdminSupportReply(updated, message || 'Admin shared an attachment.')
+    response.status(201).json(updated)
+    return
+  }
+
+  const ownRequest = listSupportRequests({ studentId: request.userId }).find((item) => item.id === request.params.id)
+  if (!ownRequest) {
+    response.status(404).json({ message: 'Support request not found.' })
+    return
+  }
+  const updated = addSupportRequestMessage(request.params.id, {
+    senderRole: 'student',
+    senderId: request.userId,
+    message,
+    attachmentName,
+    attachmentUrl,
+    attachmentMimeType,
+    attachmentSizeBytes,
+  })
+  if (!updated) {
+    response.status(404).json({ message: 'Support request not found.' })
+    return
+  }
+  response.status(201).json(updated)
+})
+
+app.get('/semester-registrations', authenticate, (request, response) => {
+  if (request.userRole === 'admin') {
+    if (!request.adminPermissions.includes('manage_student_profiles')) {
+      response.status(403).json({ message: 'You do not have permission to view semester registrations.' })
+      return
+    }
+    response.json({ data: listSemesterRegistrations() })
+    return
+  }
+  response.json({ data: listSemesterRegistrations({ studentId: request.userId }) })
+})
+
+app.post('/semester-registrations', authenticate, (request, response) => {
+  if (request.userRole !== 'student') {
+    response.status(403).json({ message: 'Only students can request semester registration.' })
+    return
+  }
+  const requestedSemester = typeof request.body?.requestedSemester === 'string' ? request.body.requestedSemester.trim() : ''
+  if (!requestedSemester || requestedSemester.length > 80) {
+    response.status(400).json({ message: 'Requested semester is required and must be 80 characters or fewer.' })
+    return
+  }
+  const created = createSemesterRegistration(request.userId, requestedSemester)
+  if (!created) {
+    response.status(404).json({ message: 'Student profile not found.' })
+    return
+  }
+  response.status(201).json(created)
+})
+
+app.patch('/semester-registrations/:id', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to approve semester registrations.'), (request, response) => {
+  const status = request.body?.status === 'approved' || request.body?.status === 'rejected' ? request.body.status : 'pending'
+  const adminNote = typeof request.body?.adminNote === 'string' ? request.body.adminNote : ''
+  const updated = updateSemesterRegistrationStatus(request.params.id, { status, adminNote, resolvedByAdminId: request.userId })
+  if (!updated) {
+    response.status(404).json({ message: 'Semester registration request not found.' })
+    return
+  }
+
+  if (updated.status === 'approved') {
+    const profile = getProfileById(updated.studentId)
+    if (profile) {
+      const curriculum = findCurriculumForStudent(profile)
+      if (curriculum) {
+        const kiuUnits = getSemesterUnits(curriculum, updated.requestedSemester)
+        if (Array.isArray(kiuUnits) && kiuUnits.length > 0) {
+          const { course_units, exams } = buildSyncPayloadFromKiuUnits(profile.id, kiuUnits)
+          adminUpdateStudentProfile(profile.id, {
+            semester: updated.requestedSemester,
+            course_units,
+            exams,
+          })
+        } else {
+          adminUpdateStudentProfile(profile.id, { semester: updated.requestedSemester })
+        }
+      } else {
+        adminUpdateStudentProfile(profile.id, { semester: updated.requestedSemester })
+      }
+    }
+  }
+
+  insertActivityLog({
+    adminId: request.userId,
+    targetProfileId: updated.studentId,
+    action: 'admin_review_semester_registration',
+    details: {
+      registrationId: updated.id,
+      status: updated.status,
+      requestedSemester: updated.requestedSemester,
+      adminNote: updated.adminNote ?? '',
+    },
+  })
 
   response.json(updated)
 })
@@ -2177,7 +2743,7 @@ app.post('/imports/financials/apply', authenticate, requireAdminPermission('mana
           name: createdProfile.name,
           email: createdProfile.email,
           studentId: createdProfile.student_id,
-          password: importedStudent.createStudent.password ?? (importedStudent.createStudent.password_hash ? '(password hash stored)' : undefined),
+          password: importedStudent.createStudent.password,
         })
       } catch (error) {
         skippedRows.push({
@@ -2274,7 +2840,7 @@ app.post('/imports/students/apply', authenticate, requireAdminPermission('manage
         name: createdProfile.name,
         email: createdProfile.email,
         studentId: createdProfile.student_id,
-        password: imported.createStudent.password ?? (imported.createStudent.password_hash ? '(password hash stored)' : undefined),
+        password: imported.createStudent.password,
       })
     } catch (error) {
       skippedRows.push({

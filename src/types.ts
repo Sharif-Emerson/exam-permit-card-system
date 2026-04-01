@@ -1,6 +1,7 @@
 export type Role = 'admin' | 'student'
-export type AdminScope = 'super-admin' | 'registrar' | 'finance' | 'operations'
+export type AdminScope = 'super-admin' | 'registrar' | 'finance' | 'operations' | 'assistant-admin'
 export type StudentCategory = 'local' | 'international'
+export type StudentGender = 'male' | 'female' | 'other'
 export type EnrollmentStatus = 'active' | 'on_leave' | 'graduated'
 export type AdminPermission =
   | 'view_students'
@@ -28,6 +29,7 @@ export interface DatabaseProfileRow {
   student_id: string | null
   student_category?: StudentCategory | null
   enrollment_status?: EnrollmentStatus | null
+  gender?: StudentGender | null
   phone_number?: string | null
   course: string | null
   program?: string | null
@@ -52,6 +54,7 @@ export interface DatabaseProfileRow {
   print_access_message?: string | null
   total_fees: number
   amount_paid: number
+  first_login_required?: number | null
 }
 
 export interface StudentProfile {
@@ -61,6 +64,7 @@ export interface StudentProfile {
   name: string
   studentId: string
   studentCategory: StudentCategory
+  gender?: StudentGender
   enrollmentStatus?: EnrollmentStatus
   phoneNumber?: string
   course: string
@@ -89,6 +93,7 @@ export interface StudentProfile {
   totalFees: number
   amountPaid: number
   feesBalance: number
+  firstLoginRequired?: boolean
 }
 
 export type StudentListStatusFilter = 'all' | 'paid' | 'outstanding'
@@ -131,6 +136,19 @@ export interface TrashedStudentProfile {
 
 export type SupportRequestStatus = 'open' | 'in_progress' | 'resolved'
 
+export interface SupportRequestMessage {
+  id: string
+  requestId: string
+  senderRole: 'student' | 'admin'
+  senderId: string
+  message: string
+  attachmentName?: string
+  attachmentUrl?: string
+  attachmentMimeType?: string
+  attachmentSizeBytes?: number
+  createdAt: string
+}
+
 export interface SupportRequest {
   id: string
   studentId: string
@@ -141,6 +159,7 @@ export interface SupportRequest {
   message: string
   status: SupportRequestStatus
   adminReply: string
+  messages?: SupportRequestMessage[]
   createdAt: string
   updatedAt: string
   resolvedAt: string | null
@@ -164,6 +183,21 @@ export interface SupportContact {
   scope: AdminScope
 }
 
+export interface SemesterRegistration {
+  id: string
+  studentId: string
+  studentName: string
+  studentEmail: string
+  registrationNumber: string
+  requestedSemester: string
+  status: 'pending' | 'approved' | 'rejected'
+  adminNote: string
+  resolvedByAdminId?: string | null
+  resolvedAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AdminProfile {
   id: string
   email: string
@@ -184,7 +218,17 @@ export interface AuthUser {
   name: string
   phoneNumber?: string
   scope?: AdminScope
+  assistantRole?: 'support_help' | 'department_prints'
   permissions?: AdminPermission[]
+}
+
+export interface AssistantAdminAccount {
+  id: string
+  name: string
+  email: string
+  phoneNumber: string
+  role: 'support_help' | 'department_prints'
+  departments: string[]
 }
 
 export interface StudentAccountUpdateInput {
@@ -201,6 +245,7 @@ export interface AdminProfileUpdateInput {
   email?: string
   studentId?: string
   studentCategory?: StudentCategory
+  gender?: StudentGender
   phoneNumber?: string
   course?: string
   program?: string

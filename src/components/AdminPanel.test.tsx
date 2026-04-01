@@ -980,12 +980,14 @@ describe('AdminPanel', () => {
     const generatedPassword = (createDlg.getByLabelText(/initial password/i) as HTMLInputElement).value
     expect(generatedPassword).toMatch(/^Permit-/)
     fireEvent.change(createDlg.getByLabelText(/registration no\./i), { target: { value: 'STU099' } })
-    const programSelect = createDlg.getByLabelText(/^program$/i) as HTMLSelectElement
+    const programSelect = createDlg.getByLabelText(/^program/i) as HTMLSelectElement
     const departmentSelect = createDlg.getByLabelText(/^department$/i) as HTMLSelectElement
-    const selectedProgram = programSelect.options[1]?.value ?? ''
+    const semesterSelect = createDlg.getByLabelText(/^semester$/i) as HTMLSelectElement
     const selectedDepartment = departmentSelect.options[1]?.value ?? ''
-    fireEvent.change(programSelect, { target: { value: selectedProgram } })
     fireEvent.change(departmentSelect, { target: { value: selectedDepartment } })
+    const selectedProgram = (programSelect as HTMLSelectElement).value
+    const selectedSemester = semesterSelect.options[1]?.value ?? ''
+    fireEvent.change(semesterSelect, { target: { value: selectedSemester } })
 
     await user.click(createDlg.getByRole('button', { name: /create student/i }))
 
@@ -1000,15 +1002,19 @@ describe('AdminPanel', () => {
           course: selectedProgram || selectedDepartment || 'General Studies',
           program: selectedProgram,
           department: selectedDepartment,
+          semester: selectedSemester,
           enrollmentStatus: 'active',
           totalFees: expect.any(Number),
           amountPaid: 0,
-          courseUnits: [],
-          exams: [],
+          courseUnits: expect.any(Array),
+          exams: expect.any(Array),
         }),
         'admin-1',
       )
     })
+    const createPayload = (createStudentProfile as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]?.[0] as { courseUnits?: string[]; exams?: unknown[] }
+    expect((createPayload.courseUnits ?? []).length).toBeGreaterThan(0)
+    expect((createPayload.exams ?? []).length).toBeGreaterThan(0)
 
     await waitFor(() => {
       expect(fetchStudentProfilesPage).toHaveBeenLastCalledWith(expect.objectContaining({

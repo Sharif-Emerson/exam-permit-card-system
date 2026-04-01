@@ -55,6 +55,7 @@ Exam Permit System is a React application backed by a REST API for managing stud
 3. For an explicit backend URL, use:
    - `VITE_BACKEND_PROVIDER=rest`
    - `VITE_API_BASE_URL=http://localhost:4000`
+   - Optional for QR scanning on phones: `VITE_PERMIT_PUBLIC_BASE_URL=http://<your-lan-ip>:4000`
 4. Start the full local stack:
    ```bash
    npm run dev:rest
@@ -69,6 +70,8 @@ During local Vite development, frontend requests first go through `/api` using t
 If the backend is offline or fails to start, the app now returns a direct REST API availability message instead of a bare `502` error.
 
 If `VITE_API_BASE_URL` is set to `http://localhost:4000` during development, the app now still prefers the proxy path for browser requests so other devices on your network do not break.
+
+If a QR code is scanned from another device and it cannot open `localhost`, set `VITE_PERMIT_PUBLIC_BASE_URL` to a URL that is reachable from that device (for example your machine LAN IP).
 
 This starts:
 

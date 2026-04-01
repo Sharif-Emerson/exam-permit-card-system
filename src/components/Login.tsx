@@ -1,11 +1,11 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { Lock, Moon, Sun, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import BrandMark from './BrandMark'
 import { backendProvider, publicApiBaseUrl } from '../config/provider'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { resetPassword } from '../services/authService'
+import { institutionContact, institutionLogo, institutionName } from '../config/branding'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -176,6 +176,30 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(187,247,208,0.75),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(254,249,195,0.75),_transparent_24%),linear-gradient(180deg,_#f0fdf4_0%,_#ecfdf5_40%,_#f7fee7_100%)] px-4 py-8 text-emerald-950 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.2),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(250,204,21,0.12),_transparent_18%),linear-gradient(180deg,_#020617_0%,_#052e16_52%,_#111827_100%)] dark:text-emerald-50 sm:px-6 lg:px-8">
+      <style>{`
+        @keyframes login-ribbon-move {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 200% 50%; }
+        }
+        .login-ribbon-border {
+          position: relative;
+        }
+        .login-ribbon-border::before {
+          content: '';
+          position: absolute;
+          inset: -2px;
+          border-radius: 1.6rem;
+          background: linear-gradient(90deg, #22c55e 0%, #10b981 25%, #34d399 50%, #10b981 75%, #22c55e 100%);
+          background-size: 200% 100%;
+          animation: login-ribbon-move 2.6s linear infinite;
+          z-index: 0;
+          opacity: 0.95;
+        }
+        .login-ribbon-border > * {
+          position: relative;
+          z-index: 1;
+        }
+      `}</style>
       <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
         <button
           type="button"
@@ -188,34 +212,40 @@ export default function Login() {
         </button>
       </div>
 
-      <div className="w-full max-w-md space-y-6 rounded-3xl border border-emerald-200 bg-white/95 p-6 shadow-lg shadow-emerald-100/60 dark:border-emerald-900/60 dark:bg-slate-950/85 dark:shadow-none sm:p-8 sm:space-y-8">
-        <div className="text-center">
-          <BrandMark
-            align="center"
-            showSubtitle={false}
-            titleClassName="text-2xl font-bold text-emerald-950 dark:text-emerald-50 sm:text-3xl"
-            subtitleClassName="text-sm text-emerald-700 dark:text-emerald-300 sm:text-base"
-          />
-          <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-300 sm:text-base">Secure examination permit portal</p>
-          <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-300 sm:text-base">Sign in with {accountProviderLabel}</p>
-        </div>
-        {configError && (
-          <div className="rounded-lg border border-amber-200 bg-amber-100 p-3 text-sm text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-200 sm:p-4">
-            {configError}
+      <div className="login-ribbon-border w-full max-w-md rounded-3xl">
+        <div className="space-y-6 rounded-3xl border border-emerald-200 bg-white/95 p-6 shadow-lg shadow-emerald-100/60 dark:border-emerald-900/60 dark:bg-slate-950/85 dark:shadow-none sm:p-8 sm:space-y-8">
+          <div className="text-center">
+          <div className="mx-auto flex w-full max-w-xs flex-col items-center">
+            <img
+              src={institutionLogo}
+              alt={`${institutionName} logo`}
+              className="h-40 w-40 object-contain sm:h-48 sm:w-48"
+              draggable={false}
+            />
+            <h1 className="mt-3 text-2xl font-bold text-emerald-700 dark:text-emerald-400 sm:text-3xl">
+              {institutionName}
+            </h1>
+            <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-300 sm:text-base">Exam Permit Portal</p>
           </div>
-        )}
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-100 p-3 text-sm text-red-700 dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-200 sm:p-4">
-            {error}
+          <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-300 sm:text-base">Log in to your account</p>
           </div>
-        )}
-        {resetMessage && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-100 p-3 text-sm text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-200 sm:p-4">
-            {resetMessage}
-          </div>
-        )}
-        {!showResetForm ? (
-          <form className="mt-6 space-y-4 sm:mt-8 sm:space-y-6" onSubmit={handleLogin}>
+          {configError && (
+            <div className="rounded-lg border border-amber-200 bg-amber-100 p-3 text-sm text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-200 sm:p-4">
+              {configError}
+            </div>
+          )}
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-100 p-3 text-sm text-red-700 dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-200 sm:p-4">
+              {error}
+            </div>
+          )}
+          {resetMessage && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-100 p-3 text-sm text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-200 sm:p-4">
+              {resetMessage}
+            </div>
+          )}
+          {!showResetForm ? (
+            <form className="mt-6 space-y-4 sm:mt-8 sm:space-y-6" onSubmit={handleLogin}>
             <div className="space-y-3 sm:space-y-4">
               <div>
                 <label htmlFor="identifier" className="block text-sm font-medium text-emerald-900 dark:text-emerald-100">
@@ -231,7 +261,7 @@ export default function Login() {
                     type="text"
                     required
                     className="block w-full rounded-md border border-emerald-200 bg-emerald-50/40 py-2 pl-9 pr-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-emerald-500 dark:border-emerald-900/60 dark:bg-slate-900/80 dark:text-white sm:py-2 sm:pl-10 sm:text-base"
-                    placeholder="name@gmail.com, +256700123456, or REG-001"
+                    placeholder="Student email or registration number"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                   />
@@ -296,9 +326,9 @@ export default function Login() {
                 </a>
               ) : null}
             </div>
-          </form>
-        ) : (
-          <form className="mt-6 space-y-4 sm:mt-8 sm:space-y-5" onSubmit={handleResetPassword}>
+            </form>
+          ) : (
+            <form className="mt-6 space-y-4 sm:mt-8 sm:space-y-5" onSubmit={handleResetPassword}>
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200">
               Enter your main login detail, then confirm with a second registered detail such as your email, phone number, or registration number.
             </div>
@@ -379,10 +409,23 @@ export default function Login() {
                 {resettingPassword ? 'Resetting...' : 'Reset password'}
               </button>
             </div>
-          </form>
-        )}
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200">
-          Please sign in with your assigned username and password. If you do not have an account or have trouble signing in, contact your system administrator for assistance.
+            </form>
+          )}
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200">
+            <p>Please sign in with your assigned username and password. If you have trouble signing in, contact the system administrator:</p>
+            <p className="mt-2">
+              Email:{' '}
+              <a href={`mailto:${institutionContact.email}`} className="font-semibold underline">
+                {institutionContact.email}
+              </a>
+            </p>
+            <p>
+              Phone:{' '}
+              <a href={`tel:${institutionContact.phone}`} className="font-semibold underline">
+                {institutionContact.phone}
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </div>

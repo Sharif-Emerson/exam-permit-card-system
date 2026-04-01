@@ -1,6 +1,7 @@
 export type BackendProvider = 'rest'
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? ''
+const configuredPermitPublicBaseUrl = import.meta.env.VITE_PERMIT_PUBLIC_BASE_URL?.trim() ?? ''
 
 function normalizeBaseUrl(value: string) {
   return value.replace(/\/$/, '')
@@ -103,6 +104,16 @@ function getPublicApiBaseUrl() {
 }
 
 export const publicApiBaseUrl = getPublicApiBaseUrl()
+
+function getPermitPublicBaseUrl() {
+  const normalizedConfiguredPermitBaseUrl = normalizeBaseUrl(configuredPermitPublicBaseUrl)
+  if (normalizedConfiguredPermitBaseUrl) {
+    return normalizedConfiguredPermitBaseUrl
+  }
+  return publicApiBaseUrl
+}
+
+export const permitPublicBaseUrl = getPermitPublicBaseUrl()
 
 export const apiBaseUrlCandidates = getDefaultApiBaseUrls()
 

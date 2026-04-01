@@ -1,4 +1,5 @@
 import type {
+  AssistantAdminAccount,
   AdminActivityLog,
   AdminActivityLogPage,
   AdminProfileUpdateInput,
@@ -14,6 +15,7 @@ import type {
   StudentProfile,
   TrashedStudentProfile,
   SupportContact,
+  SemesterRegistration,
   SupportRequest,
   SupportRequestUpdateInput,
 } from '../../types'
@@ -82,9 +84,16 @@ export interface DataAdapter {
   fetchPermitActivityHistory: () => Promise<PermitActivityRecord[]>
   fetchSupportContacts: () => Promise<SupportContact[]>
   fetchSupportRequests: () => Promise<SupportRequest[]>
-  createSupportRequest: (studentId: string, values: CreateSupportRequestInput) => Promise<SupportRequest>
+  createSupportRequest: (studentId: string, values: CreateSupportRequestInput, attachment?: File | null) => Promise<SupportRequest>
   updateSupportRequest: (requestId: string, values: SupportRequestUpdateInput) => Promise<SupportRequest>
+  sendSupportRequestMessage: (requestId: string, message: string, attachment?: File | null) => Promise<SupportRequest>
   bulkSyncCurriculum: () => Promise<BulkCurriculumSyncResult>
   previewStudentAccountsImport: (file: File) => Promise<StudentProvisionPreviewRow[]>
   applyStudentAccountsImport: (file: File) => Promise<StudentAccountsImportApplyResult>
+  fetchAssistantAdmins: () => Promise<AssistantAdminAccount[]>
+  createAssistantAdmin: (values: { name: string; email: string; phoneNumber?: string; password: string; role: 'support_help' | 'department_prints'; departments: string[] }) => Promise<AssistantAdminAccount>
+  updateAssistantAdmin: (assistantId: string, values: { role: 'support_help' | 'department_prints'; departments: string[] }) => Promise<AssistantAdminAccount>
+  fetchSemesterRegistrations: () => Promise<SemesterRegistration[]>
+  createSemesterRegistration: (requestedSemester: string) => Promise<SemesterRegistration>
+  updateSemesterRegistration: (id: string, values: { status: 'approved' | 'rejected'; adminNote?: string }) => Promise<SemesterRegistration>
 }

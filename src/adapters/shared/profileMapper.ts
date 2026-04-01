@@ -78,6 +78,7 @@ export function mapProfile(row: DatabaseProfileRow): AppProfile {
     name: row.name,
     studentId: row.student_id ?? 'N/A',
     studentCategory: row.student_category === 'international' ? 'international' : 'local',
+    gender: row.gender === 'male' || row.gender === 'female' || row.gender === 'other' ? row.gender : undefined,
     enrollmentStatus: row.enrollment_status === 'on_leave' || row.enrollment_status === 'graduated' ? row.enrollment_status : 'active',
     phoneNumber: row.phone_number ?? 'Not assigned',
     course: row.course ?? 'Not assigned',
@@ -102,6 +103,7 @@ export function mapProfile(row: DatabaseProfileRow): AppProfile {
     totalFees,
     amountPaid,
     feesBalance,
+    firstLoginRequired: Number(row.first_login_required ?? 0) === 1,
   }
 }
 

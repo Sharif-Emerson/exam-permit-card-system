@@ -16,7 +16,6 @@ import {
   PieChart,
   Printer,
   RefreshCcw,
-  Search,
   Settings2,
   ShieldAlert,
   ShieldCheck,
@@ -30,10 +29,10 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import { publicApiBaseUrl } from '../config/provider'
+import { permitPublicBaseUrl } from '../config/provider'
 import { examPermitConfig } from '../config/branding'
 import PermitCard from './PermitCard'
-import { createSupportRequest, fetchPermitActivityHistory, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, fetchSystemFeeSettings, recordPermitActivity, updateStudentAccount } from '../services/profileService'
+import { createSemesterRegistration, createSupportRequest, fetchPermitActivityHistory, fetchSemesterRegistrations, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, fetchSystemFeeSettings, recordPermitActivity, sendSupportRequestMessage, updateStudentAccount } from '../services/profileService'
 import type { PermitActivityRecord, StudentProfile, SupportContact, SupportRequest, UniversityDeadline } from '../types'
 import { FALLBACK_PROFILE_IMAGE } from './PermitCard'
 import SignOutDialog from './SignOutDialog'
@@ -71,11 +70,32 @@ type SettingsDraft = {
   confirmPassword: string
 }
 
+type FirstLoginSetupDraft = {
+  phoneNumber: string
+  password: string
+  confirmPassword: string
+  profileImage: string
+}
+
 type ApplicationDraft = {
   semester: string
-  courseUnits: string[]
-  documents: string[]
-  checklist: string[]
+}
+
+function buildOfflinePermitQrPayload(student: StudentProfile, publicBaseUrl: string) {
+  const clearanceStatus = student.feesBalance <= 0 ? 'Cleared' : 'Not Cleared'
+  const lines = [
+    'EXAM PERMIT',
+    `Token: ${student.permitToken}`,
+    `Name: ${student.name}`,
+    `RegNo: ${student.studentId || 'N/A'}`,
+    `Clearance: ${clearanceStatus}`,
+    `Department: ${student.department || 'N/A'}`,
+    `Semester: ${student.semester || 'N/A'}`,
+  ]
+  if (publicBaseUrl) {
+    lines.push(`VerifyURL: ${publicBaseUrl}/permits/${encodeURIComponent(student.permitToken)}`)
+  }
+  return lines.join('\n')
 }
 
 type SupportDraft = {
@@ -83,15 +103,6 @@ type SupportDraft = {
   message: string
 }
 
-const requiredDocumentChecklist = [
-  { id: 'course-registration', label: 'Current course registration details' },
-  { id: 'student-id', label: 'Valid student identification' },
-  { id: 'payment-evidence', label: 'Payment evidence when requested' },
-] as const
-
-function getHistoryStorageKey(userId: string) {
-  return `student-portal-history:${userId}`
-}
 
 function normalizeCurrencyCode(value: string | null | undefined) {
   const normalized = String(value ?? '').trim().toUpperCase()
@@ -111,47 +122,28 @@ function formatMoney(value: number, currencyCode: string) {
   }
 }
 
-function readApplicationHistory(userId: string): PermitApplicationRecord[] {
-  if (typeof window === 'undefined') {
-    return []
+function toPermitRecordFromSemesterRequest(input: {
+  id: string
+  requestedSemester: string
+  status: 'pending' | 'approved' | 'rejected'
+  adminNote?: string
+  createdAt: string
+}, fallbackUnits: string[] = []): PermitApplicationRecord {
+  return {
+    id: input.id,
+    createdAt: input.createdAt,
+    semester: input.requestedSemester,
+    status: input.status,
+    remarks: input.adminNote?.trim()
+      ? input.adminNote
+      : input.status === 'approved'
+        ? 'Semester registration approved by admin.'
+        : input.status === 'rejected'
+          ? 'Semester registration rejected by admin.'
+          : 'Awaiting admin approval.',
+    courseUnits: fallbackUnits,
+    documents: [],
   }
-
-  try {
-    const raw = window.localStorage.getItem(getHistoryStorageKey(userId))
-
-    if (!raw) {
-      return []
-    }
-
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) {
-      return []
-    }
-
-    return parsed.filter((item): item is PermitApplicationRecord => {
-      return Boolean(
-        item
-        && typeof item === 'object'
-        && typeof item.id === 'string'
-        && typeof item.createdAt === 'string'
-        && typeof item.semester === 'string'
-        && (item.status === 'approved' || item.status === 'pending' || item.status === 'rejected')
-        && typeof item.remarks === 'string'
-        && Array.isArray(item.courseUnits)
-        && Array.isArray(item.documents),
-      )
-    })
-  } catch {
-    return []
-  }
-}
-
-function writeApplicationHistory(userId: string, history: PermitApplicationRecord[]) {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  window.localStorage.setItem(getHistoryStorageKey(userId), JSON.stringify(history))
 }
 
 function deriveSemesterLabel(dateValue?: string) {
@@ -173,6 +165,90 @@ function deriveAcademicSession(dateValue?: string) {
   const date = dateValue ? new Date(dateValue) : new Date()
   const year = Number.isNaN(date.getTime()) ? new Date().getFullYear() : date.getFullYear()
   return `${year}/${year + 1}`
+}
+
+function buildPermitBlockers(
+  student: StudentProfile,
+  deadlineList: UniversityDeadline[],
+  currencyCode: string,
+) {
+  const items: Array<{ id: string; title: string; detail: string; tone: 'red' | 'amber' }> = []
+
+  if (student.feesBalance > 0) {
+    items.push({
+      id: 'fees',
+      title: 'Outstanding fees',
+      detail: `Your balance is ${formatMoney(student.feesBalance, currencyCode)}. Clear fees at Finance (or your approved channel) before printing your permit.`,
+      tone: 'red',
+    })
+  }
+
+  if (student.canPrintPermit === false) {
+    items.push({
+      id: 'print-cap',
+      title: 'Monthly print limit',
+      detail: student.printAccessMessage ?? 'You have used your permitted prints for this month. Contact administration if you need an extra copy.',
+      tone: 'amber',
+    })
+  }
+
+  const enrollment = student.enrollmentStatus ?? 'active'
+  if (enrollment === 'on_leave') {
+    items.push({
+      id: 'enrollment-leave',
+      title: 'Enrollment on leave',
+      detail: 'The registry must set your status back to active before you can print or download a permit.',
+      tone: 'red',
+    })
+  }
+  if (enrollment === 'graduated') {
+    items.push({
+      id: 'enrollment-graduated',
+      title: 'Graduated status',
+      detail: 'Permit printing is not available for graduated records. Contact the registry if this is incorrect.',
+      tone: 'red',
+    })
+  }
+
+  if (!(student.studentId ?? '').trim()) {
+    items.push({
+      id: 'reg-missing',
+      title: 'Registration number missing',
+      detail: 'Ask an administrator to add your official registration number to your profile.',
+      tone: 'amber',
+    })
+  }
+
+  const hasCustomPhoto = Boolean(student.profileImage?.trim()) && student.profileImage !== FALLBACK_PROFILE_IMAGE
+  if (!hasCustomPhoto) {
+    items.push({
+      id: 'photo',
+      title: 'Profile photo',
+      detail: 'Upload a clear photo under Profile Settings so your permit matches university records.',
+      tone: 'amber',
+    })
+  }
+
+  const now = Date.now()
+  for (const dl of deadlineList) {
+    if (!dl.dueAt) {
+      continue
+    }
+    const due = new Date(dl.dueAt).getTime()
+    if (Number.isNaN(due) || due >= now) {
+      continue
+    }
+    if (dl.type === 'danger' || dl.type === 'warning') {
+      items.push({
+        id: `deadline-${dl.id}`,
+        title: dl.title || 'Important deadline passed',
+        detail: dl.subtitle || 'Review recent notices from the examinations office.',
+        tone: 'amber',
+      })
+    }
+  }
+
+  return items
 }
 
 function deriveStatus(student: StudentProfile, history: PermitApplicationRecord[]): PermitStatus {
@@ -397,7 +473,6 @@ export default function Dashboard() {
   const [deadlines, setDeadlines] = useState<UniversityDeadline[]>([])
   const [feeCurrencyCode, setFeeCurrencyCode] = useState('USD')
   const [applicationHistory, setApplicationHistory] = useState<PermitApplicationRecord[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>('all')
   const [semesterFilter, setSemesterFilter] = useState('all')
   const [submittingApplication, setSubmittingApplication] = useState(false)
@@ -411,21 +486,8 @@ export default function Dashboard() {
   // Add state for button-level loading
   const [refreshing, setRefreshing] = useState(false)
 
-  // Course options for dropdown
-  const allCourseUnits = useMemo(() => {
-    const units = new Set<string>()
-    applicationHistory.forEach((rec) => rec.courseUnits.forEach((u) => units.add(u)))
-    if (studentData?.courseUnits) {
-      studentData.courseUnits.forEach((u) => units.add(u))
-    }
-    return Array.from(units).sort()
-  }, [applicationHistory, studentData])
-
   const [applicationDraft, setApplicationDraft] = useState<ApplicationDraft>({
     semester: `${deriveAcademicSession()} ${deriveSemesterLabel()}`,
-    courseUnits: [],
-    documents: [],
-    checklist: [],
   })
   const [settingsDraft, setSettingsDraft] = useState<SettingsDraft>({
     name: '',
@@ -436,22 +498,50 @@ export default function Dashboard() {
     password: '',
     confirmPassword: '',
   })
+  const [firstLoginDraft, setFirstLoginDraft] = useState<FirstLoginSetupDraft>({
+    phoneNumber: '',
+    password: '',
+    confirmPassword: '',
+    profileImage: '',
+  })
+  const [savingFirstLoginSetup, setSavingFirstLoginSetup] = useState(false)
   const [supportDraft, setSupportDraft] = useState<SupportDraft>({
     subject: '',
     message: '',
   })
+  const [supportAttachment, setSupportAttachment] = useState<File | null>(null)
+  const [supportReplyDrafts, setSupportReplyDrafts] = useState<Record<string, string>>({})
+  const [supportReplyAttachments, setSupportReplyAttachments] = useState<Record<string, File | null>>({})
+  const [sendingSupportReplyId, setSendingSupportReplyId] = useState<string | null>(null)
+  const getUnreadAdminMessageCount = useCallback((request: SupportRequest) => {
+    if (!Array.isArray(request.messages) || request.messages.length === 0) {
+      return 0
+    }
+    const latestStudentMessageAt = request.messages
+      .filter((entry) => entry.senderRole === 'student')
+      .reduce((latest, entry) => (entry.createdAt > latest ? entry.createdAt : latest), '')
+    return request.messages.filter((entry) => entry.senderRole === 'admin' && entry.createdAt > latestStudentMessageAt).length
+  }, [])
+
 
   // Calculate financial metrics
   const totalFees = studentData?.totalFees || 0
   const amountPaid = studentData?.amountPaid || 0
   const feesBalance = studentData?.feesBalance || 0
   const paymentProgress = totalFees > 0 ? Math.min(Math.round((amountPaid / totalFees) * 100), 100) : 0
+  const examPeriodDeadline = useMemo(() => {
+    return (deadlines ?? []).find((item) => {
+      const title = (item.title ?? '').toLowerCase()
+      const subtitle = (item.subtitle ?? '').toLowerCase()
+      return Boolean(item.dueAt) && (title.includes('exam') || subtitle.includes('exam'))
+    }) ?? null
+  }, [deadlines])
   const isFullyCleared = feesBalance <= 0 && amountPaid > 0
   const activeFeeCurrency = useMemo(() => normalizeCurrencyCode(feeCurrencyCode), [feeCurrencyCode])
 
   const portalSections = [
     { key: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" /> },
-    { key: 'permit_courses', label: 'Permit Courses', icon: <GraduationCap className="h-4 w-4" /> },
+    { key: 'permit_courses', label: 'Digital Permit', icon: <GraduationCap className="h-4 w-4" /> },
     {
       key: 'finance',
       label: 'Finance',
@@ -486,12 +576,19 @@ export default function Dashboard() {
     }
 
     try {
-      const [contacts, history] = await Promise.all([
+      const [contactsResult, historyResult] = await Promise.allSettled([
         fetchSupportContacts(),
         fetchPermitActivityHistory(),
       ])
-      setSupportContacts(contacts)
-      setPermitHistory(history)
+      if (contactsResult.status === 'fulfilled') {
+        setSupportContacts(contactsResult.value)
+      }
+      if (historyResult.status === 'fulfilled') {
+        setPermitHistory(historyResult.value)
+      }
+      if (contactsResult.status === 'rejected' && historyResult.status === 'rejected') {
+        throw contactsResult.reason
+      }
     } catch (loadError) {
       const nextError = loadError instanceof Error ? loadError.message : 'Unable to load support contacts or permit history.'
       setError(nextError)
@@ -550,10 +647,20 @@ export default function Dashboard() {
           phoneNumber: p.phoneNumber || '',
           profileImage: p.profileImage || '',
         }))
+        setFirstLoginDraft((current) => ({
+          ...current,
+          phoneNumber: p.phoneNumber && p.phoneNumber !== 'Not assigned' ? p.phoneNumber : '',
+          profileImage: p.profileImage && p.profileImage !== FALLBACK_PROFILE_IMAGE ? p.profileImage : '',
+        }))
       }
 
       if (initializeLocalState) {
-        setApplicationHistory(readApplicationHistory(user.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+        const semesterRequests = await fetchSemesterRegistrations()
+        setApplicationHistory(
+          semesterRequests
+            .map((entry) => toPermitRecordFromSemesterRequest(entry, profile.status === 'fulfilled' && profile.value?.courseUnits ? profile.value.courseUnits : []))
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+        )
         await Promise.all([
           loadSupportRequests(),
           loadSupportContactsAndHistory(),
@@ -630,15 +737,7 @@ export default function Dashboard() {
     }
 
     setReadNotificationIds(readStudentNotificationReadSet(user.id))
-  }, [user?.id, user.role])
-
-  useEffect(() => {
-    if (!user) {
-      return
-    }
-
-    writeApplicationHistory(user.id, applicationHistory)
-  }, [applicationHistory, user])
+  }, [user?.id, user?.role])
 
   async function handleRefresh() {
     if (!user || user.role !== 'student') {
@@ -649,6 +748,12 @@ export default function Dashboard() {
       setSuccessMessage('')
       setRefreshing(true)
       await syncStudentProfile({ showLoading: false, clearError: true, syncDrafts: true })
+      const semesterRequests = await fetchSemesterRegistrations()
+      setApplicationHistory(
+        semesterRequests
+          .map((entry) => toPermitRecordFromSemesterRequest(entry, studentData?.courseUnits ?? []))
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      )
       await Promise.all([
         loadSupportRequests(),
         loadSupportContactsAndHistory(),
@@ -688,8 +793,18 @@ export default function Dashboard() {
       return
     }
 
+    if (studentData.enrollmentStatus === 'graduated') {
+      setError('Graduated students cannot print permits through this portal. Contact the registry if you need help.')
+      return
+    }
+    if (studentData.enrollmentStatus === 'on_leave') {
+      setError('Your enrollment is on leave. Contact the registry before printing your permit.')
+      return
+    }
+
     try {
       await recordPermitActivity(studentData.id, 'print_permit')
+      await loadSupportContactsAndHistory()
       await syncStudentProfile({ syncDrafts: false })
       openPrintDialog()
     } catch (printError) {
@@ -713,8 +828,12 @@ export default function Dashboard() {
       return
     }
 
-    if (message.length < 10) {
+    if (!supportAttachment && message.length < 10) {
       setError('Support message must be at least 10 characters long.')
+      return
+    }
+    if (supportAttachment && message.length < 2) {
+      setError('Support message must be at least 2 characters when attaching a file.')
       return
     }
 
@@ -722,15 +841,39 @@ export default function Dashboard() {
       setSubmittingSupport(true)
       setError('')
       setSuccessMessage('')
-      const created = await createSupportRequest(user.id, { subject, message })
+      const created = await createSupportRequest(user.id, { subject, message }, supportAttachment)
       setSupportRequests((current) => [created, ...current])
       setSupportDraft({ subject: '', message: '' })
+      setSupportAttachment(null)
       setSuccessMessage('Support request sent to the admin desk.')
     } catch (submitError) {
       const nextError = submitError instanceof Error ? submitError.message : 'Unable to send support request'
       setError(nextError)
     } finally {
       setSubmittingSupport(false)
+    }
+  }
+
+  async function handleSendSupportReply(requestId: string) {
+    const message = (supportReplyDrafts[requestId] ?? '').trim()
+    const attachment = supportReplyAttachments[requestId] ?? null
+    if (!attachment && message.length < 2) {
+      setError('Reply message must be at least 2 characters, or add an attachment.')
+      return
+    }
+    try {
+      setSendingSupportReplyId(requestId)
+      setError('')
+      const updated = await sendSupportRequestMessage(requestId, message, attachment)
+      setSupportRequests((current) => current.map((item) => (item.id === requestId ? updated : item)))
+      setSupportReplyDrafts((current) => ({ ...current, [requestId]: '' }))
+      setSupportReplyAttachments((current) => ({ ...current, [requestId]: null }))
+      setSuccessMessage('Reply sent to support desk.')
+    } catch (replyError) {
+      const nextError = replyError instanceof Error ? replyError.message : 'Unable to send support reply.'
+      setError(nextError)
+    } finally {
+      setSendingSupportReplyId(null)
     }
   }
 
@@ -749,8 +892,18 @@ export default function Dashboard() {
       return
     }
 
+    if (studentData.enrollmentStatus === 'graduated') {
+      setError('Graduated students cannot print permits through this portal. Contact the registry if you need help.')
+      return
+    }
+    if (studentData.enrollmentStatus === 'on_leave') {
+      setError('Your enrollment is on leave. Contact the registry before downloading your permit.')
+      return
+    }
+
     try {
       await recordPermitActivity(studentData.id, 'download_permit')
+      await loadSupportContactsAndHistory()
       await syncStudentProfile({ syncDrafts: false })
       openPrintDialog()
     } catch (downloadError) {
@@ -759,18 +912,77 @@ export default function Dashboard() {
     }
   }
 
-  function handleDocumentSelection(event: ChangeEvent<HTMLInputElement>) {
-    const documents = Array.from(event.target.files ?? []).map((file) => file.name)
-    setApplicationDraft((current) => ({ ...current, documents }))
+  function handleDownloadFinanceStatement() {
+    if (!studentData || typeof window === 'undefined') {
+      return
+    }
+    const rows = [
+      ['Field', 'Value'],
+      ['Student Name', studentData.name],
+      ['Registration Number', studentData.studentId || 'N/A'],
+      ['Program', studentData.program || studentData.course || 'N/A'],
+      ['Semester', studentData.semester || 'N/A'],
+      ['Total Fees', formatMoney(studentData.totalFees, activeFeeCurrency)],
+      ['Amount Paid', formatMoney(studentData.amountPaid, activeFeeCurrency)],
+      ['Outstanding Balance', formatMoney(studentData.feesBalance, activeFeeCurrency)],
+      ['Generated At', new Date().toISOString()],
+    ]
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `statement-${(studentData.studentId || studentData.id || 'student').replace(/[^a-z0-9_-]/gi, '_')}.csv`
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    window.URL.revokeObjectURL(url)
   }
 
-  function handleChecklistToggle(itemId: string) {
-    setApplicationDraft((current) => ({
-      ...current,
-      checklist: current.checklist.includes(itemId)
-        ? current.checklist.filter((entry) => entry !== itemId)
-        : [...current.checklist, itemId],
-    }))
+  async function handleCompleteFirstLoginSetup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!studentData) {
+      return
+    }
+
+    const phone = firstLoginDraft.phoneNumber.trim()
+    const password = firstLoginDraft.password
+    const confirm = firstLoginDraft.confirmPassword
+    const profileImage = firstLoginDraft.profileImage.trim() || FALLBACK_PROFILE_IMAGE
+
+    if (!phone) {
+      setError('Phone number is required before continuing.')
+      return
+    }
+    if (password !== confirm) {
+      setError('New password and confirmation do not match.')
+      return
+    }
+    if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password) || password.length < 8) {
+      setError('Use a strong password with uppercase, lowercase, number, and special character.')
+      return
+    }
+
+    try {
+      setSavingFirstLoginSetup(true)
+      setError('')
+      await updateStudentAccount(studentData.id, {
+        phoneNumber: phone,
+        password,
+        profileImage,
+      })
+      setFirstLoginDraft({ phoneNumber: phone, password: '', confirmPassword: '', profileImage })
+      await syncStudentProfile({ syncDrafts: true })
+      await refreshUser()
+      setSuccessMessage('Profile security setup completed successfully.')
+    } catch (setupError) {
+      const nextError = setupError instanceof Error ? setupError.message : 'Unable to complete first login setup.'
+      setError(nextError)
+    } finally {
+      setSavingFirstLoginSetup(false)
+    }
   }
 
   async function handleApplicationSubmit(event: FormEvent<HTMLFormElement>) {
@@ -780,52 +992,31 @@ export default function Dashboard() {
       return
     }
 
-    const courseUnits = [...applicationDraft.courseUnits]
-
-    if (courseUnits.length === 0) {
-      setError('Add at least one course unit before submitting your permit request.')
-      return
-    }
-
-    if (applicationDraft.checklist.length !== requiredDocumentChecklist.length) {
-      setError('Complete the document checklist before submitting your permit request.')
+    const requestedSemester = applicationDraft.semester.trim()
+    if (!requestedSemester) {
+      setError('Select a semester to register.')
       return
     }
 
     setSubmittingApplication(true)
     setError('')
     setSuccessMessage('')
-
-    const nextStatus: PermitStatus = studentData.feesBalance === 0 ? 'approved' : 'pending'
-    const nextRecord: PermitApplicationRecord = {
-      id: `${user.id}-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      semester: applicationDraft.semester,
-      status: nextStatus,
-      remarks: nextStatus === 'approved'
-        ? 'Submitted and matched to your cleared permit record.'
-        : studentData.feesBalance > 0
-          ? 'Submitted. Outstanding fees must be cleared before approval.'
-          : 'Submitted successfully and awaiting review.',
-      courseUnits,
-      documents: [
-        ...requiredDocumentChecklist
-          .filter((item) => applicationDraft.checklist.includes(item.id))
-          .map((item) => item.label),
-        ...applicationDraft.documents,
-      ],
+    try {
+      await createSemesterRegistration(requestedSemester)
+      const semesterRequests = await fetchSemesterRegistrations()
+      setApplicationHistory(
+        semesterRequests
+          .map((entry) => toPermitRecordFromSemesterRequest(entry, studentData.courseUnits ?? []))
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      )
+      setSuccessMessage('Semester registration submitted and waiting for admin approval.')
+      setActiveSection('applications')
+    } catch (submitError) {
+      const nextError = submitError instanceof Error ? submitError.message : 'Unable to submit semester registration.'
+      setError(nextError)
+    } finally {
+      setSubmittingApplication(false)
     }
-
-    setApplicationHistory((current) => [nextRecord, ...current])
-    setApplicationDraft({
-      semester: applicationDraft.semester,
-      courseUnits: [],
-      documents: [],
-      checklist: [],
-    })
-    setSuccessMessage(nextStatus === 'approved' ? 'Permit request approved and added to your history.' : 'Permit request submitted successfully.')
-    setActiveSection('applications')
-    setSubmittingApplication(false)
   }
 
   async function handleSettingsSave(event: FormEvent<HTMLFormElement>) {
@@ -879,11 +1070,7 @@ export default function Dashboard() {
       setSavingSettings(false)
     }
   }
-  const qrValue = studentData
-    ? publicApiBaseUrl
-      ? `${publicApiBaseUrl}/permits/${encodeURIComponent(studentData.permitToken)}`
-      : `permit:${studentData.permitToken}`
-    : ''
+  const qrValue = studentData ? buildOfflinePermitQrPayload(studentData, permitPublicBaseUrl) : ''
 
   useEffect(() => {
     let cancelled = false
@@ -925,32 +1112,29 @@ export default function Dashboard() {
 
   const statusView = getStatusPresentation(permitStatus)
   const notifications = useMemo(() => {
-    return studentData ? buildNotifications(studentData, applicationHistory, permitStatus) : []
-  }, [applicationHistory, permitStatus, studentData])
+    if (!studentData) {
+      return []
+    }
+    const base = buildNotifications(studentData, applicationHistory, permitStatus)
+    if (examPeriodDeadline?.dueAt && studentData.feesBalance > 0) {
+      base.unshift({
+        id: 'exam-period-clearance-reminder',
+        title: 'Exam clearance reminder',
+        message: `Exams start ${formatDate(examPeriodDeadline.dueAt)}. Clear outstanding balance before the exam period.`,
+        tone: 'yellow',
+        createdAt: new Date().toISOString(),
+      })
+    }
+    return base
+  }, [applicationHistory, examPeriodDeadline, permitStatus, studentData])
 
   const filteredHistory = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase()
-
     return applicationHistory.filter((record) => {
       const matchesStatus = statusFilter === 'all' || record.status === statusFilter
       const matchesSemester = semesterFilter === 'all' || record.semester === semesterFilter
-      const remarks = (record.remarks ?? '').toLowerCase()
-      const semester = (record.semester ?? '').toLowerCase()
-      const statusLabel = record.status.toLowerCase()
-      const haystack = [
-        semester,
-        remarks,
-        record.id.toLowerCase(),
-        statusLabel,
-        ...(record.courseUnits ?? []).map((unit) => unit.toLowerCase()),
-      ].join(' ')
-      const matchesQuery = !normalizedQuery
-        || haystack.includes(normalizedQuery)
-        || haystack.split(/\s+/).some((token) => token.includes(normalizedQuery))
-
-      return matchesStatus && matchesSemester && matchesQuery
+      return matchesStatus && matchesSemester
     })
-  }, [applicationHistory, searchQuery, semesterFilter, statusFilter])
+  }, [applicationHistory, semesterFilter, statusFilter])
 
   const availableSemesters = useMemo(() => {
     return Array.from(new Set(applicationHistory.map((record) => record.semester)))
@@ -972,12 +1156,28 @@ export default function Dashboard() {
   }, [permitHistory])
 
   const profileImage = studentData?.profileImage?.trim() ? studentData.profileImage : FALLBACK_PROFILE_IMAGE
-  const permitOutputLocked = Boolean(studentData && (studentData.feesBalance > 0 || studentData.canPrintPermit === false))
+  const enrollmentBlocksPermit = Boolean(
+    studentData && (studentData.enrollmentStatus === 'on_leave' || studentData.enrollmentStatus === 'graduated'),
+  )
+  const permitOutputLocked = Boolean(
+    studentData && (studentData.feesBalance > 0 || studentData.canPrintPermit === false || enrollmentBlocksPermit),
+  )
   const permitOutputMessage = !studentData
     ? ''
-    : studentData.feesBalance > 0
-      ? 'Please clear all outstanding fees before printing or downloading your permit.'
-      : studentData.printAccessMessage || 'You have reached the monthly permit print limit. Contact administration for access.'
+    : studentData.enrollmentStatus === 'graduated'
+      ? 'Graduated students cannot print permits through this portal. Contact the registry if you need help.'
+      : studentData.enrollmentStatus === 'on_leave'
+        ? 'Your enrollment is on leave. Contact the registry before printing or downloading your permit.'
+        : studentData.feesBalance > 0
+          ? 'Please clear all outstanding fees before printing or downloading your permit.'
+          : studentData.printAccessMessage || 'You have reached the monthly permit print limit. Contact administration for access.'
+
+  const permitBlockers = useMemo(() => {
+    if (!studentData) {
+      return []
+    }
+    return buildPermitBlockers(studentData, deadlines, activeFeeCurrency)
+  }, [studentData, deadlines, activeFeeCurrency])
   const unreadNotifications = useMemo(
     () => notifications.filter((n) => !readNotificationIds.has(n.id)).length,
     [notifications, readNotificationIds],
@@ -989,7 +1189,7 @@ export default function Dashboard() {
       <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
         <div className="text-center">
           <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-green-600" />
-          <p className="text-base text-slate-600">Loading your student dashboard...</p>
+          <p className="text-base text-slate-600 dark:text-slate-300">Loading your student dashboard...</p>
         </div>
       </div>
     )
@@ -999,8 +1199,8 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
         <div className="w-full max-w-md rounded-3xl border border-red-100 bg-white p-6 text-center shadow-xl shadow-red-100/30">
-          <h2 className="mb-2 text-xl font-semibold text-slate-900">Unable to load your dashboard</h2>
-          <p className="mb-5 text-sm text-slate-600">{error || 'No student record was found for this account.'}</p>
+          <h2 className="mb-2 text-xl font-semibold text-slate-900 dark:text-white">Unable to load your dashboard</h2>
+          <p className="mb-5 text-sm text-slate-600 dark:text-slate-300">{error || 'No student record was found for this account.'}</p>
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
             <button
               type="button"
@@ -1013,7 +1213,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => setShowSignOut(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-200 px-4 py-2 text-slate-900 transition-colors hover:bg-slate-300"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-200 px-4 py-2 text-slate-900 transition-colors hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
             >
               <LogOut className="h-4 w-4" />
               Sign Out
@@ -1037,6 +1237,100 @@ export default function Dashboard() {
 
   return (
     <div className={`${darkMode ? 'dark' : ''} student-dashboard-shell`}>
+      {studentData?.firstLoginRequired && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Security setup required</h3>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              Welcome. Before continuing, set a strong password and add your phone number.
+            </p>
+            <form onSubmit={(event) => void handleCompleteFirstLoginSetup(event)} className="mt-4 space-y-3">
+              <div>
+                <label htmlFor="first-login-profile-upload" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Passport Photo (recommended 3:4 portrait)</label>
+                <div className="flex items-start gap-3">
+                  <input
+                    id="first-login-profile-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0]
+                      if (!file) return
+                      const formData = new FormData()
+                      formData.append('photo', file)
+                      try {
+                        const res = await fetch('/uploads/profile-photo', { method: 'POST', body: formData })
+                        if (!res.ok) throw new Error('Upload failed')
+                        const data = await res.json()
+                        if (typeof data.url === 'string' && data.url.trim()) {
+                          setFirstLoginDraft((current) => ({ ...current, profileImage: data.url }))
+                        }
+                      } catch {
+                        setError('Failed to upload photo. You can continue and a placeholder photo will be used.')
+                      }
+                    }}
+                    className="block w-full text-xs text-gray-700 dark:text-slate-300 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                  />
+                  <img
+                    src={firstLoginDraft.profileImage || FALLBACK_PROFILE_IMAGE}
+                    alt="Profile preview"
+                    className="h-24 w-[72px] rounded-md border object-cover"
+                    onError={(event) => {
+                      event.currentTarget.onerror = null
+                      event.currentTarget.src = FALLBACK_PROFILE_IMAGE
+                    }}
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-400">
+                  Use a clear, front-facing passport-style photo. If not uploaded, a default placeholder image will be saved.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="first-login-phone" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Phone Number</label>
+                <input
+                  id="first-login-phone"
+                  type="tel"
+                  value={firstLoginDraft.phoneNumber}
+                  onChange={(event) => setFirstLoginDraft((current) => ({ ...current, phoneNumber: event.target.value }))}
+                  required
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950"
+                  placeholder="e.g. +256700123456"
+                />
+              </div>
+              <div>
+                <label htmlFor="first-login-password" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">New Strong Password</label>
+                <input
+                  id="first-login-password"
+                  type="password"
+                  value={firstLoginDraft.password}
+                  onChange={(event) => setFirstLoginDraft((current) => ({ ...current, password: event.target.value }))}
+                  required
+                  minLength={8}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950"
+                />
+              </div>
+              <div>
+                <label htmlFor="first-login-confirm-password" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Confirm Password</label>
+                <input
+                  id="first-login-confirm-password"
+                  type="password"
+                  value={firstLoginDraft.confirmPassword}
+                  onChange={(event) => setFirstLoginDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
+                  required
+                  minLength={8}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={savingFirstLoginSetup}
+                className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {savingFirstLoginSetup ? 'Saving...' : 'Save and Continue'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
       {studentData && (
         <div hidden className="print-permit-sheet-wrapper">
           <PermitCard
@@ -1050,7 +1344,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="student-dashboard-app min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(191,219,254,0.55),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(187,247,208,0.55),_transparent_28%),linear-gradient(180deg,_#eff6ff_0%,_#f8fafc_50%,_#eefbf3_100%)] text-slate-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(30,41,59,0.95),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(20,83,45,0.5),_transparent_26%),linear-gradient(180deg,_#020617_0%,_#0f172a_55%,_#052e16_100%)] dark:text-slate-100">
+      <div className="student-dashboard-app min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(187,247,208,0.65),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(209,250,229,0.65),_transparent_28%),linear-gradient(180deg,_#ecfdf5_0%,_#f0fdf4_45%,_#dcfce7_100%)] text-slate-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(6,78,59,0.9),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(20,83,45,0.5),_transparent_26%),linear-gradient(180deg,_#022c22_0%,_#052e16_55%,_#022c22_100%)] dark:text-slate-100">
         {sidebarOpen && (
           <button
             type="button"
@@ -1065,7 +1359,7 @@ export default function Dashboard() {
           <aside className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-white/60 bg-white/85 px-4 py-5 shadow-2xl shadow-slate-200/60 backdrop-blur-xl transition-transform duration-300 dark:border-slate-800 dark:bg-slate-950/85 dark:shadow-none lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
             <div className="flex items-center justify-between px-2 pb-5">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-green-600 dark:text-green-300">Student Portal</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-green-600 dark:text-green-300">Student Exam Permit Portal</p>
                 <h1 className="mt-1 text-xl font-semibold">Exam Permit Hub</h1>
               </div>
               <button
@@ -1152,17 +1446,6 @@ export default function Dashboard() {
                 >
                   <Menu className="h-4 w-4" />
                 </button>
-
-                <div className="relative min-w-[220px] flex-1">
-                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search applications, semesters, or remarks"
-                    className="w-full rounded-full border border-white/70 bg-white/90 py-3 pl-11 pr-4 text-sm text-slate-900 shadow-sm outline-none transition focus:border-green-300 focus:ring-2 focus:ring-green-200 dark:border-slate-700 dark:bg-slate-900/90 dark:text-white dark:focus:border-green-400 dark:focus:ring-green-950"
-                  />
-                </div>
 
                 <button
                   type="button"
@@ -1396,6 +1679,23 @@ export default function Dashboard() {
                           </span>
                         </div>
 
+                        {permitBlockers.length > 0 && (
+                          <div className="mb-5 rounded-2xl border border-amber-200/90 bg-amber-50/95 p-4 dark:border-amber-900/50 dark:bg-amber-950/35">
+                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">What affects your permit right now</p>
+                            <ul className="mt-2 list-inside list-disc space-y-2 text-sm marker:text-amber-600 dark:marker:text-amber-400">
+                              {permitBlockers.map((blocker) => (
+                                <li
+                                  key={blocker.id}
+                                  className={blocker.tone === 'red' ? 'text-red-700 dark:text-red-300' : 'text-amber-900 dark:text-amber-100/95'}
+                                >
+                                  <span className="font-medium">{blocker.title}:</span>{' '}
+                                  {blocker.detail}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
                         <div className="rounded-[2rem] border border-sky-100 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(220,252,231,0.92))] p-5 dark:border-slate-700 dark:bg-[linear-gradient(145deg,_rgba(15,23,42,0.98),_rgba(5,46,22,0.88))]">
                           <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                             <div className="flex items-center gap-4">
@@ -1415,16 +1715,16 @@ export default function Dashboard() {
                                 <p className="text-sm text-slate-600 dark:text-slate-300">{studentData.course}</p>
                               </div>
                             </div>
-                            <div className="rounded-3xl bg-white/80 p-3 shadow-sm dark:bg-slate-950/70">
+                            <div className="w-32 shrink-0 rounded-3xl bg-white/80 p-3 shadow-sm dark:bg-slate-950/70">
                               {qrCodeUrl ? (
                                 <>
-                                  <img src={qrCodeUrl} alt="Verification QR code" className="h-28 w-28" />
-                                  <div className="mt-2 break-all text-xs text-green-700 dark:text-green-300 text-center">
-                                    {qrValue}
+                                  <img src={qrCodeUrl} alt="Verification QR code" className="h-24 w-24 mx-auto" />
+                                  <div className="mt-2 text-[11px] text-green-700 dark:text-green-300 text-center">
+                                    Scan to verify
                                   </div>
                                 </>
                               ) : (
-                                <div className="flex h-28 w-28 items-center justify-center rounded-2xl bg-slate-100 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                                <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-slate-100 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                                   QR unavailable
                                 </div>
                               )}
@@ -1436,9 +1736,6 @@ export default function Dashboard() {
                               <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Exam Details</p>
                               <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
                                 <p>Date: {formatDate(studentData.examDate)}</p>
-                                <p>Time: {studentData.examTime || 'To be announced'}</p>
-                                <p>Venue: {studentData.venue || 'To be announced'}</p>
-                                <p>Seat: {studentData.seatNumber || 'To be assigned'}</p>
                               </div>
                             </div>
                             <div className="rounded-3xl bg-white/70 p-4 dark:bg-slate-950/70">
@@ -1486,8 +1783,8 @@ export default function Dashboard() {
                       <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-green-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
                         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Apply for Exam Permit</p>
-                            <h2 className="mt-2 text-2xl font-semibold">Submit a new permit request</h2>
+                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Semester Registration</p>
+                            <h2 className="mt-2 text-2xl font-semibold">Register for a new semester</h2>
                           </div>
                           <button
                             type="button"
@@ -1499,79 +1796,31 @@ export default function Dashboard() {
                           </button>
                         </div>
 
-                        <form className="mt-6 grid gap-4 lg:grid-cols-2" onSubmit={(event) => void handleApplicationSubmit(event)}>
-                          <div>
-                            <label htmlFor="semester" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Exam session / semester</label>
+                        <form className="mt-6 space-y-4" onSubmit={(event) => void handleApplicationSubmit(event)}>
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Select semester
                             <select
-                              id="semester"
                               value={applicationDraft.semester}
-                              onChange={(event) => setApplicationDraft((current) => ({ ...current, semester: event.target.value }))}
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-green-300 focus:ring-2 focus:ring-green-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:focus:border-green-400 dark:focus:ring-green-950"
+                              onChange={(event) => setApplicationDraft({ semester: event.target.value })}
+                              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
                             >
-                              <option value="">Select semester</option>
-                              {availableSemesters.map((sem) => (
-                                <option key={sem} value={sem}>{sem}</option>
+                              {availableSemesters.length === 0 ? (
+                                <option value={applicationDraft.semester}>{applicationDraft.semester}</option>
+                              ) : availableSemesters.map((semester) => (
+                                <option key={semester} value={semester}>{semester}</option>
                               ))}
                             </select>
-                          </div>
-                          <div>
-                            <p className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Document checklist</p>
-                            <div className="space-y-2 rounded-[1.75rem] border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-900/70">
-                              {requiredDocumentChecklist.map((item) => (
-                                <label key={item.id} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
-                                  <input
-                                    type="checkbox"
-                                    checked={applicationDraft.checklist.includes(item.id)}
-                                    onChange={() => handleChecklistToggle(item.id)}
-                                    className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                                  />
-                                  <span>{item.label}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <label htmlFor="documents" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Upload required documents</label>
-                            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-green-300 bg-green-50 px-4 py-3 text-sm text-slate-600 transition hover:border-green-300 hover:bg-green-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-green-500 dark:hover:bg-slate-800">
-                              <Upload className="h-4 w-4" />
-                              <span>{applicationDraft.documents.length > 0 ? applicationDraft.documents.join(', ') : 'Choose files'}</span>
-                              <input id="documents" type="file" multiple className="sr-only" onChange={handleDocumentSelection} />
-                            </label>
-                          </div>
-                          <div className="lg:col-span-2">
-                            <label htmlFor="courseUnits" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Course units</label>
-                            <Select
-                              id="courseUnits"
-                              isMulti
-                              options={allCourseUnits.map((u) => ({ value: u, label: u }))}
-                              value={applicationDraft.courseUnits.map((u) => ({ value: u, label: u }))}
-                              onChange={(selected) => {
-                                const unique = Array.from(new Set(selected.map((s) => s.value)))
-                                setApplicationDraft((current) => ({ ...current, courseUnits: unique }))
-                              }}
-                              classNamePrefix="react-select"
-                              placeholder="Select or type to add course units"
-                              isClearable={false}
-                              isSearchable
-                              noOptionsMessage={() => 'Type to add new course unit'}
-                            />
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {applicationDraft.courseUnits.length === 0 && <span className="text-slate-400">No course units selected</span>}
-                              {applicationDraft.courseUnits.map((u) => (
-                                <span key={u} className="inline-block rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">{u}</span>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="lg:col-span-2 flex justify-end">
-                            <button
-                              type="submit"
-                              disabled={submittingApplication}
-                              className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-500 dark:text-slate-950 dark:hover:bg-emerald-400"
-                            >
-                              <FileBadge2 className="h-4 w-4" />
-                              {submittingApplication ? 'Submitting...' : 'Apply for Permit'}
-                            </button>
-                          </div>
+                          </label>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            After admin approval, your semester and course units will be updated automatically.
+                          </p>
+                          <button
+                            type="submit"
+                            disabled={submittingApplication}
+                            className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                          >
+                            {submittingApplication ? 'Submitting...' : 'Submit semester registration'}
+                          </button>
                         </form>
                       </section>
                     </div>
@@ -1622,7 +1871,7 @@ export default function Dashboard() {
                     <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Search & Filters</p>
+                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Filters</p>
                           <h2 className="mt-2 text-2xl font-semibold">Filter application history</h2>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[28rem]">
@@ -1658,61 +1907,29 @@ export default function Dashboard() {
 
                     <div className="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
                       <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Apply for Exam Permit</p>
-                        <h2 className="mt-2 text-2xl font-semibold">Application form</h2>
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Semester Registration</p>
+                        <h2 className="mt-2 text-2xl font-semibold">Submit a semester request</h2>
                         <form className="mt-6 space-y-4" onSubmit={(event) => void handleApplicationSubmit(event)}>
-                          <div>
-                            <label htmlFor="application-semester" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Exam session / semester</label>
-                            <input
-                              id="application-semester"
-                              type="text"
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Semester
+                            <select
                               value={applicationDraft.semester}
-                              onChange={(event) => setApplicationDraft((current) => ({ ...current, semester: event.target.value }))}
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor="application-course-units" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Course units</label>
-                            <textarea
-                              id="application-course-units"
-                              rows={6}
-                              value={applicationDraft.courseUnits.join('\n')}
-                              onChange={(event) => setApplicationDraft((current) => ({ ...current, courseUnits: event.target.value.split('\n').map(v => v.trim()).filter(Boolean) }))}
-                              placeholder="CSC 401 - Compiler Construction"
-                              className="w-full rounded-[1.75rem] border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                            />
-                          </div>
-                          <div>
-                            <p className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Document checklist</p>
-                            <div className="space-y-2 rounded-[1.75rem] border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-900/70">
-                              {requiredDocumentChecklist.map((item) => (
-                                <label key={item.id} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
-                                  <input
-                                    type="checkbox"
-                                    checked={applicationDraft.checklist.includes(item.id)}
-                                    onChange={() => handleChecklistToggle(item.id)}
-                                    className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                                  />
-                                  <span>{item.label}</span>
-                                </label>
+                              onChange={(event) => setApplicationDraft({ semester: event.target.value })}
+                              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            >
+                              {availableSemesters.length === 0 ? (
+                                <option value={applicationDraft.semester}>{applicationDraft.semester}</option>
+                              ) : availableSemesters.map((semester) => (
+                                <option key={semester} value={semester}>{semester}</option>
                               ))}
-                            </div>
-                          </div>
-                          <div>
-                            <label htmlFor="application-documents" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Required documents</label>
-                            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                              <Upload className="h-4 w-4" />
-                              <span>{applicationDraft.documents.length > 0 ? applicationDraft.documents.join(', ') : 'Attach files if needed'}</span>
-                              <input id="application-documents" type="file" multiple className="sr-only" onChange={handleDocumentSelection} />
-                            </label>
-                          </div>
+                            </select>
+                          </label>
                           <button
                             type="submit"
                             disabled={submittingApplication}
-                            className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                           >
-                            <FileBadge2 className="h-4 w-4" />
-                            {submittingApplication ? 'Submitting...' : 'Apply for Permit'}
+                            {submittingApplication ? 'Submitting...' : 'Submit request'}
                           </button>
                         </form>
                       </section>
@@ -1873,7 +2090,7 @@ export default function Dashboard() {
                                 }
                                 reader.readAsDataURL(file)
                               }}
-                              className="block w-full text-sm text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                              className="block w-full text-sm text-slate-700 dark:text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
                             />
                             {settingsDraft.profileImage && (
                               <img src={settingsDraft.profileImage} alt="Profile preview" className="h-12 w-12 rounded-full object-cover border" />
@@ -1976,27 +2193,8 @@ export default function Dashboard() {
                         <FileText className="h-9 w-9 text-blue-600 dark:text-blue-300" />
                         <h2 className="mt-4 text-xl font-semibold">Help & support</h2>
                         <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                          If your application is pending or rejected, review your remarks, confirm your document checklist, and make sure your fees are fully cleared before contacting the admin desk.
+                          If your semester registration is pending or rejected, review admin remarks and contact support for guidance.
                         </p>
-                      </section>
-
-                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                        <FileText className="h-9 w-9 text-emerald-600 dark:text-emerald-300" />
-                        <h2 className="mt-4 text-xl font-semibold">Document checklist</h2>
-                        <div className="mt-4 space-y-3">
-                          {requiredDocumentChecklist.map((item) => {
-                            const checked = applicationDraft.checklist.includes(item.id)
-
-                            return (
-                              <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/70">
-                                <span>{item.label}</span>
-                                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${checked ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200'}`}>
-                                  {checked ? 'Ready' : 'Pending'}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
                       </section>
 
                       <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
@@ -2045,6 +2243,20 @@ export default function Dashboard() {
                               className="w-full rounded-[1.75rem] border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
                             />
                           </div>
+                          <div>
+                            <label htmlFor="support-attachment" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Attachment (optional)</label>
+                            <input
+                              id="support-attachment"
+                              type="file"
+                              onChange={(event) => setSupportAttachment(event.target.files?.[0] ?? null)}
+                              className="block w-full text-sm text-slate-700 dark:text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                            />
+                            {supportAttachment && (
+                              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                Selected: {supportAttachment.name}
+                              </p>
+                            )}
+                          </div>
                           <button
                             type="submit"
                             disabled={submittingSupport}
@@ -2072,13 +2284,70 @@ export default function Dashboard() {
                                 <span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white dark:bg-emerald-500 dark:text-slate-950">
                                   {request.status.replace('_', ' ')}
                                 </span>
+                                {getUnreadAdminMessageCount(request) > 0 ? (
+                                  <span className="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">
+                                    {getUnreadAdminMessageCount(request)} unread
+                                  </span>
+                                ) : null}
                               </div>
                               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{formatDateTime(request.createdAt)}</p>
                               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{request.message}</p>
-                              {request.adminReply && (
+                              {Array.isArray(request.messages) && request.messages.length > 0 ? (
+                                <div className="mt-3 space-y-2 rounded-2xl bg-white p-3 text-sm dark:bg-slate-950">
+                                  {request.messages.map((entry) => (
+                                    <div key={entry.id} className={`rounded-xl px-3 py-2 ${entry.senderRole === 'admin' ? 'bg-blue-50 text-slate-800 dark:bg-blue-950/30 dark:text-slate-200' : 'bg-emerald-50 text-slate-800 dark:bg-emerald-950/30 dark:text-slate-200'}`}>
+                                      <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">
+                                        {entry.senderRole === 'admin' ? 'Admin' : 'You'} • {formatDateTime(entry.createdAt)}
+                                      </p>
+                                      <p className="mt-1">{entry.message}</p>
+                                      {entry.attachmentUrl ? (
+                                        <a
+                                          href={entry.attachmentUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="mt-2 inline-flex text-xs font-semibold text-blue-700 underline dark:text-blue-300"
+                                        >
+                                          Attachment: {entry.attachmentName || 'Download file'}
+                                        </a>
+                                      ) : null}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : request.adminReply ? (
                                 <p className="mt-3 rounded-2xl bg-white px-3 py-2 text-sm text-slate-700 dark:bg-slate-950 dark:text-slate-200">
                                   Admin reply: {request.adminReply}
                                 </p>
+                              ) : null}
+                              {request.status !== 'resolved' && (
+                                <div className="mt-3">
+                                  <textarea
+                                    rows={2}
+                                    value={supportReplyDrafts[request.id] ?? ''}
+                                    onChange={(event) => setSupportReplyDrafts((current) => ({ ...current, [request.id]: event.target.value }))}
+                                    placeholder="Add follow-up details or clarifications..."
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                                  />
+                                  <div className="mt-2 flex justify-end">
+                                    <input
+                                      type="file"
+                                      aria-label={`Attach file for support request ${request.id}`}
+                                      title="Attach a file"
+                                      onChange={(event) => {
+                                        const file = event.target.files?.[0] ?? null
+                                        setSupportReplyAttachments((current) => ({ ...current, [request.id]: file }))
+                                      }}
+                                      className="mr-2 block text-xs text-slate-500 file:mr-3 file:rounded-lg file:border file:border-slate-200 file:bg-white file:px-2 file:py-1 file:text-xs file:font-medium dark:text-slate-300 dark:file:border-slate-700 dark:file:bg-slate-900"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleSendSupportReply(request.id)}
+                                      disabled={sendingSupportReplyId === request.id}
+                                      className="inline-flex items-center rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                                    >
+                                      {sendingSupportReplyId === request.id ? 'Sending...' : 'Send follow-up'}
+                                    </button>
+                                  </div>
+                                </div>
                               )}
                             </div>
                           )) : (
@@ -2110,22 +2379,24 @@ export default function Dashboard() {
                               </h2>
                             </div>
                           </div>
-                          <div className="mt-6 flex gap-3">
-                            <button
-                              type="button"
-                              onClick={() => alert(`Please visit the KIU Finance Office to process your ${formatMoney(feesBalance, activeFeeCurrency)} payment.`)}
-                              className="flex-1 rounded-full bg-emerald-500 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600 shadow-sm"
-                            >
-                              Pay Now
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => alert('Preparing your statement... please wait while we generate your digital invoice.')}
-                              className="flex-1 rounded-full border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 shadow-sm"
-                            >
-                              Download Invoice
-                            </button>
-                          </div>
+                          {examPeriodDeadline && (
+                            <div className={`mt-4 rounded-2xl border px-3 py-2 text-xs ${
+                              feesBalance > 0
+                                ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200'
+                                : 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200'
+                            }`}>
+                              <p className="font-semibold">
+                                Exam period: {examPeriodDeadline.title}
+                              </p>
+                              <p>
+                                Starts {formatDate(examPeriodDeadline.dueAt ?? '')}
+                                {formatDeadlineCountdown(examPeriodDeadline.dueAt) ? ` (${formatDeadlineCountdown(examPeriodDeadline.dueAt)})` : ''}
+                              </p>
+                              {feesBalance > 0 && (
+                                <p className="mt-1 font-semibold">Reminder: clear your balance before exam period starts.</p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </section>
 
@@ -2205,7 +2476,11 @@ export default function Dashboard() {
                     <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
                       <div className="flex items-center justify-between mb-6">
                         <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Recent Transactions</h2>
-                        <button className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex text-center gap-1">
+                        <button
+                          type="button"
+                          onClick={handleDownloadFinanceStatement}
+                          className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex text-center gap-1"
+                        >
                           <Download className="h-4 w-4" />
                           Statement
                         </button>
@@ -2277,6 +2552,32 @@ export default function Dashboard() {
                           </span>
                           <h1 className="text-3xl font-bold">{currentSession}</h1>
                           <p className="mt-2 text-blue-100 max-w-md">You are cleared for {studentData.courseUnits?.length || 0} courses on your digital permit. Ensure your details match the university register.</p>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="rounded-3xl border border-white/70 bg-white/85 p-5 shadow-lg dark:border-slate-800 dark:bg-slate-950/80">
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Digital Permit Details</h2>
+                      <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_auto]">
+                        <div className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                          <p><span className="font-semibold">Name:</span> {studentData.name}</p>
+                          <p><span className="font-semibold">Registration No:</span> {studentData.studentId}</p>
+                          <p><span className="font-semibold">Program:</span> {studentData.program || studentData.course}</p>
+                          <p><span className="font-semibold">Semester:</span> {studentData.semester || currentSession}</p>
+                          <p><span className="font-semibold">Exam Date:</span> {formatDate(studentData.examDate)}</p>
+                          <p><span className="font-semibold">Status:</span> {statusView.label}</p>
+                        </div>
+                        <div className="w-32 shrink-0 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                          {qrCodeUrl ? (
+                            <>
+                              <img src={qrCodeUrl} alt="Permit QR code" className="mx-auto h-24 w-24" />
+                              <p className="mt-2 text-center text-[11px] text-slate-500 dark:text-slate-400">Scan to verify</p>
+                            </>
+                          ) : (
+                            <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                              QR unavailable
+                            </div>
+                          )}
                         </div>
                       </div>
                     </section>

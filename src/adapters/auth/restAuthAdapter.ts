@@ -101,8 +101,12 @@ function extractAuthUser(payload: unknown): AuthUser | null {
       || candidate.scope === 'registrar'
       || candidate.scope === 'finance'
       || candidate.scope === 'operations'
+      || candidate.scope === 'assistant-admin'
     ) {
       nextUser.scope = candidate.scope
+    }
+    if (candidate.assistantRole === 'support_help' || candidate.assistantRole === 'department_prints') {
+      nextUser.assistantRole = candidate.assistantRole
     }
 
     if (Array.isArray(candidate.permissions)) {

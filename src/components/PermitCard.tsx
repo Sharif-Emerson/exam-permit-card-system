@@ -33,6 +33,36 @@ type PermitCardProps = {
 
 type PermitCardFieldKey = 'photo' | 'department' | 'semester' | 'course'
 
+type DepartmentPrintTheme = {
+  cardBg: string
+  cardBorder: string
+  headerBg: string
+  headerBorder: string
+  headerText: string
+}
+
+const DEPARTMENT_PRINT_THEMES: DepartmentPrintTheme[] = [
+  { cardBg: '#eff6ff', cardBorder: '#93c5fd', headerBg: '#dbeafe', headerBorder: '#93c5fd', headerText: '#1e3a8a' },
+  { cardBg: '#f0fdf4', cardBorder: '#86efac', headerBg: '#dcfce7', headerBorder: '#86efac', headerText: '#14532d' },
+  { cardBg: '#fff7ed', cardBorder: '#fdba74', headerBg: '#ffedd5', headerBorder: '#fdba74', headerText: '#9a3412' },
+  { cardBg: '#fdf4ff', cardBorder: '#e9a8fd', headerBg: '#fae8ff', headerBorder: '#e9a8fd', headerText: '#86198f' },
+  { cardBg: '#ecfeff', cardBorder: '#67e8f9', headerBg: '#cffafe', headerBorder: '#67e8f9', headerText: '#155e75' },
+  { cardBg: '#fefce8', cardBorder: '#fde047', headerBg: '#fef9c3', headerBorder: '#fde047', headerText: '#854d0e' },
+]
+
+function getDepartmentPrintTheme(department: string | undefined) {
+  const key = (department ?? '').trim().toLowerCase()
+  if (!key) {
+    return DEPARTMENT_PRINT_THEMES[0]
+  }
+  let hash = 0
+  for (let i = 0; i < key.length; i += 1) {
+    hash = (hash << 5) - hash + key.charCodeAt(i)
+    hash |= 0
+  }
+  return DEPARTMENT_PRINT_THEMES[Math.abs(hash) % DEPARTMENT_PRINT_THEMES.length]
+}
+
 type StoredPermitCardDesign = {
   logo?: string
   name?: string
@@ -84,6 +114,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
   const name = permitDesign.name || defaultName
   const showField = (field: PermitCardFieldKey) => permitDesign.fields?.[field] !== false
   const profileImage = studentData.profileImage?.trim() ? studentData.profileImage : FALLBACK_PROFILE_IMAGE
+  const departmentTheme = getDepartmentPrintTheme(studentData.department)
 
   // Permit validity: valid from today to exam date or a set period (e.g., 30 days from issue)
   const issueDate = new Date()
@@ -119,7 +150,10 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
           </div>
         </div>
 
-        <div className="permit-sheet bg-amber-50 rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border border-amber-200 relative">
+        <div
+          className="permit-sheet rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border relative"
+          style={{ backgroundColor: departmentTheme.cardBg, borderColor: departmentTheme.cardBorder }}
+        >
           {/* Watermark for print/download view */}
           <div className="hidden print:block pointer-events-none select-none" style={{
             position: 'absolute',
@@ -145,16 +179,19 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
           <div className="text-center mb-6 sm:mb-8 border-b border-slate-200 pb-5 print:hidden">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-2">Official Examination Access Card</p>
             {logo && <img src={logo} alt="Permit Logo" className="h-12 mx-auto mb-2" />}
-            <div className="text-2xl sm:text-3xl font-bold text-gray-900">{name}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-emerald-700">{name}</div>
           </div>
 
           {/* Print-only permit header with custom logo */}
-          <div className="mb-5 hidden rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-center print:block print:mb-4">
+          <div
+            className="mb-5 hidden rounded-xl border px-4 py-4 text-center print:block print:mb-4"
+            style={{ borderColor: departmentTheme.headerBorder, backgroundColor: departmentTheme.headerBg }}
+          >
             <div className="flex flex-col items-center gap-2">
               {logo && <img src={logo} alt="Permit Logo" className="h-14 w-14 object-contain" draggable={false} />}
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-emerald-700">Official Examination Permit</p>
-                <p className="mt-0.5 text-sm font-bold text-emerald-900">{name}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-emerald-800">Official Examination Permit</p>
+                <p className="mt-0.5 text-sm font-bold text-emerald-700">{name}</p>
               </div>
             </div>
           </div>
@@ -210,6 +247,12 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                 <span className="text-sm sm:text-base">{studentData.studentCategory === 'international' ? 'International' : 'Local'}</span>
               </div>
               <div className="flex items-center space-x-2">
+                <span className="font-medium text-sm sm:text-base">Gender:</span>
+                <span className="text-sm sm:text-base">
+                  {studentData.gender === 'male' ? 'Male' : studentData.gender === 'female' ? 'Female' : studentData.gender === 'other' ? 'Other' : 'Not assigned'}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
                 <span className="font-medium text-sm sm:text-base">Phone:</span>
                 <span className="text-sm sm:text-base">{studentData.phoneNumber ?? 'Not assigned'}</span>
               </div>
@@ -230,6 +273,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
               <p><span className="font-semibold">Department:</span> {studentData.department ?? 'Not assigned'}</p>
               <p><span className="font-semibold">Semester:</span> {studentData.semester ?? 'Not assigned'}</p>
               <p><span className="font-semibold">Category:</span> {studentData.studentCategory === 'international' ? 'International' : 'Local'}</p>
+              <p><span className="font-semibold">Gender:</span> {studentData.gender === 'male' ? 'Male' : studentData.gender === 'female' ? 'Female' : studentData.gender === 'other' ? 'Other' : 'Not assigned'}</p>
               <p className="col-span-2"><span className="font-semibold">Phone:</span> {studentData.phoneNumber ?? 'Not assigned'}</p>
             </div>
           </div>

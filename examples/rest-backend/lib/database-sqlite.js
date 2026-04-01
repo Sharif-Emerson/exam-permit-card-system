@@ -4,6 +4,8 @@ import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypt
 import Database from 'better-sqlite3'
 import { fileURLToPath } from 'node:url'
 import { getBootstrapAdmins, getBootstrapProfiles } from './bootstrap-admins.js'
+import { assertNoStudentExamTimeConflicts } from './exam-schedule-validation.js'
+import { signPermitPayload } from './permit-integrity.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -33,6 +35,7 @@ const defaultSystemFeeSettings = Object.freeze({
   international_student_fee: 6000,
   currency_code: 'USD',
 })
+const fallbackStudentProfileImage = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'><rect width='160' height='160' fill='%23e2e8f0'/><circle cx='80' cy='58' r='28' fill='%2394a3b8'/><path d='M36 132c8-24 28-36 44-36s36 12 44 36' fill='%2394a3b8'/></svg>"
 const trashRetentionDays = Math.max(Number(process.env.TRASH_RETENTION_DAYS ?? '30') || 30, 1)
 
 db.exec(`
@@ -48,7 +51,9 @@ db.exec(`
     email TEXT NOT NULL UNIQUE,
     phone_number TEXT,
     role TEXT NOT NULL CHECK (role IN ('admin', 'student')),
-    admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations')),
+    admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations', 'assistant-admin')),
+    assistant_role TEXT CHECK (assistant_role IN ('support_help', 'department_prints')),
+    assistant_departments_json TEXT NOT NULL DEFAULT '[]',
     name TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -63,6 +68,7 @@ db.exec(`
     name TEXT NOT NULL,
     student_id TEXT,
     student_category TEXT NOT NULL DEFAULT 'local' CHECK (student_category IN ('local', 'international')),
+    gender TEXT CHECK (gender IN ('male', 'female', 'other')),
     enrollment_status TEXT NOT NULL DEFAULT 'active' CHECK (enrollment_status IN ('active', 'on_leave', 'graduated')),
     course TEXT,
     program TEXT,
@@ -80,6 +86,7 @@ db.exec(`
     exams_json TEXT NOT NULL DEFAULT '[]',
     total_fees REAL NOT NULL DEFAULT 0,
     amount_paid REAL NOT NULL DEFAULT 0,
+    first_login_required INTEGER NOT NULL DEFAULT 0 CHECK (first_login_required IN (0, 1)),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
@@ -145,6 +152,33 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS support_request_messages (
+    id TEXT PRIMARY KEY,
+    request_id TEXT NOT NULL,
+    sender_role TEXT NOT NULL CHECK (sender_role IN ('student', 'admin')),
+    sender_id TEXT NOT NULL,
+    message TEXT NOT NULL,
+    attachment_name TEXT,
+    attachment_url TEXT,
+    attachment_mime_type TEXT,
+    attachment_size_bytes INTEGER,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (request_id) REFERENCES support_requests(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS semester_registrations (
+    id TEXT PRIMARY KEY,
+    student_id TEXT NOT NULL,
+    requested_semester TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    admin_note TEXT NOT NULL DEFAULT '',
+    resolved_by_admin_id TEXT,
+    resolved_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (student_id) REFERENCES profiles(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS trashed_profiles (
     id TEXT PRIMARY KEY,
     profile_id TEXT NOT NULL,
@@ -183,12 +217,16 @@ function ensureColumn(tableName, columnDefinition) {
 ensureColumn('users', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
 ensureColumn('users', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
 ensureColumn('users', 'phone_number TEXT')
-ensureColumn('users', "admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations'))")
+ensureColumn('users', "admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations', 'assistant-admin'))")
+ensureColumn('users', "assistant_role TEXT CHECK (assistant_role IN ('support_help', 'department_prints'))")
+ensureColumn('users', "assistant_departments_json TEXT NOT NULL DEFAULT '[]'")
 ensureColumn('profiles', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
 ensureColumn('profiles', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
 ensureColumn('profiles', 'phone_number TEXT')
 ensureColumn('profiles', "student_category TEXT NOT NULL DEFAULT 'local'")
+ensureColumn('profiles', "gender TEXT CHECK (gender IN ('male', 'female', 'other'))")
 ensureColumn('profiles', "enrollment_status TEXT NOT NULL DEFAULT 'active' CHECK (enrollment_status IN ('active', 'on_leave', 'graduated'))")
+ensureColumn('profiles', "first_login_required INTEGER NOT NULL DEFAULT 0 CHECK (first_login_required IN (0, 1))")
 ensureColumn('profiles', 'permit_token TEXT')
 ensureColumn('profiles', 'permit_print_grant_month TEXT')
 ensureColumn('profiles', 'permit_print_grants_remaining INTEGER NOT NULL DEFAULT 0')
@@ -202,6 +240,10 @@ ensureColumn('system_settings', "deadlines_json TEXT NOT NULL DEFAULT '[]'")
 ensureColumn('system_settings', "currency_code TEXT NOT NULL DEFAULT 'USD'")
 ensureColumn('admin_activity_logs', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
 ensureColumn('admin_activity_logs', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
+ensureColumn('support_request_messages', 'attachment_name TEXT')
+ensureColumn('support_request_messages', 'attachment_url TEXT')
+ensureColumn('support_request_messages', 'attachment_mime_type TEXT')
+ensureColumn('support_request_messages', 'attachment_size_bytes INTEGER')
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_users_campus_id ON users(campus_id);
@@ -217,6 +259,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_admin_activity_logs_created_at ON admin_activity_logs(created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_support_requests_student_id ON support_requests(student_id);
   CREATE INDEX IF NOT EXISTS idx_support_requests_status_updated_at ON support_requests(status, updated_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_support_request_messages_request_id ON support_request_messages(request_id, created_at ASC);
+  CREATE INDEX IF NOT EXISTS idx_semester_registrations_student_id ON semester_registrations(student_id, created_at DESC);
 `)
 
 db.prepare(`
@@ -232,12 +276,12 @@ db.prepare(`
     WHEN id = 'admin-1' THEN 'super-admin'
     WHEN id = 'admin-2' THEN 'registrar'
     WHEN id = 'admin-3' THEN 'finance'
-    WHEN id = 'admin-4' THEN 'operations'
+    WHEN id = 'admin-4' THEN 'assistant-admin'
     WHEN admin_scope IS NOT NULL AND admin_scope != '' THEN admin_scope
     WHEN lower(email) = 'admin@example.com' THEN 'super-admin'
     WHEN lower(email) = 'registrar@example.com' THEN 'registrar'
     WHEN lower(email) = 'finance@example.com' THEN 'finance'
-    WHEN lower(email) = 'operations@example.com' THEN 'operations'
+    WHEN lower(email) = 'operations@example.com' THEN 'assistant-admin'
     ELSE 'operations'
   END
 `).run()
@@ -387,6 +431,8 @@ function mapUser(row) {
     email: row.email,
     role: row.role,
     admin_scope: row.admin_scope ?? null,
+    assistant_role: row.assistant_role ?? null,
+    assistant_departments_json: row.assistant_departments_json ?? '[]',
     name: row.name,
     campusId: row.campus_id,
     campusName: row.campus_name,
@@ -557,6 +603,7 @@ function listProfileExamsByIds(profileIds) {
 function replaceProfileExams(profileId, exams) {
   const timestamp = nowIso()
   const normalizedExams = normalizeExamAssignments(exams, { id: profileId })
+  assertNoStudentExamTimeConflicts(normalizedExams)
   const deleteStatement = db.prepare('DELETE FROM profile_exams WHERE profile_id = ?')
   const insertStatement = db.prepare(`
     INSERT INTO profile_exams (id, profile_id, title, exam_date, exam_time, venue, seat_number, created_at, updated_at)
@@ -701,11 +748,11 @@ async function seedDatabaseIfNeeded() {
   `)
   const insertProfile = db.prepare(`
     INSERT INTO profiles (
-      id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, enrollment_status, course, program, college,
+      id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, gender, enrollment_status, course, program, college,
       department, semester, course_units_json, exam_date, exam_time, venue, seat_number,
       instructions, profile_image, permit_token, exams_json, total_fees, amount_paid, created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   const insertLog = db.prepare(`
     INSERT INTO admin_activity_logs (id, admin_id, target_profile_id, action, details, campus_id, campus_name, created_at)
@@ -759,6 +806,7 @@ async function seedDatabaseIfNeeded() {
         profile.campus_name ?? 'Main Campus',
         profile.student_id ?? null,
         normalizeStudentCategory(profile.student_category),
+        profile.gender === 'male' || profile.gender === 'female' || profile.gender === 'other' ? profile.gender : null,
         normalizeEnrollmentStatus(profile.enrollment_status),
         profile.course ?? null,
         profile.program ?? profile.course ?? null,
@@ -865,7 +913,7 @@ export function getSessionUser(token) {
   pruneExpiredSessions()
   const tokenHash = hashToken(token)
   const row = db.prepare(`
-    SELECT users.id, users.email, users.role, users.admin_scope, users.name, users.campus_id, users.campus_name, sessions.expires_at AS expiresAt
+    SELECT users.id, users.email, users.role, users.admin_scope, users.assistant_role, users.assistant_departments_json, users.name, users.campus_id, users.campus_name, sessions.expires_at AS expiresAt
     FROM sessions
     JOIN users ON users.id = sessions.user_id
     WHERE sessions.token_hash = ?
@@ -978,6 +1026,90 @@ export function listProfiles(role) {
   return rows.map((row) => mapProfile(row, examsByProfileId))
 }
 
+function parseAssistantDepartments(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) {
+    return []
+  }
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.map((value) => String(value ?? '').trim()).filter(Boolean) : []
+  } catch {
+    return []
+  }
+}
+
+export function listAssistantAdmins() {
+  const rows = db.prepare(`
+    SELECT id, email, phone_number, name, assistant_role, assistant_departments_json, campus_id, campus_name
+    FROM users
+    WHERE role = 'admin' AND admin_scope = 'assistant-admin'
+    ORDER BY created_at DESC
+  `).all()
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    phoneNumber: row.phone_number ?? '',
+    role: row.assistant_role === 'support_help' ? 'support_help' : 'department_prints',
+    departments: parseAssistantDepartments(row.assistant_departments_json),
+    campusId: row.campus_id ?? 'main-campus',
+    campusName: row.campus_name ?? 'Main Campus',
+  }))
+}
+
+export function createAssistantAdmin(input) {
+  const id = randomBytes(12).toString('hex')
+  const timestamp = nowIso()
+  const email = String(input.email ?? '').trim().toLowerCase()
+  const name = String(input.name ?? '').trim()
+  const phoneNumber = normalizePhoneNumber(input.phone_number) || null
+  const password = String(input.password ?? '').trim()
+  const role = input.role === 'support_help' ? 'support_help' : 'department_prints'
+  const departments = Array.isArray(input.departments) ? input.departments.map((item) => String(item ?? '').trim()).filter(Boolean) : []
+  const campusId = String(input.campus_id ?? 'main-campus').trim() || 'main-campus'
+  const campusName = String(input.campus_name ?? 'Main Campus').trim() || 'Main Campus'
+  const departmentsJson = JSON.stringify(departments)
+
+  upsertCampus(campusId, campusName)
+  db.exec('BEGIN')
+  try {
+    db.prepare(`
+      INSERT INTO users (id, email, phone_number, role, admin_scope, assistant_role, assistant_departments_json, name, campus_id, campus_name, password_hash, created_at, updated_at)
+      VALUES (?, ?, ?, 'admin', 'assistant-admin', ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, email, phoneNumber, role, departmentsJson, name, campusId, campusName, hashPassword(password), timestamp, timestamp)
+
+    db.prepare(`
+      INSERT INTO profiles (
+        id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, gender, enrollment_status, course, program, college,
+        department, semester, course_units_json, exam_date, exam_time, venue, seat_number, instructions, profile_image,
+        permit_token, permit_print_grant_month, permit_print_grants_remaining, exams_json, total_fees, amount_paid, created_at, updated_at
+      )
+      VALUES (?, ?, ?, 'admin', ?, ?, ?, NULL, 'local', NULL, 'active', NULL, NULL, NULL, NULL, NULL, '[]', NULL, NULL, NULL, NULL, NULL, NULL, ?, NULL, 0, '[]', 0, 0, ?, ?)
+    `).run(id, email, phoneNumber, name, campusId, campusName, createPermitToken(), timestamp, timestamp)
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+  return listAssistantAdmins().find((item) => item.id === id) ?? null
+}
+
+export function updateAssistantAdmin(id, updates) {
+  const existing = db.prepare(`SELECT * FROM users WHERE id = ? AND role = 'admin' AND admin_scope = 'assistant-admin'`).get(id)
+  if (!existing) {
+    return null
+  }
+  const role = updates.role === 'support_help' ? 'support_help' : 'department_prints'
+  const departments = Array.isArray(updates.departments) ? updates.departments.map((item) => String(item ?? '').trim()).filter(Boolean) : parseAssistantDepartments(existing.assistant_departments_json)
+  const updatedAt = nowIso()
+  db.prepare(`
+    UPDATE users
+    SET assistant_role = ?, assistant_departments_json = ?, updated_at = ?
+    WHERE id = ?
+  `).run(role, JSON.stringify(departments), updatedAt, id)
+  return listAssistantAdmins().find((item) => item.id === id) ?? null
+}
+
 export function listProfilesPage({ role, search, status, department, program, course, college, page = 1, pageSize = 25 } = {}) {
   pruneExpiredTrashedProfiles()
   const whereClauses = []
@@ -1081,15 +1213,23 @@ export function getPermitByToken(permitToken) {
 
   const exams = listProfileExamsByIds([row.id]).get(row.id) ?? parseLegacyExamAssignments(row)
 
-  return {
+  const cleared = Number(row.amount_paid ?? 0) >= Number(row.total_fees ?? 0)
+  const base = {
     permitToken: row.permit_token,
     profileId: row.id,
     studentName: row.name,
     profileImage: row.profile_image,
-    cleared: Number(row.amount_paid ?? 0) >= Number(row.total_fees ?? 0),
+    cleared,
     exams,
     updatedAt: row.updated_at,
   }
+  const integrity = signPermitPayload({
+    permitToken: base.permitToken,
+    profileId: base.profileId,
+    cleared: base.cleared,
+    updatedAt: base.updatedAt,
+  })
+  return integrity ? { ...base, integrity } : base
 }
 
 export function updateProfileFinancials(profileId, amountPaid, totalFees) {
@@ -1166,6 +1306,7 @@ export function createStudentProfile(input) {
   const nextPhoneNumber = normalizePhoneNumber(input.phone_number) || null
   const nextStudentId = input.student_id ?? null
   const nextStudentCategory = normalizeStudentCategory(input.student_category)
+  const nextGender = input.gender === 'male' || input.gender === 'female' || input.gender === 'other' ? input.gender : null
   const nextCourse = input.course ?? null
   const nextProgram = input.program ?? null
   const nextCollege = input.college ?? null
@@ -1212,11 +1353,11 @@ export function createStudentProfile(input) {
 
     db.prepare(`
       INSERT INTO profiles (
-        id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, enrollment_status, course, program, college,
+        id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, gender, enrollment_status, course, program, college,
         department, semester, course_units_json, exam_date, exam_time, venue, seat_number,
-        instructions, profile_image, permit_token, exams_json, total_fees, amount_paid, created_at, updated_at
+        instructions, profile_image, permit_token, exams_json, total_fees, amount_paid, first_login_required, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       profileId,
       nextEmail,
@@ -1227,6 +1368,7 @@ export function createStudentProfile(input) {
       nextCampusName,
       nextStudentId,
       nextStudentCategory,
+      nextGender,
       normalizeEnrollmentStatus(input.enrollment_status),
       nextCourse,
       nextProgram,
@@ -1244,6 +1386,7 @@ export function createStudentProfile(input) {
       serializeExamAssignments(exams),
       nextTotalFees,
       nextAmountPaid,
+      1,
       timestamp,
       timestamp,
     )
@@ -1277,16 +1420,23 @@ export function updateStudentAccount(profileId, updates) {
       : profileRow.profile_image
   const requestedPassword = typeof updates.password === 'string' ? updates.password.trim() : ''
   const currentPassword = typeof updates.currentPassword === 'string' ? updates.currentPassword.trim() : ''
+  const firstLoginRequired = profileRow.role === 'student' && Number(profileRow.first_login_required ?? 0) === 1
 
   if (requestedPassword) {
-    if (!currentPassword) {
+    if (!currentPassword && !firstLoginRequired) {
       throw new Error('Current password is required to set a new password.')
     }
 
-    if (!verifyPassword(currentPassword, userRow.password_hash)) {
+    if (!firstLoginRequired && !verifyPassword(currentPassword, userRow.password_hash)) {
       throw new Error('Current password is incorrect.')
     }
   }
+  const nextFirstLoginRequired = firstLoginRequired
+    ? ((requestedPassword.length >= 8 && nextPhoneNumber) ? 0 : 1)
+    : Number(profileRow.first_login_required ?? 0)
+  const effectiveProfileImage = firstLoginRequired && !nextProfileImage
+    ? fallbackStudentProfileImage
+    : nextProfileImage
 
   const nextPasswordHash = typeof updates.password === 'string' && updates.password.trim()
     ? hashPassword(updates.password.trim())
@@ -1304,9 +1454,9 @@ export function updateStudentAccount(profileId, updates) {
 
     db.prepare(`
       UPDATE profiles
-      SET email = ?, phone_number = ?, name = ?, profile_image = ?, updated_at = ?
+      SET email = ?, phone_number = ?, name = ?, profile_image = ?, first_login_required = ?, updated_at = ?
       WHERE id = ?
-    `).run(nextEmail, nextPhoneNumber, nextName, nextProfileImage, updatedAt, profileId)
+    `).run(nextEmail, nextPhoneNumber, nextName, effectiveProfileImage, nextFirstLoginRequired, updatedAt, profileId)
 
     db.exec('COMMIT')
   } catch (error) {
@@ -1346,6 +1496,9 @@ export function adminUpdateStudentProfile(profileId, updates) {
   const nextPhoneNumber = 'phone_number' in updates ? (normalizePhoneNumber(updates.phone_number) || null) : userRow.phone_number
   const nextStudentId = 'student_id' in updates ? (updates.student_id ?? null) : profileRow.student_id
   const nextStudentCategory = 'student_category' in updates ? normalizeStudentCategory(updates.student_category) : normalizeStudentCategory(profileRow.student_category)
+  const nextGender = 'gender' in updates
+    ? (updates.gender === 'male' || updates.gender === 'female' || updates.gender === 'other' ? updates.gender : null)
+    : profileRow.gender
   const nextEnrollmentStatus = 'enrollment_status' in updates ? normalizeEnrollmentStatus(updates.enrollment_status) : normalizeEnrollmentStatus(profileRow.enrollment_status)
   const nextCourse = 'course' in updates ? (updates.course ?? null) : profileRow.course
   const nextProgram = 'program' in updates ? (updates.program ?? null) : profileRow.program
@@ -1384,9 +1537,9 @@ export function adminUpdateStudentProfile(profileId, updates) {
 
     db.prepare(`
       UPDATE profiles
-      SET email = ?, phone_number = ?, name = ?, student_id = ?, student_category = ?, enrollment_status = ?, course = ?, program = ?, college = ?, department = ?, semester = ?, course_units_json = ?, profile_image = ?, total_fees = ?, exams_json = ?, updated_at = ?
+      SET email = ?, phone_number = ?, name = ?, student_id = ?, student_category = ?, gender = ?, enrollment_status = ?, course = ?, program = ?, college = ?, department = ?, semester = ?, course_units_json = ?, profile_image = ?, total_fees = ?, exams_json = ?, updated_at = ?
       WHERE id = ?
-    `).run(nextEmail, nextPhoneNumber, nextName, nextStudentId, nextStudentCategory, nextEnrollmentStatus, nextCourse, nextProgram, nextCollege, nextDepartment, nextSemester, nextCourseUnitsJson, nextProfileImage, nextTotalFees, nextExamsJson, updatedAt, profileId)
+    `).run(nextEmail, nextPhoneNumber, nextName, nextStudentId, nextStudentCategory, nextGender, nextEnrollmentStatus, nextCourse, nextProgram, nextCollege, nextDepartment, nextSemester, nextCourseUnitsJson, nextProfileImage, nextTotalFees, nextExamsJson, updatedAt, profileId)
 
     if (examsToReplace) {
       replaceProfileExams(profileId, examsToReplace)
@@ -1454,7 +1607,46 @@ function mapSupportRequest(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     resolvedAt: row.resolved_at,
+    messages: Array.isArray(row.messages) ? row.messages : [],
   }
+}
+
+function mapSupportMessage(row) {
+  return {
+    id: row.id,
+    requestId: row.request_id,
+    senderRole: row.sender_role,
+    senderId: row.sender_id,
+    message: row.message,
+    attachmentName: row.attachment_name ?? null,
+    attachmentUrl: row.attachment_url ?? null,
+    attachmentMimeType: row.attachment_mime_type ?? null,
+    attachmentSizeBytes: row.attachment_size_bytes == null ? null : Number(row.attachment_size_bytes),
+    createdAt: row.created_at,
+  }
+}
+
+function listSupportMessagesByRequestIds(requestIds) {
+  const uniqueIds = [...new Set(requestIds.filter(Boolean))]
+  const collection = new Map(uniqueIds.map((id) => [id, []]))
+  if (uniqueIds.length === 0) {
+    return collection
+  }
+  const placeholders = uniqueIds.map(() => '?').join(', ')
+  const rows = db.prepare(`
+    SELECT * FROM support_request_messages
+    WHERE request_id IN (${placeholders})
+    ORDER BY created_at ASC
+  `).all(...uniqueIds)
+
+  for (const row of rows) {
+    const bucket = collection.get(row.request_id)
+    const mapped = mapSupportMessage(row)
+    if (bucket) bucket.push(mapped)
+    else collection.set(row.request_id, [mapped])
+  }
+
+  return collection
 }
 
 export function listSupportRequests({ studentId } = {}) {
@@ -1476,11 +1668,24 @@ export function listSupportRequests({ studentId } = {}) {
     ${whereSql}
     ORDER BY support_requests.updated_at DESC, support_requests.created_at DESC
   `).all(...params)
-
-  return rows.map(mapSupportRequest)
+  const messagesByRequestId = listSupportMessagesByRequestIds(rows.map((row) => row.id))
+  return rows.map((row) => mapSupportRequest({
+    ...row,
+    messages: messagesByRequestId.get(row.id) ?? [],
+  }))
 }
 
-export function createSupportRequest(studentId, { subject, message }) {
+export function createSupportRequest(
+  studentId,
+  {
+    subject,
+    message,
+    attachmentName = null,
+    attachmentUrl = null,
+    attachmentMimeType = null,
+    attachmentSizeBytes = null,
+  },
+) {
   const profile = getProfileById(studentId)
 
   if (!profile || profile.role !== 'student') {
@@ -1490,12 +1695,90 @@ export function createSupportRequest(studentId, { subject, message }) {
   const id = randomBytes(12).toString('hex')
   const timestamp = nowIso()
 
-  db.prepare(`
-    INSERT INTO support_requests (id, student_id, subject, message, status, admin_reply, resolved_at, created_at, updated_at)
-    VALUES (?, ?, ?, ?, 'open', '', NULL, ?, ?)
-  `).run(id, studentId, subject, message, timestamp, timestamp)
+  db.exec('BEGIN')
+  try {
+    db.prepare(`
+      INSERT INTO support_requests (id, student_id, subject, message, status, admin_reply, resolved_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 'open', '', NULL, ?, ?)
+    `).run(id, studentId, subject, message, timestamp, timestamp)
+    db.prepare(`
+      INSERT INTO support_request_messages (
+        id, request_id, sender_role, sender_id, message,
+        attachment_name, attachment_url, attachment_mime_type, attachment_size_bytes,
+        created_at
+      )
+      VALUES (?, ?, 'student', ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      randomBytes(12).toString('hex'),
+      id,
+      studentId,
+      message,
+      attachmentName,
+      attachmentUrl,
+      attachmentMimeType,
+      attachmentSizeBytes,
+      timestamp,
+    )
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
 
   return listSupportRequests({ studentId }).find((request) => request.id === id) ?? null
+}
+
+export function addSupportRequestMessage(requestId, { senderRole, senderId, message, attachmentName = null, attachmentUrl = null, attachmentMimeType = null, attachmentSizeBytes = null }) {
+  const existing = db.prepare('SELECT * FROM support_requests WHERE id = ?').get(requestId)
+  if (!existing) {
+    return null
+  }
+  const trimmed = String(message ?? '').trim()
+  const hasAttachment = Boolean(attachmentUrl)
+  if (!trimmed && !hasAttachment) {
+    return listSupportRequests().find((request) => request.id === requestId) ?? null
+  }
+  const timestamp = nowIso()
+  const normalizedRole = senderRole === 'admin' ? 'admin' : 'student'
+  const nextStatus = normalizedRole === 'student'
+    ? (existing.status === 'resolved' ? 'open' : existing.status)
+    : (existing.status === 'open' ? 'in_progress' : existing.status)
+  const nextResolvedAt = nextStatus === 'resolved' ? (existing.resolved_at ?? timestamp) : null
+
+  db.exec('BEGIN')
+  try {
+    db.prepare(`
+      INSERT INTO support_request_messages (
+        id, request_id, sender_role, sender_id, message,
+        attachment_name, attachment_url, attachment_mime_type, attachment_size_bytes,
+        created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      randomBytes(12).toString('hex'),
+      requestId,
+      normalizedRole,
+      senderId,
+      trimmed,
+      attachmentName,
+      attachmentUrl,
+      attachmentMimeType,
+      attachmentSizeBytes,
+      timestamp,
+    )
+
+    db.prepare(`
+      UPDATE support_requests
+      SET status = ?, resolved_at = ?, updated_at = ?
+      WHERE id = ?
+    `).run(nextStatus, nextResolvedAt, timestamp, requestId)
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+
+  return listSupportRequests().find((request) => request.id === requestId) ?? null
 }
 
 export function updateSupportRequest(requestId, { status, adminReply }) {
@@ -1512,13 +1795,91 @@ export function updateSupportRequest(requestId, { status, adminReply }) {
     : null
   const updatedAt = nowIso()
 
-  db.prepare(`
-    UPDATE support_requests
-    SET status = ?, admin_reply = ?, resolved_at = ?, updated_at = ?
-    WHERE id = ?
-  `).run(nextStatus, nextAdminReply, resolvedAt, updatedAt, requestId)
+  db.exec('BEGIN')
+  try {
+    db.prepare(`
+      UPDATE support_requests
+      SET status = ?, admin_reply = ?, resolved_at = ?, updated_at = ?
+      WHERE id = ?
+    `).run(nextStatus, nextAdminReply, resolvedAt, updatedAt, requestId)
+
+    if (typeof adminReply === 'string' && adminReply.trim() && adminReply.trim() !== String(existing.admin_reply ?? '').trim()) {
+      db.prepare(`
+        INSERT INTO support_request_messages (id, request_id, sender_role, sender_id, message, created_at)
+        VALUES (?, ?, 'admin', ?, ?, ?)
+      `).run(randomBytes(12).toString('hex'), requestId, 'admin-system', adminReply.trim(), updatedAt)
+    }
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
 
   return listSupportRequests().find((request) => request.id === requestId) ?? null
+}
+
+export function listSemesterRegistrations({ studentId } = {}) {
+  const params = []
+  const whereSql = studentId ? 'WHERE semester_registrations.student_id = ?' : ''
+  if (studentId) {
+    params.push(studentId)
+  }
+  const rows = db.prepare(`
+    SELECT
+      semester_registrations.*,
+      profiles.name AS student_name,
+      profiles.email AS student_email,
+      profiles.student_id AS registration_number
+    FROM semester_registrations
+    JOIN profiles ON profiles.id = semester_registrations.student_id
+    ${whereSql}
+    ORDER BY semester_registrations.updated_at DESC, semester_registrations.created_at DESC
+  `).all(...params)
+  return rows.map((row) => ({
+    id: row.id,
+    studentId: row.student_id,
+    studentName: row.student_name,
+    studentEmail: row.student_email,
+    registrationNumber: row.registration_number ?? '',
+    requestedSemester: row.requested_semester,
+    status: row.status,
+    adminNote: row.admin_note ?? '',
+    resolvedByAdminId: row.resolved_by_admin_id ?? null,
+    resolvedAt: row.resolved_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }))
+}
+
+export function createSemesterRegistration(studentId, requestedSemester) {
+  const profile = getProfileById(studentId)
+  if (!profile || profile.role !== 'student') {
+    return null
+  }
+  const id = randomBytes(12).toString('hex')
+  const timestamp = nowIso()
+  db.prepare(`
+    INSERT INTO semester_registrations (id, student_id, requested_semester, status, admin_note, resolved_by_admin_id, resolved_at, created_at, updated_at)
+    VALUES (?, ?, ?, 'pending', '', NULL, NULL, ?, ?)
+  `).run(id, studentId, requestedSemester, timestamp, timestamp)
+  return listSemesterRegistrations({ studentId }).find((item) => item.id === id) ?? null
+}
+
+export function updateSemesterRegistrationStatus(registrationId, { status, adminNote, resolvedByAdminId }) {
+  const existing = db.prepare('SELECT * FROM semester_registrations WHERE id = ?').get(registrationId)
+  if (!existing) {
+    return null
+  }
+  const nextStatus = status === 'approved' || status === 'rejected' ? status : existing.status
+  const note = typeof adminNote === 'string' ? adminNote.trim() : (existing.admin_note ?? '')
+  const resolvedAt = nextStatus === 'pending' ? null : nowIso()
+  const updatedAt = nowIso()
+  db.prepare(`
+    UPDATE semester_registrations
+    SET status = ?, admin_note = ?, resolved_by_admin_id = ?, resolved_at = ?, updated_at = ?
+    WHERE id = ?
+  `).run(nextStatus, note, nextStatus === 'pending' ? null : (resolvedByAdminId ?? existing.resolved_by_admin_id ?? null), resolvedAt, updatedAt, registrationId)
+  return listSemesterRegistrations().find((item) => item.id === registrationId) ?? null
 }
 
 export function deleteStudentProfile(profileId, deletedByAdminId = null) {
@@ -1532,6 +1893,10 @@ export function deleteStudentProfile(profileId, deletedByAdminId = null) {
   const userRow = db.prepare('SELECT * FROM users WHERE id = ?').get(profileId)
   const examRows = db.prepare('SELECT * FROM profile_exams WHERE profile_id = ? ORDER BY created_at ASC').all(profileId)
   const supportRows = db.prepare('SELECT * FROM support_requests WHERE student_id = ? ORDER BY created_at ASC').all(profileId)
+  const supportRequestIds = supportRows.map((row) => row.id).filter(Boolean)
+  const supportMessageRows = supportRequestIds.length > 0
+    ? db.prepare(`SELECT * FROM support_request_messages WHERE request_id IN (${supportRequestIds.map(() => '?').join(', ')}) ORDER BY created_at ASC`).all(...supportRequestIds)
+    : []
   const activityRows = db.prepare(`
     SELECT * FROM admin_activity_logs
     WHERE target_profile_id = ? OR admin_id = ?
@@ -1545,6 +1910,7 @@ export function deleteStudentProfile(profileId, deletedByAdminId = null) {
     profile: profileRow,
     exams: examRows,
     supportRequests: supportRows,
+    supportRequestMessages: supportMessageRows,
     activityLogs: activityRows,
   })
 
@@ -1628,6 +1994,7 @@ export function restoreStudentProfile(trashId, restoredByAdminId = null) {
   const profileRow = snapshot?.profile ?? null
   const examRows = Array.isArray(snapshot?.exams) ? snapshot.exams : []
   const supportRows = Array.isArray(snapshot?.supportRequests) ? snapshot.supportRequests : []
+  const supportMessageRows = Array.isArray(snapshot?.supportRequestMessages) ? snapshot.supportRequestMessages : []
   const activityRows = Array.isArray(snapshot?.activityLogs) ? snapshot.activityLogs : []
 
   if (!userRow || !profileRow || profileRow.role !== 'student') {
@@ -1677,11 +2044,11 @@ export function restoreStudentProfile(trashId, restoredByAdminId = null) {
 
     db.prepare(`
       INSERT INTO profiles (
-        id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, enrollment_status, course, program, college,
+        id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, gender, enrollment_status, course, program, college,
         department, semester, course_units_json, exam_date, exam_time, venue, seat_number, instructions, profile_image,
         permit_token, permit_print_grant_month, permit_print_grants_remaining, exams_json, total_fees, amount_paid, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       profileRow.id,
       profileRow.email,
@@ -1692,6 +2059,7 @@ export function restoreStudentProfile(trashId, restoredByAdminId = null) {
       profileRow.campus_name ?? 'Main Campus',
       profileRow.student_id ?? null,
       normalizeStudentCategory(profileRow.student_category),
+      profileRow.gender === 'male' || profileRow.gender === 'female' || profileRow.gender === 'other' ? profileRow.gender : null,
       normalizeEnrollmentStatus(profileRow.enrollment_status),
       profileRow.course ?? null,
       profileRow.program ?? null,
@@ -1746,6 +2114,19 @@ export function restoreStudentProfile(trashId, restoredByAdminId = null) {
         supportRow.resolved_at ?? null,
         supportRow.created_at,
         supportRow.updated_at,
+      )
+    }
+    for (const messageRow of supportMessageRows) {
+      db.prepare(`
+        INSERT INTO support_request_messages (id, request_id, sender_role, sender_id, message, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(
+        messageRow.id,
+        messageRow.request_id,
+        messageRow.sender_role === 'admin' ? 'admin' : 'student',
+        messageRow.sender_id,
+        messageRow.message,
+        messageRow.created_at,
       )
     }
 

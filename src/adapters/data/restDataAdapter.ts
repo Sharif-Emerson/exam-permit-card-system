@@ -1,5 +1,6 @@
 import { apiBaseUrl } from '../../config/provider'
 import type {
+  AssistantAdminAccount,
   AdminActivityLog,
   AdminActivityLogPage,
   AdminProfileUpdateInput,
@@ -19,6 +20,7 @@ import type {
   SystemFeeSettings,
   SupportRequest,
   SupportRequestUpdateInput,
+  SemesterRegistration,
   UniversityDeadline,
 } from '../../types'
 import { requestWithApiFallback } from '../rest/request'
@@ -83,6 +85,7 @@ function toDatabaseProfileRow(payload: unknown): DatabaseProfileRow {
       : record.enrollment_status === 'graduated' || record.enrollmentStatus === 'graduated'
         ? 'graduated'
         : 'active',
+    gender: record.gender === 'male' || record.gender === 'female' || record.gender === 'other' ? record.gender : null,
     phone_number: record.phone_number == null ? (record.phoneNumber == null ? null : String(record.phoneNumber)) : String(record.phone_number),
     course: record.course == null ? null : String(record.course),
     program: record.program == null ? null : String(record.program),
@@ -113,6 +116,9 @@ function toDatabaseProfileRow(payload: unknown): DatabaseProfileRow {
     print_access_message: record.print_access_message == null ? (record.printAccessMessage == null ? null : String(record.printAccessMessage)) : String(record.print_access_message),
     total_fees: Number(record.total_fees ?? record.totalFees ?? 0),
     amount_paid: Number(record.amount_paid ?? record.amountPaid ?? 0),
+    first_login_required: record.first_login_required == null
+      ? (record.firstLoginRequired == null ? null : (record.firstLoginRequired ? 1 : 0))
+      : Number(record.first_login_required),
   }
 }
 
@@ -304,6 +310,34 @@ function toSupportRequest(payload: unknown): SupportRequest {
     message: String(record.message ?? ''),
     status: record.status === 'resolved' || record.status === 'in_progress' ? record.status : 'open',
     adminReply: String(record.admin_reply ?? record.adminReply ?? ''),
+    messages: messagesRaw
+      .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+      .map((item) => ({
+        id: String(item.id ?? ''),
+        requestId: String(item.requestId ?? item.request_id ?? ''),
+        senderRole: item.senderRole === 'admin' || item.sender_role === 'admin' ? 'admin' : 'student',
+        senderId: String(item.senderId ?? item.sender_id ?? ''),
+        message: String(item.message ?? ''),
+        attachmentName: typeof item.attachmentName === 'string'
+          ? item.attachmentName
+          : typeof item.attachment_name === 'string'
+            ? item.attachment_name
+            : undefined,
+        attachmentUrl: typeof item.attachmentUrl === 'string'
+          ? item.attachmentUrl
+          : typeof item.attachment_url === 'string'
+            ? item.attachment_url
+            : undefined,
+        attachmentMimeType: typeof item.attachmentMimeType === 'string'
+          ? item.attachmentMimeType
+          : typeof item.attachment_mime_type === 'string'
+            ? item.attachment_mime_type
+            : undefined,
+        attachmentSizeBytes: Number(item.attachmentSizeBytes ?? item.attachment_size_bytes ?? 0) > 0
+          ? Number(item.attachmentSizeBytes ?? item.attachment_size_bytes ?? 0)
+          : undefined,
+        createdAt: String(item.createdAt ?? item.created_at ?? ''),
+      })),
     createdAt: String(record.created_at ?? record.createdAt ?? ''),
     updatedAt: String(record.updated_at ?? record.updatedAt ?? ''),
     resolvedAt: record.resolved_at == null ? null : String(record.resolved_at),
@@ -349,7 +383,43 @@ function toSupportContact(payload: unknown): SupportContact {
     name: String(record.name ?? ''),
     email: String(record.email ?? ''),
     phoneNumber: String(record.phoneNumber ?? record.phone_number ?? 'Not assigned'),
-    scope: record.scope === 'registrar' || record.scope === 'finance' || record.scope === 'operations' ? record.scope : 'super-admin',
+    scope: record.scope === 'registrar' || record.scope === 'finance' || record.scope === 'operations' || record.scope === 'assistant-admin' ? record.scope : 'super-admin',
+  }
+}
+
+function toAssistantAdminAccount(payload: unknown): AssistantAdminAccount {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('The API returned an invalid assistant admin payload.')
+  }
+  const record = payload as Record<string, unknown>
+  return {
+    id: String(record.id ?? ''),
+    name: String(record.name ?? ''),
+    email: String(record.email ?? ''),
+    phoneNumber: String(record.phoneNumber ?? record.phone_number ?? ''),
+    role: record.role === 'support_help' ? 'support_help' : 'department_prints',
+    departments: Array.isArray(record.departments) ? record.departments.map((item) => String(item ?? '').trim()).filter(Boolean) : [],
+  }
+}
+
+function toSemesterRegistration(payload: unknown): SemesterRegistration {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('The API returned an invalid semester registration payload.')
+  }
+  const record = payload as Record<string, unknown>
+  return {
+    id: String(record.id ?? ''),
+    studentId: String(record.studentId ?? record.student_id ?? ''),
+    studentName: String(record.studentName ?? record.student_name ?? ''),
+    studentEmail: String(record.studentEmail ?? record.student_email ?? ''),
+    registrationNumber: String(record.registrationNumber ?? record.registration_number ?? ''),
+    requestedSemester: String(record.requestedSemester ?? record.requested_semester ?? ''),
+    status: record.status === 'approved' || record.status === 'rejected' ? record.status : 'pending',
+    adminNote: String(record.adminNote ?? record.admin_note ?? ''),
+    resolvedByAdminId: record.resolvedByAdminId == null ? null : String(record.resolvedByAdminId),
+    resolvedAt: record.resolvedAt == null ? null : String(record.resolvedAt),
+    createdAt: String(record.createdAt ?? record.created_at ?? ''),
+    updatedAt: String(record.updatedAt ?? record.updated_at ?? ''),
   }
 }
 
@@ -470,6 +540,7 @@ export const restDataAdapter: DataAdapter = {
       password: values.password,
       student_id: values.studentId,
       student_category: values.studentCategory,
+      gender: values.gender,
       enrollment_status: values.enrollmentStatus ?? 'active',
       course: values.course,
       total_fees: Number(values.totalFees.toFixed(2)),
@@ -518,6 +589,7 @@ export const restDataAdapter: DataAdapter = {
     if (typeof values.email === 'string') payload.email = values.email
     if (typeof values.studentId === 'string') payload.student_id = values.studentId || null
     if (values.studentCategory === 'local' || values.studentCategory === 'international') payload.student_category = values.studentCategory
+    if (values.gender === 'male' || values.gender === 'female' || values.gender === 'other') payload.gender = values.gender
     if (typeof values.phoneNumber === 'string') payload.phone_number = values.phoneNumber || null
     if (typeof values.course === 'string') payload.course = values.course || null
     if (typeof values.program === 'string') payload.program = values.program || null
@@ -615,10 +687,21 @@ export const restDataAdapter: DataAdapter = {
     const payload = await request('/support-requests', { method: 'GET' })
     return extractCollection(payload).map(toSupportRequest)
   },
-  async createSupportRequest(studentId: string, values: CreateSupportRequestInput): Promise<SupportRequest> {
+  async createSupportRequest(studentId: string, values: CreateSupportRequestInput, attachment?: File | null): Promise<SupportRequest> {
+    let body: BodyInit
+    if (attachment) {
+      const form = new FormData()
+      form.append('studentId', studentId)
+      form.append('subject', values.subject)
+      form.append('message', values.message)
+      form.append('attachment', attachment)
+      body = form
+    } else {
+      body = JSON.stringify({ studentId, ...values })
+    }
     const payload = await request('/support-requests', {
       method: 'POST',
-      body: JSON.stringify({ studentId, ...values }),
+      body,
     })
 
     return toSupportRequest(payload)
@@ -629,6 +712,18 @@ export const restDataAdapter: DataAdapter = {
       body: JSON.stringify(values),
     })
 
+    return toSupportRequest(payload)
+  },
+  async sendSupportRequestMessage(requestId: string, message: string, attachment?: File | null): Promise<SupportRequest> {
+    const body = new FormData()
+    body.append('message', message)
+    if (attachment) {
+      body.append('attachment', attachment)
+    }
+    const payload = await request(`/support-requests/${requestId}/messages`, {
+      method: 'POST',
+      body,
+    })
     return toSupportRequest(payload)
   },
   async bulkSyncCurriculum(): Promise<BulkCurriculumSyncResult> {
@@ -696,5 +791,41 @@ export const restDataAdapter: DataAdapter = {
         }
       }),
     }
+  },
+  async fetchAssistantAdmins(): Promise<AssistantAdminAccount[]> {
+    const payload = await request('/admin/assistants', { method: 'GET' })
+    return extractCollection(payload).map(toAssistantAdminAccount)
+  },
+  async createAssistantAdmin(values: { name: string; email: string; phoneNumber?: string; password: string; role: 'support_help' | 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
+    const payload = await request('/admin/assistants', {
+      method: 'POST',
+      body: JSON.stringify(values),
+    })
+    return toAssistantAdminAccount(payload)
+  },
+  async updateAssistantAdmin(assistantId: string, values: { role: 'support_help' | 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
+    const payload = await request(`/admin/assistants/${assistantId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(values),
+    })
+    return toAssistantAdminAccount(payload)
+  },
+  async fetchSemesterRegistrations(): Promise<SemesterRegistration[]> {
+    const payload = await request('/semester-registrations', { method: 'GET' })
+    return extractCollection(payload).map(toSemesterRegistration)
+  },
+  async createSemesterRegistration(requestedSemester: string): Promise<SemesterRegistration> {
+    const payload = await request('/semester-registrations', {
+      method: 'POST',
+      body: JSON.stringify({ requestedSemester }),
+    })
+    return toSemesterRegistration(payload)
+  },
+  async updateSemesterRegistration(id: string, values: { status: 'approved' | 'rejected'; adminNote?: string }): Promise<SemesterRegistration> {
+    const payload = await request(`/semester-registrations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(values),
+    })
+    return toSemesterRegistration(payload)
   },
 }

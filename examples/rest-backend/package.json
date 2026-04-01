@@ -12,12 +12,14 @@
         "performance-test": "node scripts/performance-test.js",
         "reset-data": "node scripts/reset-data.js",
         "security-test": "node scripts/security-test.js",
-        "smoke-test": "node scripts/smoke-test.js"
+        "smoke-test": "node scripts/smoke-test.js",
+        "backup-db": "node scripts/backup-sqlite.js"
     },
     "dependencies": {
         "better-sqlite3": "^12.8.0",
         "cors": "^2.8.6",
         "express": "^5.2.1",
+        "express-rate-limit": "^7.5.1",
         "multer": "^2.1.1",
         "nodemailer": "^8.0.4",
         "openid-client": "^5.6.5",

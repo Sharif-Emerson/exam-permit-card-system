@@ -1,6 +1,7 @@
 import { activeDataAdapter } from '../adapters/data'
 import type { FinancialUpdateValues, StudentAccountsImportApplyResult, StudentProvisionPreviewRow } from '../adapters/data/types'
 import type {
+  AssistantAdminAccount,
   AdminActivityLog,
   AdminActivityLogPage,
   AdminProfileUpdateInput,
@@ -20,6 +21,7 @@ import type {
   TrashedStudentProfile,
   SupportRequest,
   SupportRequestUpdateInput,
+  SemesterRegistration,
 } from '../types'
 
 export function getDataConfigError() {
@@ -122,12 +124,16 @@ export async function fetchSupportRequests(): Promise<SupportRequest[]> {
   return activeDataAdapter.fetchSupportRequests()
 }
 
-export async function createSupportRequest(studentId: string, values: CreateSupportRequestInput): Promise<SupportRequest> {
-  return activeDataAdapter.createSupportRequest(studentId, values)
+export async function createSupportRequest(studentId: string, values: CreateSupportRequestInput, attachment?: File | null): Promise<SupportRequest> {
+  return activeDataAdapter.createSupportRequest(studentId, values, attachment)
 }
 
 export async function updateSupportRequest(requestId: string, values: SupportRequestUpdateInput): Promise<SupportRequest> {
   return activeDataAdapter.updateSupportRequest(requestId, values)
+}
+
+export async function sendSupportRequestMessage(requestId: string, message: string, attachment?: File | null): Promise<SupportRequest> {
+  return activeDataAdapter.sendSupportRequestMessage(requestId, message, attachment)
 }
 
 export async function importStudentFinancials(updates: FinancialImportUpdate[], adminId: string): Promise<FinancialImportResult> {
@@ -173,4 +179,28 @@ export async function previewStudentAccountsImport(file: File): Promise<StudentP
 
 export async function applyStudentAccountsImport(file: File): Promise<StudentAccountsImportApplyResult> {
   return activeDataAdapter.applyStudentAccountsImport(file)
+}
+
+export async function fetchAssistantAdmins(): Promise<AssistantAdminAccount[]> {
+  return activeDataAdapter.fetchAssistantAdmins()
+}
+
+export async function createAssistantAdmin(values: { name: string; email: string; phoneNumber?: string; password: string; role: 'support_help' | 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
+  return activeDataAdapter.createAssistantAdmin(values)
+}
+
+export async function updateAssistantAdmin(assistantId: string, values: { role: 'support_help' | 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
+  return activeDataAdapter.updateAssistantAdmin(assistantId, values)
+}
+
+export async function fetchSemesterRegistrations(): Promise<SemesterRegistration[]> {
+  return activeDataAdapter.fetchSemesterRegistrations()
+}
+
+export async function createSemesterRegistration(requestedSemester: string): Promise<SemesterRegistration> {
+  return activeDataAdapter.createSemesterRegistration(requestedSemester)
+}
+
+export async function updateSemesterRegistration(id: string, values: { status: 'approved' | 'rejected'; adminNote?: string }): Promise<SemesterRegistration> {
+  return activeDataAdapter.updateSemesterRegistration(id, values)
 }

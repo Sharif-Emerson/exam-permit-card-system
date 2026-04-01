@@ -38,8 +38,8 @@ const defaultBootstrapAdmins = Object.freeze([
     phone_number: '+256700100004',
     password: 'Permit@2026',
     role: 'admin',
-    admin_scope: 'operations',
-    name: 'Operations Office',
+    admin_scope: 'assistant-admin',
+    name: 'Assistant Admin',
     campus_id: 'main-campus',
     campus_name: 'Main Campus',
   },
@@ -67,7 +67,7 @@ function normalizePhoneNumber(value) {
 }
 
 function normalizeAdminScope(value) {
-  return value === 'registrar' || value === 'finance' || value === 'operations' || value === 'super-admin'
+  return value === 'registrar' || value === 'finance' || value === 'operations' || value === 'assistant-admin' || value === 'super-admin'
     ? value
     : 'super-admin'
 }

@@ -1,6 +1,6 @@
 const studentAccountsTemplateContent = [
-  ['student_name', 'student_id', 'email', 'course', 'total_fees', 'password', 'password_hash', 'student_category', 'program', 'college', 'department', 'semester'],
-  ['Jane Student', 'REG-2026-001', 'jane.student@university.edu', 'BSc Software Engineering', '3000', '', '', 'local', '', '', '', ''],
+  ['student_name', 'student_id', 'email', 'course', 'total_fees', 'student_category', 'program', 'college', 'department', 'semester'],
+  ['Jane Student', 'REG-2026-001', 'jane.student@university.edu', 'BSc Software Engineering', '3000', 'local', '', '', '', ''],
 ].map((row) => row.join(',')).join('\n')
 
 export function downloadStudentAccountsImportTemplate() {
