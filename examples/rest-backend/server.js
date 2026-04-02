@@ -14,6 +14,8 @@ import {
   addSupportRequestMessage,
   deleteAdminActivityLogById,
   deletePermitActivityLogs,
+  markActivityLogRead,
+  markAllPermitActivityLogsRead,
   deleteStudentProfile,
   getConfiguredDbPath,
   getPermitByToken,
@@ -2311,6 +2313,22 @@ app.get('/permit-activity', authenticate, (request, response) => {
 app.delete('/admin-activity-logs/all-permit-events', authenticate, requireAdminPermission('write_audit_logs', 'You do not have permission to delete permit activity.'), (_request, response) => {
   const deleted = deletePermitActivityLogs()
   response.json({ ok: true, deleted })
+})
+
+app.patch('/admin-activity-logs/permit-events/mark-all-read', authenticate, requireAdminPermission('view_audit_logs', 'You do not have permission to update activity logs.'), (_request, response) => {
+  const marked = markAllPermitActivityLogsRead()
+  response.json({ ok: true, marked })
+})
+
+app.patch('/admin-activity-logs/:id/read', authenticate, requireAdminPermission('view_audit_logs', 'You do not have permission to update activity logs.'), (request, response) => {
+  const ok = markActivityLogRead(request.params.id)
+
+  if (!ok) {
+    response.status(404).json({ message: 'Activity log not found.' })
+    return
+  }
+
+  response.json({ ok: true })
 })
 
 app.delete('/admin-activity-logs/:id', authenticate, requireAdminPermission('write_audit_logs', 'You do not have permission to delete audit activity.'), (request, response) => {

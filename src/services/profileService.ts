@@ -62,6 +62,14 @@ export async function purgePermitActivityLogs(): Promise<number> {
   return activeDataAdapter.purgePermitActivityLogs()
 }
 
+export async function markActivityLogRead(logId: string): Promise<void> {
+  return activeDataAdapter.markActivityLogRead(logId)
+}
+
+export async function markAllPermitActivityLogsRead(): Promise<void> {
+  return activeDataAdapter.markAllPermitActivityLogsRead()
+}
+
 export async function fetchSystemFeeSettings(): Promise<SystemFeeSettings> {
   return activeDataAdapter.fetchSystemFeeSettings()
 }

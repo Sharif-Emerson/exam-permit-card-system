@@ -350,6 +350,7 @@ export interface AdminActivityLog {
   targetProfileId: string
   action: string
   details: Record<string, unknown>
+  isRead: boolean
   createdAt: string
 }
 

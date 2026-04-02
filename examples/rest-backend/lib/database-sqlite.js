@@ -240,6 +240,7 @@ ensureColumn('system_settings', "deadlines_json TEXT NOT NULL DEFAULT '[]'")
 ensureColumn('system_settings', "currency_code TEXT NOT NULL DEFAULT 'USD'")
 ensureColumn('admin_activity_logs', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
 ensureColumn('admin_activity_logs', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
+ensureColumn('admin_activity_logs', 'is_read INTEGER NOT NULL DEFAULT 0')
 ensureColumn('support_request_messages', 'attachment_name TEXT')
 ensureColumn('support_request_messages', 'attachment_url TEXT')
 ensureColumn('support_request_messages', 'attachment_mime_type TEXT')
@@ -745,6 +746,7 @@ function mapActivityLog(row) {
 
   return {
     ...activityLog,
+    isRead: row.is_read === 1,
     createdAt: row.created_at,
     details: JSON.parse(row.details ?? '{}'),
   }
@@ -1710,6 +1712,19 @@ export function deletePermitActivityLogs() {
   const result = db.prepare(`
     DELETE FROM admin_activity_logs
     WHERE action IN ('print_permit', 'download_permit')
+  `).run()
+  return Number(result.changes ?? 0)
+}
+
+export function markActivityLogRead(logId) {
+  const result = db.prepare('UPDATE admin_activity_logs SET is_read = 1 WHERE id = ?').run(logId)
+  return result.changes > 0
+}
+
+export function markAllPermitActivityLogsRead() {
+  const result = db.prepare(`
+    UPDATE admin_activity_logs SET is_read = 1
+    WHERE action IN ('print_permit', 'download_permit') AND is_read = 0
   `).run()
   return Number(result.changes ?? 0)
 }

@@ -18,7 +18,7 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync } from '../services/profileService'
+import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync } from '../services/profileService'
 import type { SisStatus, SisSyncResult } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
 import type { FaqItem } from './faqStorage'
@@ -1458,6 +1458,7 @@ export default function AdminPanel() {
   ].filter((label): label is string => Boolean(label))
   const openSupportRequestCount = supportRequests.filter((request) => request.status !== 'resolved').length
   const permitEventCount = permitActivityLogs.length
+  const permitUnreadCount = permitActivityLogs.filter((log) => !log.isRead).length
   const pageStart = totalItems === 0 ? 0 : ((page - 1) * pageSize) + 1
   const pageEnd = totalItems === 0 ? 0 : Math.min(page * pageSize, totalItems)
   const activityPageStart = activityTotalItems === 0 ? 0 : ((activityPage - 1) * ACTIVITY_PAGE_SIZE) + 1
@@ -1551,10 +1552,10 @@ export default function AdminPanel() {
       actionLabel: 'Open Support',
       onAction: () => setActiveSection('support'),
     }] : []),
-    ...(canViewPermitActivity && permitEventCount > 0 ? [{
+    ...(canViewPermitActivity && permitUnreadCount > 0 ? [{
       id: 'permit-events',
       title: 'Permit activity ready for review',
-      message: `${permitEventCount} permit print/download event(s) are available in the activity log.`,
+      message: `${permitUnreadCount} unread permit print/download event(s) in the activity log.`,
       tone: 'info' as const,
       actionLabel: 'Open Permit Activity',
       onAction: () => setActiveSection('permits'),
@@ -1941,6 +1942,27 @@ export default function AdminPanel() {
       await pendingConfirmation.action()
     } finally {
       setPendingConfirmation(null)
+    }
+  }
+
+  async function handleMarkPermitActivityLogRead(log: AdminActivityLog) {
+    try {
+      await markActivityLogRead(log.id)
+      await loadActivityLogs({ silent: true })
+    } catch (markError) {
+      const nextError = markError instanceof Error ? markError.message : 'Unable to mark the entry as read.'
+      setError(nextError)
+    }
+  }
+
+  async function handleMarkAllPermitActivityRead() {
+    try {
+      setError('')
+      await markAllPermitActivityLogsRead()
+      await loadActivityLogs({ silent: true })
+    } catch (markError) {
+      const nextError = markError instanceof Error ? markError.message : 'Unable to mark all entries as read.'
+      setError(nextError)
     }
   }
 
@@ -2409,7 +2431,7 @@ export default function AdminPanel() {
     { id: 'dustbin', key: 'dustbin', label: 'General Dustbin', icon: <Trash2 className="w-5 h-5" />, badge: trashedStudents.length > 0 ? trashedStudents.length : undefined },
     { id: 'support-requests', key: 'support', label: 'Support Requests', icon: <Bell className="w-5 h-5" />, badge: openSupportRequestCount > 0 ? openSupportRequestCount : undefined },
     { id: 'sub-admins', key: 'assistants', label: 'Sub-Admins', icon: <Shield className="w-5 h-5" /> },
-    { id: 'permit-activity', key: 'permits', label: 'Permit Activity', icon: <FileCheck className="w-5 h-5" />, badge: permitEventCount > 0 ? permitEventCount : undefined },
+    { id: 'permit-activity', key: 'permits', label: 'Permit Activity', icon: <FileCheck className="w-5 h-5" />, badge: permitUnreadCount > 0 ? permitUnreadCount : undefined },
     { id: 'permit-cards', key: 'permit-cards', label: 'Permit Cards', icon: <CreditCard className="w-5 h-5" />, badge: clearedStudents > 0 ? clearedStudents : undefined },
     { id: 'bulk-import', key: 'import', label: 'Bulk Import', icon: <FileUp className="w-5 h-5" /> },
     { id: 'reports', key: 'reports', label: 'Reports', icon: <BarChart2 className="w-5 h-5" /> },
@@ -4188,6 +4210,16 @@ export default function AdminPanel() {
                     <p className="text-sm text-gray-500">Showing {activityPageStart}-{activityPageEnd} of {activityTotalItems} event(s)</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {canViewPermitActivity && permitUnreadCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleMarkAllPermitActivityRead()}
+                        className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 shadow-sm hover:bg-emerald-100"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Mark all as read
+                      </button>
+                    ) : null}
                     {canDeleteAuditLogs ? (
                       <button
                         type="button"
@@ -4220,14 +4252,14 @@ export default function AdminPanel() {
                           <th className="px-5 py-3 text-left">Student ID</th>
                           <th className="px-5 py-3 text-left">Action</th>
                           <th className="px-5 py-3 text-left">Time</th>
-                          {canDeleteAuditLogs ? <th className="px-5 py-3 text-right"> </th> : null}
+                          <th className="px-5 py-3 text-right"> </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {permitActivityLogs.map((log) => {
                           const student = students.find((s) => s.id === log.targetProfileId)
                           return (
-                            <tr key={log.id} className="hover:bg-gray-50">
+                            <tr key={log.id} className={`transition-colors hover:bg-gray-50 ${!log.isRead ? 'bg-blue-50 dark:bg-blue-950/20' : ''}`}>
                               <td className="px-5 py-3 font-medium text-gray-800">{student?.name ?? log.targetProfileId}</td>
                               <td className="px-5 py-3 text-gray-500">{student?.studentId ?? '-'}</td>
                               <td className="px-5 py-3">
@@ -4238,25 +4270,38 @@ export default function AdminPanel() {
                               <td className="px-5 py-3 text-gray-500">
                                 {log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}
                               </td>
-                              {canDeleteAuditLogs ? (
-                                <td className="px-5 py-3 text-right">
-                                  <button
-                                    type="button"
-                                    title="Delete this activity row"
-                                    aria-label="Delete this activity row"
-                                    onClick={() => void handleDeletePermitActivityLog(log)}
-                                    className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </td>
-                              ) : null}
+                              <td className="px-5 py-3 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {!log.isRead ? (
+                                    <button
+                                      type="button"
+                                      title="Mark as read"
+                                      aria-label="Mark as read"
+                                      onClick={() => void handleMarkPermitActivityLogRead(log)}
+                                      className="rounded-lg p-2 text-emerald-500 hover:bg-emerald-50 hover:text-emerald-700"
+                                    >
+                                      <CheckCircle2 className="h-4 w-4" />
+                                    </button>
+                                  ) : null}
+                                  {canDeleteAuditLogs ? (
+                                    <button
+                                      type="button"
+                                      title="Delete this activity row"
+                                      aria-label="Delete this activity row"
+                                      onClick={() => void handleDeletePermitActivityLog(log)}
+                                      className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </td>
                             </tr>
                           )
                         })}
                         {permitActivityLogs.length === 0 && (
                           <tr>
-                            <td className="px-5 py-8 text-center text-gray-400" colSpan={canDeleteAuditLogs ? 5 : 4}>No permit activity has been recorded yet.</td>
+                            <td className="px-5 py-8 text-center text-gray-400" colSpan={5}>No permit activity has been recorded yet.</td>
                           </tr>
                         )}
                       </tbody>

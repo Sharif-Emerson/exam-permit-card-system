@@ -68,6 +68,8 @@ export interface DataAdapter {
   fetchAdminActivityLogsPage: (query?: { page?: number; pageSize?: number }) => Promise<AdminActivityLogPage>
   deleteAdminActivityLog: (logId: string) => Promise<void>
   purgePermitActivityLogs: () => Promise<number>
+  markActivityLogRead: (logId: string) => Promise<void>
+  markAllPermitActivityLogsRead: () => Promise<void>
   fetchSystemFeeSettings: () => Promise<SystemFeeSettings>
   updateSystemFeeSettings: (values: SystemFeeSettings) => Promise<SystemFeeSettings>
   createStudentProfile: (values: CreateStudentInput, adminId: string) => Promise<StudentProfile>

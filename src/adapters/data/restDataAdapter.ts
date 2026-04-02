@@ -276,6 +276,7 @@ function toAdminActivityLog(payload: unknown): AdminActivityLog {
     targetProfileId: String(record.target_profile_id ?? record.targetProfileId ?? ''),
     action: String(record.action ?? ''),
     details: record.details && typeof record.details === 'object' ? record.details as Record<string, unknown> : {},
+    isRead: Boolean(record.is_read ?? record.isRead ?? false),
     createdAt: String(record.created_at ?? record.createdAt ?? ''),
   }
 }
@@ -517,6 +518,12 @@ export const restDataAdapter: DataAdapter = {
       return Number((payload as Record<string, unknown>).deleted ?? 0)
     }
     return 0
+  },
+  async markActivityLogRead(logId: string): Promise<void> {
+    await request(`/admin-activity-logs/${encodeURIComponent(logId)}/read`, { method: 'PATCH' })
+  },
+  async markAllPermitActivityLogsRead(): Promise<void> {
+    await request('/admin-activity-logs/permit-events/mark-all-read', { method: 'PATCH' })
   },
   async fetchSystemFeeSettings(): Promise<SystemFeeSettings> {
     const payload = await request('/system-settings', { method: 'GET' })
