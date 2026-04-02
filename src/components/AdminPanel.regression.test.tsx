@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   signOut: vi.fn(),
   refreshUser: vi.fn().mockResolvedValue(undefined),
   fetchStudentProfilesPage: vi.fn(),
+  fetchAssistantAdmins: vi.fn(),
+  createAssistantAdmin: vi.fn(),
   fetchSupportRequests: vi.fn(),
   fetchAdminActivityLogsPage: vi.fn(),
   fetchSystemFeeSettings: vi.fn(),
@@ -81,6 +83,8 @@ vi.mock('../hooks/useUnsavedChanges', () => ({
 vi.mock('../services/profileService', () => ({
   getDataConfigError: () => null,
   fetchStudentProfilesPage: mocks.fetchStudentProfilesPage,
+  fetchAssistantAdmins: mocks.fetchAssistantAdmins,
+  createAssistantAdmin: mocks.createAssistantAdmin,
   fetchSupportRequests: mocks.fetchSupportRequests,
   fetchAdminActivityLogsPage: mocks.fetchAdminActivityLogsPage,
   fetchSystemFeeSettings: mocks.fetchSystemFeeSettings,
@@ -166,6 +170,7 @@ describe('AdminPanel regression guard', () => {
       outstandingStudents: 1,
     })
     mocks.fetchSupportRequests.mockResolvedValue([])
+    mocks.fetchAssistantAdmins.mockResolvedValue([])
     mocks.fetchAdminActivityLogsPage.mockResolvedValue({
       items: [],
       page: 1,
