@@ -28,9 +28,9 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import { permitPublicBaseUrl } from '../config/provider'
 import { examPermitConfig } from '../config/branding'
 import { DIALOG_Z } from '../constants/dialogLayers'
+import { buildPermitQrPayload } from '../utils/permitQr'
 import BrandMark from './BrandMark'
 import PermitCard from './PermitCard'
 import { createSemesterRegistration, createSupportRequest, fetchPermitActivityHistory, fetchSemesterRegistrations, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, fetchSystemFeeSettings, recordPermitActivity, sendSupportRequestMessage, updateStudentAccount } from '../services/profileService'
@@ -79,36 +79,6 @@ type FirstLoginSetupDraft = {
 
 type ApplicationDraft = {
   semester: string
-}
-
-/** Turn API base (possibly `/api` or host-relative) into an absolute URL phones can open from a scan. */
-function resolvePermitPublicBaseForQr(base: string): string {
-  const trimmed = base.trim().replace(/\/$/, '')
-  if (!trimmed) {
-    return ''
-  }
-  if (/^https?:\/\//i.test(trimmed)) {
-    return trimmed
-  }
-  if (typeof window !== 'undefined' && trimmed.startsWith('/')) {
-    return `${window.location.origin.replace(/\/$/, '')}${trimmed}`
-  }
-  return trimmed
-}
-
-/**
- * Keep payload short: dense multi-line text creates high-version QRs that fail on cameras when shown small.
- * Prefer a single verification URL; otherwise a compact token line invigilator tools can parse or look up.
- */
-function buildOfflinePermitQrPayload(student: StudentProfile, publicBaseUrl: string) {
-  const absoluteBase = resolvePermitPublicBaseForQr(publicBaseUrl)
-  const token = encodeURIComponent(student.permitToken)
-  if (absoluteBase) {
-    return `${absoluteBase}/permits/${token}`
-  }
-  const clearance = student.feesBalance <= 0 ? '1' : '0'
-  const reg = (student.studentId || 'NA').replace(/\|/g, '_')
-  return `KIU-PERMIT|${student.permitToken}|${reg}|${clearance}`
 }
 
 type SupportDraft = {
@@ -1132,7 +1102,7 @@ export default function Dashboard() {
       setSavingSettings(false)
     }
   }
-  const qrValue = studentData ? buildOfflinePermitQrPayload(studentData, permitPublicBaseUrl) : ''
+  const qrValue = studentData ? buildPermitQrPayload(studentData) : ''
 
   useEffect(() => {
     let cancelled = false

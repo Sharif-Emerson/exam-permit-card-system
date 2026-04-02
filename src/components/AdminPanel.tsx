@@ -22,6 +22,7 @@ import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, cre
 import type { SisStatus, SisSyncResult } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
 import type { FaqItem } from './faqStorage'
+import { buildPermitQrPayload } from '../utils/permitQr'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
 import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AssistantAdminAccount, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline } from '../types'
 import { DIALOG_Z } from '../constants/dialogLayers'
@@ -1747,13 +1748,9 @@ export default function AdminPanel() {
       const { default: QRCode } = await import('qrcode')
 
       const qrEntries = await Promise.all(printableStudents.map(async (student) => {
-        const qrValue = publicApiBaseUrl
-          ? `${publicApiBaseUrl}/permits/${encodeURIComponent(student.permitToken)}`
-          : ''
+        const qrValue = buildPermitQrPayload(student)
 
-        const qrCodeUrl = qrValue
-          ? await QRCode.toDataURL(qrValue, { errorCorrectionLevel: 'M', margin: 1, width: 160 })
-          : ''
+        const qrCodeUrl = await QRCode.toDataURL(qrValue, { errorCorrectionLevel: 'M', margin: 1, width: 160 })
 
         return [student.id, qrCodeUrl] as const
       }))
