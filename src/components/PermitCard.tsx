@@ -1,4 +1,4 @@
-import { Download, LogOut, MapPin, Printer, RefreshCcw, User } from 'lucide-react'
+import { Download, LogOut, Printer, RefreshCcw, User } from 'lucide-react'
 import { useCallback } from 'react'
 import { generalExamRules } from '../config/examRules'
 import { institutionLogo as defaultLogo, institutionName as defaultName, examPermitConfig } from '../config/branding'
@@ -284,17 +284,16 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
             </div>
           </div>
 
-          {/* Print: two columns on A4; course units as table (no venue); exams compact table without venue */}
+          {/* Print: two columns on A4; course units and fee/verification summary */}
           <div className="print:grid print:grid-cols-[1.15fr_0.85fr] print:gap-x-4 print:items-start print:[page-break-inside:avoid]">
-            {/* Column 1: Exams */}
+            {/* Column 1: Course units */}
             <div className="bg-gray-50 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8 print:bg-transparent print:p-0 print:mb-0">
               <div className="flex items-center justify-between gap-4 mb-4 print:hidden">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Assigned Exams</h3>
-                <span className="text-xs sm:text-sm text-slate-500">{studentData.exams.length} scheduled</span>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Registered Course Units</h3>
               </div>
               {studentData.courseUnits && studentData.courseUnits.length > 0 && (
                 <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:mb-1.5 print:rounded-md print:p-1.5 print:shadow-none">
-                  <h4 className="mb-2 text-sm font-semibold text-slate-900 print:text-[10px] print:mb-1">Registered Course Units</h4>
+                  <h4 className="mb-2 text-sm font-semibold text-slate-900 print:text-[10px] print:mb-1">Course Units</h4>
                   <div className="flex flex-wrap gap-2 print:hidden">
                     {studentData.courseUnits.map((unit) => (
                       <span key={unit} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
@@ -325,42 +324,8 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                   </table>
                 </div>
               )}
-              {studentData.exams.length > 0 ? (
-                <>
-                  <div className="grid grid-cols-1 gap-4 print:hidden">
-                    {studentData.exams.map((exam) => (
-                      <div key={exam.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <h4 className="text-sm sm:text-base font-semibold text-slate-900 mb-3">{exam.title}</h4>
-                        <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                          <div className="flex items-center space-x-2">
-                            <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0" />
-                            <span className="font-medium text-sm sm:text-base">Venue:</span>
-                            <span className="text-sm sm:text-base">{exam.venue}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <table className="hidden w-full border-collapse border border-slate-400 text-left print:table print:mt-1 print:text-[8px]">
-                    <caption className="sr-only">Assigned exams</caption>
-                    <thead>
-                      <tr className="bg-slate-100">
-                        <th className="border border-slate-400 px-1 py-0.5 font-semibold">Exam</th>
-                        <th className="border border-slate-400 px-1 py-0.5 font-semibold">Venue</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {studentData.exams.map((exam) => (
-                        <tr key={exam.id}>
-                          <td className="border border-slate-400 px-1 py-0.5 align-top">{exam.title}</td>
-                          <td className="border border-slate-400 px-1 py-0.5 align-top">{exam.venue}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </>
-              ) : (
-                <p className="text-sm text-slate-600 print:text-[10px]">No exams have been assigned to your account yet.</p>
+              {(!studentData.courseUnits || studentData.courseUnits.length === 0) && (
+                <p className="text-sm text-slate-600 print:text-[10px]">No course units are listed on your account yet.</p>
               )}
             </div>
 

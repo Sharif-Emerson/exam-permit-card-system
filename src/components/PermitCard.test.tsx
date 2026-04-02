@@ -52,7 +52,7 @@ describe('PermitCard', () => {
     )
 
     expect(screen.getByText('John Doe')).toBeTruthy()
-    expect(screen.getAllByText('Computer Science Theory').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('CSC 401 - Compiler Construction').length).toBeGreaterThan(0)
     expect(screen.getAllByText(/college of computing/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/international/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/\+256700123456/i).length).toBeGreaterThan(0)
