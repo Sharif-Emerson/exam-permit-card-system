@@ -1433,6 +1433,10 @@ export default function Dashboard() {
       )}
 
       <div className="student-dashboard-app min-h-screen bg-[radial-gradient(circle_at_8%_12%,_rgba(59,130,246,0.16),_transparent_30%),radial-gradient(circle_at_92%_16%,_rgba(239,68,68,0.14),_transparent_28%),radial-gradient(circle_at_50%_98%,_rgba(234,179,8,0.16),_transparent_26%),linear-gradient(180deg,_#f8fafc_0%,_#f0fdf4_45%,_#fefce8_100%)] text-slate-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(30,58,138,0.45),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(127,29,29,0.35),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#052e16_55%,_#1f2937_100%)] dark:text-slate-100">
+        {/* KIU Logo in the corner */}
+        <div className="absolute left-0 top-0 z-50 p-4">
+          <BrandMark titleClassName="text-base font-bold leading-tight text-gray-900 dark:text-white" subtitleClassName="text-xs text-emerald-600 dark:text-emerald-300" />
+        </div>
         {sidebarOpen && (
           <button
             type="button"
@@ -1700,7 +1704,7 @@ export default function Dashboard() {
                 </div>
               )}
 
-              <section className="mb-6 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+              {activeSection === 'overview' && <section className="mb-6 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
                 <div className="rounded-[2rem] border border-emerald-200/80 bg-[linear-gradient(135deg,_rgba(236,253,245,0.95),_rgba(239,246,255,0.92)_52%,_rgba(254,252,232,0.9))] p-6 shadow-xl shadow-emerald-200/55 backdrop-blur dark:border-emerald-900/30 dark:bg-[linear-gradient(135deg,_rgba(2,44,34,0.9),_rgba(15,23,42,0.9)_55%,_rgba(120,53,15,0.65))] dark:shadow-none">
                   <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                     <div>
@@ -1762,7 +1766,7 @@ export default function Dashboard() {
                     Apply for Permit
                   </button>
                 </div>
-              </section>
+              </section>}
 
               <div key={activeSection} className="kiu-page-in-animate">
                 {activeSection === 'overview' && (
