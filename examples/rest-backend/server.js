@@ -56,7 +56,7 @@ import {
 import { sendEmail, sendSms, getEmailStatus } from './lib/notification.js'
 import * as oidcFlow from './lib/oidc-flow.js'
 import { getSisStatus, previewSisConnection } from './lib/sis-client.js'
-import { isPermitIntegrityEnabled, verifyPermitPayload } from './lib/permit-integrity.js'
+import { isPermitIntegrityEnabled, signPermitPayload, verifyPermitPayload } from './lib/permit-integrity.js'
 // Default session TTL for login tokens (in hours)
 const sessionTtlHours = 24
 
@@ -1133,14 +1133,22 @@ app.get('/permits/verify/:token', permitPublicLimiter, (request, response) => {
   }
 
   const provided = typeof request.query.integrity === 'string' ? request.query.integrity.trim() : ''
+
+  // Compute the expected HMAC from the permit record to verify the provided signature
+  const computedSignature = signPermitPayload({
+    permitToken: permit.permitToken,
+    profileId: permit.profileId,
+    cleared: permit.cleared,
+    updatedAt: permit.updatedAt ?? '',
+  })
   const integrityVerified = Boolean(
     provided
-    && permit.integrity
+    && computedSignature
     && verifyPermitPayload({
       permitToken: permit.permitToken,
       profileId: permit.profileId,
       cleared: permit.cleared,
-      updatedAt: permit.updatedAt,
+      updatedAt: permit.updatedAt ?? '',
     }, provided),
   )
 
@@ -1616,7 +1624,15 @@ app.get('/profiles/:id', authenticate, (request, response) => {
     return
   }
 
-  response.json(profile)
+  // Attach a server-signed HMAC so real permits are cryptographically distinguishable from fakes
+  const permitSignature = signPermitPayload({
+    permitToken: profile.permit_token ?? '',
+    profileId: profile.id,
+    cleared: Number(profile.amount_paid ?? 0) >= Number(profile.total_fees ?? 0),
+    updatedAt: profile.updated_at ?? '',
+  })
+
+  response.json({ ...profile, permit_signature: permitSignature ?? null })
 })
 
 app.get('/profiles', authenticate, requireAdminPermission('view_students', 'You do not have permission to view student records.'), (request, response) => {

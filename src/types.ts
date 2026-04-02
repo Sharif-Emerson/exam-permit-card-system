@@ -80,6 +80,7 @@ export interface StudentProfile {
   instructions: string
   profileImage: string
   permitToken: string
+  permitSignature?: string
   exams: StudentExam[]
   monthlyPrintCount?: number
   monthlyPrintLimit?: number

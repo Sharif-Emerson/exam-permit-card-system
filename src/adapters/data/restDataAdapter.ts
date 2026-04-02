@@ -103,6 +103,7 @@ function toDatabaseProfileRow(payload: unknown): DatabaseProfileRow {
     instructions: record.instructions == null ? null : String(record.instructions),
     profile_image: record.profile_image == null ? (record.profileImage == null ? null : String(record.profileImage)) : String(record.profile_image),
     permit_token: record.permit_token == null ? (record.permitToken == null ? null : String(record.permitToken)) : String(record.permit_token),
+    permit_signature: record.permit_signature == null ? (record.permitSignature == null ? null : String(record.permitSignature)) : String(record.permit_signature),
     exams_json: typeof record.exams_json === 'string'
       ? record.exams_json
       : exams

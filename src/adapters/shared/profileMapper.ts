@@ -152,6 +152,7 @@ export function mapProfile(row: DatabaseProfileRow): AppProfile {
     instructions: row.instructions ?? 'No instructions have been added yet.',
     profileImage: row.profile_image ?? 'https://via.placeholder.com/150',
     permitToken: row.permit_token ?? row.id,
+    permitSignature: typeof row.permit_signature === 'string' && row.permit_signature ? row.permit_signature : undefined,
     exams,
     monthlyPrintCount: Number(row.monthly_print_count ?? 0),
     monthlyPrintLimit: Number(row.monthly_print_limit ?? 2),

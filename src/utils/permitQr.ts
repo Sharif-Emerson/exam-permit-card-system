@@ -6,6 +6,10 @@ import type { StudentProfile } from '../types'
  *
  * All key permit details are embedded as plain text so invigilators can
  * verify a student's permit by simply scanning it with any camera app.
+ *
+ * When PERMIT_INTEGRITY_SECRET is configured on the server, a short HMAC
+ * signature prefix is embedded so staff can spot-check authenticity: a forged
+ * QR (e.g. "OUTSTANDING" changed to "CLEARED") produces a different signature.
  */
 export function buildPermitQrPayload(student: StudentProfile): string {
   const cleared = student.feesBalance <= 0
@@ -27,6 +31,12 @@ export function buildPermitQrPayload(student: StudentProfile): string {
 
   lines.push(`Status: ${cleared ? 'CLEARED' : 'OUTSTANDING'}`)
   lines.push(`Token: ${student.permitToken}`)
+
+  // Include a 16-char HMAC prefix so invigilators can visually spot-check
+  // authenticity and admins can do full cryptographic verification online.
+  if (student.permitSignature) {
+    lines.push(`SIG: ${student.permitSignature.slice(0, 16)}`)
+  }
 
   return lines.join('\n')
 }
