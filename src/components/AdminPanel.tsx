@@ -38,7 +38,13 @@ type ImportPreviewRow = {
   reason?: string
   studentName?: string
 }
-type NavSection = 'dashboard' | 'students' | 'dustbin' | 'support' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'assistants' | 'settings'
+const ADMIN_VALID_SECTIONS = new Set<NavSection>(['dashboard', 'students', 'dustbin', 'support', 'permits', 'import', 'reports', 'permit-cards', 'assistants', 'settings'])
+
+function readAdminSectionFromHash(): NavSection | null {
+  if (typeof window === 'undefined') return null
+  const hash = window.location.hash.replace(/^#/, '')
+  return ADMIN_VALID_SECTIONS.has(hash as NavSection) ? (hash as NavSection) : null
+}
 type BulkImportSubSection = 'financial' | 'api'
 
 type AdminPermitDesignFields = {
@@ -579,7 +585,7 @@ export default function AdminPanel() {
   const [showPrintedOnly, setShowPrintedOnly] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-  const [activeSection, setActiveSection] = useState<NavSection>('students')
+  const [activeSection, setActiveSection] = useState<NavSection>(() => readAdminSectionFromHash() ?? 'students')
   const [searchInputValue, setSearchInputValue] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [showSignOut, setShowSignOut] = useState(false) // 2. Add showSignOut state
@@ -1284,6 +1290,12 @@ export default function AdminPanel() {
       setActiveSection(adminCapability.sections[0] ?? 'dashboard')
     }
   }, [activeSection, adminCapability.sections])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.location.hash = activeSection
+    }
+  }, [activeSection])
 
   useEffect(() => {
     if (bulkImportTabs.length === 0) {

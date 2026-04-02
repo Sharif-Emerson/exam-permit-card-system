@@ -40,6 +40,14 @@ import SignOutDialog from './SignOutDialog'
 import Faq from './Faq'
 type PermitStatus = 'approved' | 'pending' | 'rejected'
 type PortalSection = 'overview' | 'permit_courses' | 'finance' | 'applications' | 'settings' | 'support'
+const PORTAL_VALID_SECTIONS = new Set<PortalSection>(['overview', 'permit_courses', 'finance', 'applications', 'settings', 'support'])
+
+function readPortalSectionFromHash(): PortalSection | null {
+  if (typeof window === 'undefined') return null
+  const hash = window.location.hash.replace(/^#/, '')
+  return PORTAL_VALID_SECTIONS.has(hash as PortalSection) ? (hash as PortalSection) : null
+}
+
 type HistoryStatusFilter = PermitStatus | 'all'
 
 type PermitApplicationRecord = {
@@ -465,7 +473,7 @@ export default function Dashboard() {
   const [showSignOut, setShowSignOut] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [qrCodeUrl, setQrCodeUrl] = useState('')
-  const [activeSection, setActiveSection] = useState<PortalSection>('overview')
+  const [activeSection, setActiveSection] = useState<PortalSection>(() => readPortalSectionFromHash() ?? 'overview')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => new Set())
@@ -700,6 +708,12 @@ export default function Dashboard() {
     })
 
   }, [syncStudentProfile])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.location.hash = activeSection
+    }
+  }, [activeSection])
 
   useEffect(() => {
     if (!user || user.role !== 'student' || typeof window === 'undefined') {
