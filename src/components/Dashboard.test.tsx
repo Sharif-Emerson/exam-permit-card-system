@@ -73,6 +73,77 @@ const {
 }))
 
 describe('Dashboard', () => {
+  it('allows cancelling first-login security setup', async () => {
+    window.localStorage.clear()
+
+    fetchStudentProfileById.mockResolvedValueOnce({
+      id: 'student-id',
+      email: 'student@example.com',
+      role: 'student',
+      name: 'John Doe',
+      studentId: 'STU001',
+      studentCategory: 'international',
+      phoneNumber: '+256700123456',
+      course: 'Computer Science',
+      program: 'BSc Computer Science',
+      college: 'College of Computing',
+      department: 'Computer Science Department',
+      semester: 'Semester 1 2026/2027',
+      courseUnits: ['CSC 401 - Compiler Construction'],
+      examDate: '2026-04-15',
+      examTime: '10:00 AM',
+      venue: 'Hall A',
+      seatNumber: 'A-001',
+      instructions: 'Bring ID.',
+      profileImage: 'https://via.placeholder.com/150',
+      permitToken: 'permit-token-1',
+      firstLoginRequired: true,
+      exams: [
+        {
+          id: 'student-id-exam-1',
+          title: 'Computer Science Theory',
+          examDate: '2026-04-15',
+          examTime: '10:00 AM',
+          venue: 'Hall A',
+          seatNumber: 'A-001',
+        },
+      ],
+      totalFees: 3000,
+      amountPaid: 500,
+      feesBalance: 2500,
+    })
+
+    const authContextModule = await import('../context/AuthContext')
+    vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
+      user: { id: 'student-id', email: 'student@example.com', role: 'student', name: 'John Doe' },
+      loading: false,
+      configError: null,
+      signIn: vi.fn(),
+      signInWithToken: vi.fn(),
+      signOut,
+      refreshUser,
+    })
+
+    const profileServiceModule = await import('../services/profileService')
+    vi.spyOn(profileServiceModule, 'fetchStudentProfileById').mockImplementation(fetchStudentProfileById)
+    vi.spyOn(profileServiceModule, 'updateStudentAccount').mockImplementation(updateStudentAccount)
+    vi.spyOn(profileServiceModule, 'fetchSupportRequests').mockImplementation(fetchSupportRequests)
+    vi.spyOn(profileServiceModule, 'fetchSupportContacts').mockImplementation(fetchSupportContacts)
+    vi.spyOn(profileServiceModule, 'fetchPermitActivityHistory').mockImplementation(fetchPermitActivityHistory)
+    vi.spyOn(profileServiceModule, 'createSupportRequest').mockImplementation(createSupportRequest)
+    vi.spyOn(profileServiceModule, 'recordPermitActivity').mockImplementation(recordPermitActivity)
+    vi.spyOn(profileServiceModule, 'fetchSemesterRegistrations').mockImplementation(fetchSemesterRegistrations)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+
+    const { default: Dashboard } = await import('./Dashboard')
+    const user = userEvent.setup()
+    render(<Dashboard />)
+
+    expect(await screen.findByText(/security setup required/i)).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }))
+    expect(await screen.findByRole('heading', { name: /sign out\?/i })).toBeTruthy()
+  }, 10000)
+
   it('disables printing when fees are not fully cleared', async () => {
     const authContextModule = await import('../context/AuthContext')
     vi.spyOn(authContextModule, 'useAuth').mockReturnValue({
