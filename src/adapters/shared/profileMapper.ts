@@ -1,5 +1,63 @@
 import type { AppProfile, DatabaseProfileRow, StudentExam, StudentProfile } from '../../types'
 
+function norm(s: string | null | undefined): string {
+  return String(s ?? '').trim().toLowerCase()
+}
+
+/** True when the value is empty or a known “not set yet” label from curriculum sync / admin UI. */
+function isPlaceholderExamDate(value: string | null | undefined): boolean {
+  const t = norm(value)
+  return !t || t === 'not scheduled' || t === 'to be announced' || t === 'tba' || t === 'n/a'
+}
+
+function isPlaceholderExamTime(value: string | null | undefined): boolean {
+  return isPlaceholderExamDate(value)
+}
+
+function isPlaceholderVenue(value: string | null | undefined): boolean {
+  const t = norm(value)
+  return !t || t === 'not assigned' || t === 'to be announced' || t === 'tba' || t === 'n/a'
+}
+
+function isPlaceholderSeat(value: string | null | undefined): boolean {
+  const t = norm(value)
+  return !t || t === 'not assigned' || t === 'to be assigned' || t === 'to be announced' || t === 'tba' || t === 'n/a'
+}
+
+function pickScheduleField(
+  profileValue: string | null | undefined,
+  examValue: string | undefined,
+  emptyLabel: string,
+  isPlaceholder: (v: string | null | undefined) => boolean,
+): string {
+  const p = profileValue?.trim() ?? ''
+  const e = examValue?.trim() ?? ''
+  if (p && !isPlaceholder(p)) return p
+  if (e && !isPlaceholder(e)) return e
+  return p || e || emptyLabel
+}
+
+/** When the profile row has a real exam date/time/venue but synced unit rows still say “To be announced”, use the profile values. */
+function mergeExamsWithProfileAnnouncements(row: DatabaseProfileRow, exams: StudentExam[]): StudentExam[] {
+  if (exams.length === 0) return exams
+  const pd = row.exam_date?.trim()
+  const pt = row.exam_time?.trim()
+  const pv = row.venue?.trim()
+  const ps = row.seat_number?.trim()
+  const dateOk = pd && !isPlaceholderExamDate(pd)
+  const timeOk = pt && !isPlaceholderExamTime(pt)
+  const venueOk = pv && !isPlaceholderVenue(pv)
+  const seatOk = ps && !isPlaceholderSeat(ps)
+  if (!dateOk && !timeOk && !venueOk && !seatOk) return exams
+  return exams.map((exam) => ({
+    ...exam,
+    examDate: dateOk && isPlaceholderExamDate(exam.examDate) ? pd! : exam.examDate,
+    examTime: timeOk && isPlaceholderExamTime(exam.examTime) ? pt! : exam.examTime,
+    venue: venueOk && isPlaceholderVenue(exam.venue) ? pv! : exam.venue,
+    seatNumber: seatOk && isPlaceholderSeat(exam.seatNumber) ? ps! : exam.seatNumber,
+  }))
+}
+
 function createFallbackExam(row: DatabaseProfileRow): StudentExam[] {
   if (!row.exam_date && !row.exam_time && !row.venue && !row.seat_number) {
     return []
@@ -68,7 +126,7 @@ export function mapProfile(row: DatabaseProfileRow): AppProfile {
     }
   }
 
-  const exams = parseStudentExams(row)
+  const exams = mergeExamsWithProfileAnnouncements(row, parseStudentExams(row))
   const primaryExam = exams[0]
 
   return {
@@ -87,10 +145,10 @@ export function mapProfile(row: DatabaseProfileRow): AppProfile {
     department: row.department ?? 'Not assigned',
     semester: row.semester ?? 'Not assigned',
     courseUnits: Array.isArray(row.course_units) ? row.course_units : [],
-    examDate: primaryExam?.examDate ?? row.exam_date ?? 'Not scheduled',
-    examTime: primaryExam?.examTime ?? row.exam_time ?? 'Not scheduled',
-    venue: primaryExam?.venue ?? row.venue ?? 'Not assigned',
-    seatNumber: primaryExam?.seatNumber ?? row.seat_number ?? 'Not assigned',
+    examDate: pickScheduleField(row.exam_date, primaryExam?.examDate, 'Not scheduled', isPlaceholderExamDate),
+    examTime: pickScheduleField(row.exam_time, primaryExam?.examTime, 'Not scheduled', isPlaceholderExamTime),
+    venue: pickScheduleField(row.venue, primaryExam?.venue, 'Not assigned', isPlaceholderVenue),
+    seatNumber: pickScheduleField(row.seat_number, primaryExam?.seatNumber, 'Not assigned', isPlaceholderSeat),
     instructions: row.instructions ?? 'No instructions have been added yet.',
     profileImage: row.profile_image ?? 'https://via.placeholder.com/150',
     permitToken: row.permit_token ?? row.id,

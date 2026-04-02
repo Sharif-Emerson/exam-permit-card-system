@@ -34,9 +34,12 @@ export const socialMedia = {
 
 export const examPermitConfig = {
     printLimitPerMonth: 2,
-    qrCodeSize: 160,
-    qrCodeMargin: 1,
-    qrErrorCorrection: 'M' as const,
+    /** Raster width/height for PNG; larger modules scan more reliably on phone cameras. */
+    qrCodeSize: 320,
+    /** Quiet zone in modules; QR spec expects ~4 — values below 3 often fail physical scanners. */
+    qrCodeMargin: 4,
+    /** Higher correction survives blur, glare, and small on-screen size. */
+    qrErrorCorrection: 'Q' as const,
     permitTitle: 'Official Examination Permit',
     permitSubtitle: 'Kampala International University',
 }

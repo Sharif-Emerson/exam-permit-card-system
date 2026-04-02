@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell,
   CheckCircle2,
@@ -81,21 +81,34 @@ type ApplicationDraft = {
   semester: string
 }
 
-function buildOfflinePermitQrPayload(student: StudentProfile, publicBaseUrl: string) {
-  const clearanceStatus = student.feesBalance <= 0 ? 'Cleared' : 'Not Cleared'
-  const lines = [
-    'EXAM PERMIT',
-    `Token: ${student.permitToken}`,
-    `Name: ${student.name}`,
-    `RegNo: ${student.studentId || 'N/A'}`,
-    `Clearance: ${clearanceStatus}`,
-    `Department: ${student.department || 'N/A'}`,
-    `Semester: ${student.semester || 'N/A'}`,
-  ]
-  if (publicBaseUrl) {
-    lines.push(`VerifyURL: ${publicBaseUrl}/permits/${encodeURIComponent(student.permitToken)}`)
+/** Turn API base (possibly `/api` or host-relative) into an absolute URL phones can open from a scan. */
+function resolvePermitPublicBaseForQr(base: string): string {
+  const trimmed = base.trim().replace(/\/$/, '')
+  if (!trimmed) {
+    return ''
   }
-  return lines.join('\n')
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed
+  }
+  if (typeof window !== 'undefined' && trimmed.startsWith('/')) {
+    return `${window.location.origin.replace(/\/$/, '')}${trimmed}`
+  }
+  return trimmed
+}
+
+/**
+ * Keep payload short: dense multi-line text creates high-version QRs that fail on cameras when shown small.
+ * Prefer a single verification URL; otherwise a compact token line invigilator tools can parse or look up.
+ */
+function buildOfflinePermitQrPayload(student: StudentProfile, publicBaseUrl: string) {
+  const absoluteBase = resolvePermitPublicBaseForQr(publicBaseUrl)
+  const token = encodeURIComponent(student.permitToken)
+  if (absoluteBase) {
+    return `${absoluteBase}/permits/${token}`
+  }
+  const clearance = student.feesBalance <= 0 ? '1' : '0'
+  const reg = (student.studentId || 'NA').replace(/\|/g, '_')
+  return `KIU-PERMIT|${student.permitToken}|${reg}|${clearance}`
 }
 
 type SupportDraft = {
@@ -454,6 +467,18 @@ function getNotificationToneClasses(tone: NotificationItem['tone']) {
   }
 
   return 'border-green-200 bg-green-50 text-green-800'
+}
+
+/** Sets width imperatively so we avoid a `style` prop (a11y / lint tooling). */
+function PaymentProgressBarFill({ percent }: { percent: number }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (el) {
+      el.style.width = `${percent}%`
+    }
+  }, [percent])
+  return <div ref={ref} className="h-2.5 rounded-full bg-blue-500 transition-all duration-1000" />
 }
 
 export default function Dashboard() {
@@ -1087,6 +1112,10 @@ export default function Dashboard() {
           errorCorrectionLevel: examPermitConfig.qrErrorCorrection,
           margin: examPermitConfig.qrCodeMargin,
           width: examPermitConfig.qrCodeSize,
+          color: {
+            dark: '#000000',
+            light: '#ffffff',
+          },
         })
 
         if (!cancelled) {
@@ -1280,7 +1309,7 @@ export default function Dashboard() {
                     }}
                   />
                 </div>
-                <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-400">
+                <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-300">
                   Use a clear, front-facing passport-style photo. If not uploaded, a default placeholder image will be saved.
                 </p>
               </div>
@@ -1499,7 +1528,7 @@ export default function Dashboard() {
                             title="Close notifications"
                             aria-label="Close notifications"
                             onClick={() => setShowNotifications(false)}
-                            className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            className="rounded-full p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -1551,7 +1580,7 @@ export default function Dashboard() {
                   />
                   <div className="hidden sm:block">
                     <p className="text-sm font-semibold">{studentData.name}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{studentData.course}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-300">{studentData.course}</p>
                   </div>
                 </div>
 
@@ -1626,20 +1655,20 @@ export default function Dashboard() {
 
                   <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
-                      <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Student ID</p>
+                      <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Student ID</p>
                       <p className="mt-3 text-lg font-semibold">{studentData.studentId}</p>
                     </div>
                     <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
-                      <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Permit Courses</p>
+                      <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Permit Courses</p>
                       <p className="mt-3 text-lg font-semibold">{studentData.courseUnits?.length || 0} Registered Units</p>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">View codes in permit preview</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">View codes in permit preview</p>
                     </div>
                     <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
-                      <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Year / Semester</p>
+                      <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Year / Semester</p>
                       <p className="mt-3 text-lg font-semibold">{studentData.semester || currentSession}</p>
                     </div>
                     <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
-                      <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Permit Status</p>
+                      <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Permit Status</p>
                       <p className="mt-3 text-lg font-semibold">{statusView.label}</p>
                     </div>
                   </div>
@@ -1664,7 +1693,7 @@ export default function Dashboard() {
                 </div>
               </section>
 
-              <div key={activeSection} style={{ animation: 'kiu-page-in 0.3s ease-out both' }}>
+              <div key={activeSection} className="kiu-page-in-animate">
                 {activeSection === 'overview' && (
                   <div className="grid gap-6 xl:grid-cols-[1.55fr_1fr]">
                     <div className="space-y-6">
@@ -1709,7 +1738,7 @@ export default function Dashboard() {
                                 }}
                               />
                               <div>
-                                <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">Student Name</p>
+                                <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Student Name</p>
                                 <h3 className="mt-2 text-xl font-semibold">{studentData.name}</h3>
                                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Registration No. {studentData.studentId}</p>
                                 <p className="text-sm text-slate-600 dark:text-slate-300">{studentData.course}</p>
@@ -1718,13 +1747,17 @@ export default function Dashboard() {
                             <div className="w-32 shrink-0 rounded-3xl bg-white/80 p-3 shadow-sm dark:bg-slate-950/70">
                               {qrCodeUrl ? (
                                 <>
-                                  <img src={qrCodeUrl} alt="Verification QR code" className="h-24 w-24 mx-auto" />
+                                  <img
+                                    src={qrCodeUrl}
+                                    alt="Verification QR code"
+                                    className="mx-auto h-40 w-40 max-w-full rounded-lg bg-white p-1 sm:h-44 sm:w-44"
+                                  />
                                   <div className="mt-2 text-[11px] text-green-700 dark:text-green-300 text-center">
                                     Scan to verify
                                   </div>
                                 </>
                               ) : (
-                                <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-slate-100 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                                <div className="flex h-40 w-40 max-w-full items-center justify-center rounded-2xl bg-slate-100 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300 sm:h-44 sm:w-44">
                                   QR unavailable
                                 </div>
                               )}
@@ -1733,13 +1766,13 @@ export default function Dashboard() {
 
                           <div className="mt-6 grid gap-4 sm:grid-cols-2">
                             <div className="rounded-3xl bg-white/70 p-4 dark:bg-slate-950/70">
-                              <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Exam Details</p>
+                              <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Exam Details</p>
                               <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
                                 <p>Date: {formatDate(studentData.examDate)}</p>
                               </div>
                             </div>
                             <div className="rounded-3xl bg-white/70 p-4 dark:bg-slate-950/70">
-                              <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Fee Clearance</p>
+                              <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Fee Clearance</p>
                               <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
                                 <p>Total Fees: {formatMoney(studentData.totalFees, activeFeeCurrency)}</p>
                                 <p>Amount Paid: {formatMoney(studentData.amountPaid, activeFeeCurrency)}</p>
@@ -1747,7 +1780,7 @@ export default function Dashboard() {
                                 <p className={permitOutputLocked ? 'text-red-600 dark:text-red-300' : 'text-green-700 dark:text-green-300'}>
                                   {permitOutputLocked ? permitOutputMessage : 'Eligible for printing'}
                                 </p>
-                                <p className="text-slate-500 dark:text-slate-400">
+                                <p className="text-slate-500 dark:text-slate-300">
                                   Prints this month: {studentData.monthlyPrintCount ?? 0}/{studentData.monthlyPrintLimit ?? examPermitConfig.printLimitPerMonth}
                                   {(studentData.grantedPrintsRemaining ?? 0) > 0 ? ` • Extra admin prints left: ${studentData.grantedPrintsRemaining}` : ''}
                                 </p>
@@ -1760,7 +1793,7 @@ export default function Dashboard() {
                               type="button"
                               onClick={handleDownload}
                               disabled={permitOutputLocked}
-                              className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${permitOutputLocked ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-emerald-500 text-white hover:bg-emerald-400'}`}
+                              className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${permitOutputLocked ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-300' : 'bg-emerald-500 text-white hover:bg-emerald-400'}`}
                               title={permitOutputLocked ? permitOutputMessage : 'Download permit'}
                             >
                               <Download className="h-4 w-4" />
@@ -1770,7 +1803,7 @@ export default function Dashboard() {
                               type="button"
                               onClick={handlePrint}
                               disabled={permitOutputLocked}
-                              className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${permitOutputLocked ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-400' : 'bg-green-600 text-white hover:bg-green-500'}`}
+                              className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${permitOutputLocked ? 'cursor-not-allowed bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-300' : 'bg-green-600 text-white hover:bg-green-500'}`}
                               title={permitOutputLocked ? permitOutputMessage : 'Print permit'}
                             >
                               <Printer className="h-4 w-4" />
@@ -1811,7 +1844,7 @@ export default function Dashboard() {
                               ))}
                             </select>
                           </label>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                          <p className="text-xs text-slate-500 dark:text-slate-300">
                             After admin approval, your semester and course units will be updated automatically.
                           </p>
                           <button
@@ -1851,7 +1884,7 @@ export default function Dashboard() {
                                   {record.status}
                                 </span>
                               </div>
-                              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{formatDateTime(record.createdAt)}</p>
+                              <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">{formatDateTime(record.createdAt)}</p>
                               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{record.remarks}</p>
                             </div>
                           ))}
@@ -1939,7 +1972,7 @@ export default function Dashboard() {
                         <h2 className="mt-2 text-2xl font-semibold">Permit requests</h2>
                         <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800">
                           <table className="min-w-full text-left text-sm">
-                            <thead className="bg-slate-50 text-xs uppercase tracking-[0.25em] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                            <thead className="bg-slate-50 text-xs uppercase tracking-[0.25em] text-slate-500 dark:bg-slate-900 dark:text-slate-300">
                               <tr>
                                 <th className="px-5 py-4">Date applied</th>
                                 <th className="px-5 py-4">Semester</th>
@@ -1978,7 +2011,7 @@ export default function Dashboard() {
                       <h2 className="mt-2 text-2xl font-semibold">One record per semester</h2>
                       <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800">
                         <table className="min-w-full text-left text-sm">
-                          <thead className="bg-slate-50 text-xs uppercase tracking-[0.25em] text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                          <thead className="bg-slate-50 text-xs uppercase tracking-[0.25em] text-slate-500 dark:bg-slate-900 dark:text-slate-300">
                             <tr>
                               <th className="px-5 py-4">Semester</th>
                               <th className="px-5 py-4">Latest action</th>
@@ -2252,7 +2285,7 @@ export default function Dashboard() {
                               className="block w-full text-sm text-slate-700 dark:text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
                             />
                             {supportAttachment && (
-                              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                              <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">
                                 Selected: {supportAttachment.name}
                               </p>
                             )}
@@ -2290,7 +2323,7 @@ export default function Dashboard() {
                                   </span>
                                 ) : null}
                               </div>
-                              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{formatDateTime(request.createdAt)}</p>
+                              <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">{formatDateTime(request.createdAt)}</p>
                               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{request.message}</p>
                               {Array.isArray(request.messages) && request.messages.length > 0 ? (
                                 <div className="mt-3 space-y-2 rounded-2xl bg-white p-3 text-sm dark:bg-slate-950">
@@ -2373,7 +2406,7 @@ export default function Dashboard() {
                               <Wallet className="h-6 w-6" />
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Current Balance</p>
+                              <p className="text-sm font-medium text-slate-500 dark:text-slate-300">Current Balance</p>
                               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
                                 {formatMoney(feesBalance, activeFeeCurrency)}
                               </h2>
@@ -2405,12 +2438,12 @@ export default function Dashboard() {
                         <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-blue-500/10 blur-2xl"></div>
                         <div className="relative z-10 h-full flex flex-col justify-between">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Paid (Semester)</p>
+                            <p className="text-sm font-medium text-slate-500 dark:text-slate-300">Total Paid (Semester)</p>
                             <PieChart className="h-5 w-5 text-blue-500" />
                           </div>
                           <div className="mt-2 text-center sm:text-left">
                             <h2 className="text-3xl font-bold text-slate-900 dark:text-white">{formatMoney(amountPaid, activeFeeCurrency)}</h2>
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center sm:justify-start gap-1">
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-300 flex items-center justify-center sm:justify-start gap-1">
                               {feesBalance <= 0 ? (
                                 <><CheckCircle2 className="h-3 w-3 text-emerald-500" /> Fully cleared for previous sessions</>
                               ) : (
@@ -2419,7 +2452,7 @@ export default function Dashboard() {
                             </p>
                           </div>
                           <div className="mt-4 w-full rounded-full bg-slate-100 dark:bg-slate-800 h-2.5">
-                            <div className="bg-blue-500 h-2.5 rounded-full transition-all duration-1000" style={{ width: `${paymentProgress}%` }}></div>
+                            <PaymentProgressBarFill percent={paymentProgress} />
                           </div>
                           <p className="text-xs text-right mt-1 text-slate-500 font-medium">{paymentProgress}% of Annual Target</p>
                         </div>
@@ -2439,7 +2472,7 @@ export default function Dashboard() {
                                 <div key={dl.id} className="flex items-center justify-between border-l-2 border-orange-500 pl-3 gap-3">
                                   <div className="min-w-0">
                                     <p className="text-sm font-medium text-slate-900 dark:text-white">{dl.title}</p>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">{dl.subtitle}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-300">{dl.subtitle}</p>
                                     {countdown ? (
                                       <p className="mt-1 text-[11px] font-semibold text-orange-600 dark:text-orange-400">{countdown}</p>
                                     ) : null}
@@ -2455,14 +2488,14 @@ export default function Dashboard() {
                               <div className="flex items-center justify-between border-l-2 border-orange-500 pl-3">
                                 <div>
                                   <p className="text-sm font-medium text-slate-900 dark:text-white">Final Exam Clearance</p>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400">Clear all balances to generate permit</p>
+                                  <p className="text-xs text-slate-500 dark:text-slate-300">Clear all balances to generate permit</p>
                                 </div>
                                 <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/40 dark:text-orange-300">In 14 Days</span>
                               </div>
                               <div className="flex items-center justify-between border-l-2 border-slate-300 dark:border-slate-600 pl-3">
                                 <div>
                                   <p className="text-sm font-medium text-slate-900 dark:text-white">Next Semester Reg.</p>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400">Early bird registration fee</p>
+                                  <p className="text-xs text-slate-500 dark:text-slate-300">Early bird registration fee</p>
                                 </div>
                                 <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded-full dark:bg-slate-800 dark:text-slate-300">August 1st</span>
                               </div>
@@ -2488,7 +2521,7 @@ export default function Dashboard() {
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
                           <thead>
-                            <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
+                            <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-300">
                               <th className="pb-3 font-medium">Date</th>
                               <th className="pb-3 font-medium">Description</th>
                               <th className="pb-3 font-medium">Method</th>
@@ -2519,7 +2552,7 @@ export default function Dashboard() {
                                 <td className="py-4 font-medium text-slate-900 dark:text-white">{txn.desc}</td>
                                 <td className="py-4 text-slate-600 dark:text-slate-300">
                                   <div className="flex items-center gap-2">
-                                    <CreditCard className="h-4 w-4 text-slate-400" />
+                                    <CreditCard className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-300" />
                                     {txn.method}
                                   </div>
                                 </td>
@@ -2570,11 +2603,15 @@ export default function Dashboard() {
                         <div className="w-32 shrink-0 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                           {qrCodeUrl ? (
                             <>
-                              <img src={qrCodeUrl} alt="Permit QR code" className="mx-auto h-24 w-24" />
-                              <p className="mt-2 text-center text-[11px] text-slate-500 dark:text-slate-400">Scan to verify</p>
+                              <img
+                                src={qrCodeUrl}
+                                alt="Permit QR code"
+                                className="mx-auto h-40 w-40 max-w-full rounded-lg bg-white p-1 sm:h-44 sm:w-44"
+                              />
+                              <p className="mt-2 text-center text-[11px] text-slate-500 dark:text-slate-300">Scan to verify</p>
                             </>
                           ) : (
-                            <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                            <div className="mx-auto flex h-40 w-40 max-w-full items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300 sm:h-44 sm:w-44">
                               QR unavailable
                             </div>
                           )}
@@ -2585,7 +2622,7 @@ export default function Dashboard() {
                     {/* Courses Grid */}
                     <div className="flex items-center justify-between mb-2">
                       <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Permit Courses</h2>
-                      <button className="text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition" onClick={() => setActiveSection('overview')}>Digital Permit &rarr;</button>
+                      <button className="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition" onClick={() => setActiveSection('overview')}>Digital Permit &rarr;</button>
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -2601,10 +2638,10 @@ export default function Dashboard() {
                               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                                 <BookOpen className="h-5 w-5" />
                               </div>
-                              <span className="text-xs font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{code}</span>
+                              <span className="text-xs font-bold text-slate-600 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{code}</span>
                             </div>
                             <h3 className="text-base font-semibold text-slate-900 dark:text-white leading-snug line-clamp-2 min-h-[2.5rem]">{title}</h3>
-                            <div className="mt-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                            <div className="mt-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-300">
                               <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" /> Scheduled Session</span>
                               <span>Permit Unit</span>
                             </div>
@@ -2613,9 +2650,9 @@ export default function Dashboard() {
                       })}
                       {(!studentData.courseUnits || studentData.courseUnits.length === 0) && (
                         <div className="col-span-full rounded-3xl border border-dashed border-slate-300 p-10 text-center dark:border-slate-700">
-                          <BookOpen className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
+                          <BookOpen className="mx-auto h-10 w-10 text-slate-400 dark:text-slate-400 mb-3" />
                           <h3 className="text-lg font-medium text-slate-900 dark:text-white">No courses assigned</h3>
-                          <p className="mt-1 text-sm text-slate-500">You are not currently enrolled in any course units on your permit.</p>
+                          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">You are not currently enrolled in any course units on your permit.</p>
                         </div>
                       )}
                     </div>

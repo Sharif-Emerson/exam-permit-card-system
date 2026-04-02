@@ -8,7 +8,19 @@ vi.mock('qrcode', () => ({
   },
 }))
 
-const { signOut, refreshUser, fetchStudentProfileById, updateStudentAccount, fetchSupportRequests, fetchSupportContacts, fetchPermitActivityHistory, createSupportRequest, recordPermitActivity, fetchSystemFeeSettings } = vi.hoisted(() => ({
+const {
+  signOut,
+  refreshUser,
+  fetchStudentProfileById,
+  updateStudentAccount,
+  fetchSupportRequests,
+  fetchSupportContacts,
+  fetchPermitActivityHistory,
+  createSupportRequest,
+  recordPermitActivity,
+  fetchSystemFeeSettings,
+  fetchSemesterRegistrations,
+} = vi.hoisted(() => ({
   signOut: vi.fn(),
   refreshUser: vi.fn().mockResolvedValue(undefined),
   fetchStudentProfileById: vi.fn().mockResolvedValue({
@@ -57,6 +69,7 @@ const { signOut, refreshUser, fetchStudentProfileById, updateStudentAccount, fet
     internationalStudentFee: 5000,
     currencyCode: 'USD',
   }),
+  fetchSemesterRegistrations: vi.fn().mockResolvedValue([]),
 }))
 
 describe('Dashboard', () => {
@@ -80,6 +93,8 @@ describe('Dashboard', () => {
     vi.spyOn(profileServiceModule, 'fetchPermitActivityHistory').mockImplementation(fetchPermitActivityHistory)
     vi.spyOn(profileServiceModule, 'createSupportRequest').mockImplementation(createSupportRequest)
     vi.spyOn(profileServiceModule, 'recordPermitActivity').mockImplementation(recordPermitActivity)
+    vi.spyOn(profileServiceModule, 'fetchSemesterRegistrations').mockImplementation(fetchSemesterRegistrations)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
 
     const { default: Dashboard } = await import('./Dashboard')
     render(<Dashboard />)
@@ -115,6 +130,7 @@ describe('Dashboard', () => {
     vi.spyOn(profileServiceModule, 'createSupportRequest').mockImplementation(createSupportRequest)
     vi.spyOn(profileServiceModule, 'recordPermitActivity').mockImplementation(recordPermitActivity)
     vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
+    vi.spyOn(profileServiceModule, 'fetchSemesterRegistrations').mockImplementation(fetchSemesterRegistrations)
 
     updateStudentAccount.mockResolvedValue({
       id: 'student-id',
@@ -211,6 +227,8 @@ describe('Dashboard', () => {
     vi.spyOn(profileServiceModule, 'fetchPermitActivityHistory').mockImplementation(fetchPermitActivityHistory)
     vi.spyOn(profileServiceModule, 'createSupportRequest').mockImplementation(createSupportRequest)
     vi.spyOn(profileServiceModule, 'recordPermitActivity').mockImplementation(recordPermitActivity)
+    vi.spyOn(profileServiceModule, 'fetchSemesterRegistrations').mockImplementation(fetchSemesterRegistrations)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
 
     const { default: Dashboard } = await import('./Dashboard')
     render(<Dashboard />)
@@ -250,6 +268,8 @@ describe('Dashboard', () => {
     vi.spyOn(profileServiceModule, 'fetchPermitActivityHistory').mockImplementation(fetchPermitActivityHistory)
     vi.spyOn(profileServiceModule, 'createSupportRequest').mockImplementation(createSupportRequest)
     vi.spyOn(profileServiceModule, 'recordPermitActivity').mockImplementation(recordPermitActivity)
+    vi.spyOn(profileServiceModule, 'fetchSemesterRegistrations').mockImplementation(fetchSemesterRegistrations)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
 
     const { default: Dashboard } = await import('./Dashboard')
     const user = userEvent.setup()
@@ -341,6 +361,8 @@ describe('Dashboard', () => {
     vi.spyOn(profileServiceModule, 'fetchPermitActivityHistory').mockImplementation(fetchPermitActivityHistory)
     vi.spyOn(profileServiceModule, 'createSupportRequest').mockImplementation(createSupportRequest)
     vi.spyOn(profileServiceModule, 'recordPermitActivity').mockImplementation(recordPermitActivity)
+    vi.spyOn(profileServiceModule, 'fetchSemesterRegistrations').mockImplementation(fetchSemesterRegistrations)
+    vi.spyOn(profileServiceModule, 'fetchSystemFeeSettings').mockImplementation(fetchSystemFeeSettings)
 
     const { default: Dashboard } = await import('./Dashboard')
     const user = userEvent.setup()

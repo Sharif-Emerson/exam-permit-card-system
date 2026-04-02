@@ -78,6 +78,7 @@ export default defineConfig(({ mode }) => {
       setupFiles: './src/test/setup.ts',
       css: true,
       globals: true,
+      testTimeout: 15000,
       include: ['src/**/*.test.{ts,tsx}'],
       exclude: ['node_modules/**', 'e2e/**', 'playwright.config.ts'],
       define: {

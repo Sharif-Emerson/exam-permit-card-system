@@ -48,18 +48,29 @@ const backendArgs = isWindows
   ? ['/d', '/s', '/c', `${npmCommand} run dev`]
   : ['run', 'dev']
 
+const restDevPort = process.env.REST_DEV_PORT || process.env.PORT || '4000'
+const viteProxyTarget =
+  process.env.VITE_DEV_PROXY_TARGET || `http://127.0.0.1:${restDevPort}`
+
 try {
   children.push(
     startChild('backend', backendCommand, backendArgs, {
       cwd: backendRoot,
-      env: process.env,
+      env: {
+        ...process.env,
+        PORT: restDevPort,
+        REST_BIND_STRICT: process.env.REST_BIND_STRICT ?? '1',
+      },
     }),
   )
 
   children.push(
     startChild('frontend', process.execPath, [path.resolve(projectRoot, 'scripts', 'run-vite-rest.mjs'), 'dev'], {
       cwd: projectRoot,
-      env: process.env,
+      env: {
+        ...process.env,
+        VITE_DEV_PROXY_TARGET: viteProxyTarget,
+      },
     }),
   )
 } catch (error) {

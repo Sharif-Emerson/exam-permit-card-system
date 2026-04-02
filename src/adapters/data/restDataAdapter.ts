@@ -299,6 +299,7 @@ function toSupportRequest(payload: unknown): SupportRequest {
   }
 
   const record = payload as Record<string, unknown>
+  const messagesRaw = Array.isArray(record.messages) ? record.messages : []
 
   return {
     id: String(record.id ?? ''),
@@ -540,11 +541,14 @@ export const restDataAdapter: DataAdapter = {
       password: values.password,
       student_id: values.studentId,
       student_category: values.studentCategory,
-      gender: values.gender,
       enrollment_status: values.enrollmentStatus ?? 'active',
       course: values.course,
       total_fees: Number(values.totalFees.toFixed(2)),
       amount_paid: Number((values.amountPaid ?? 0).toFixed(2)),
+    }
+
+    if (values.gender === 'male' || values.gender === 'female' || values.gender === 'other') {
+      payload.gender = values.gender
     }
 
     if (typeof values.phoneNumber === 'string') payload.phone_number = values.phoneNumber || null
@@ -599,6 +603,12 @@ export const restDataAdapter: DataAdapter = {
     if (Array.isArray(values.courseUnits)) payload.course_units = values.courseUnits
     if ('profileImage' in values) payload.profile_image = values.profileImage ?? null
     if (typeof values.totalFees === 'number') payload.total_fees = Number(values.totalFees.toFixed(2))
+    if ('examDate' in values) payload.exam_date = values.examDate ?? null
+    if ('examTime' in values) payload.exam_time = values.examTime ?? null
+    if ('venue' in values) payload.venue = values.venue ?? null
+    if ('seatNumber' in values) payload.seat_number = values.seatNumber ?? null
+    if ('instructions' in values) payload.instructions = values.instructions ?? null
+    if (Array.isArray(values.exams)) payload.exams = values.exams
 
     const result = await request(`/profiles/${studentId}/admin`, {
       method: 'PATCH',

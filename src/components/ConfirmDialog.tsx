@@ -42,7 +42,7 @@ export default function ConfirmDialog({
             title="Close"
             aria-label="Close dialog"
             onClick={onCancel}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
           >
             <X className="h-4 w-4" />
           </button>

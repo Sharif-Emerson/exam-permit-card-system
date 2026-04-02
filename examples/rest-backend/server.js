@@ -1490,6 +1490,17 @@ app.patch('/profiles/:id/admin', authenticate, requireAdminPermission('manage_st
     return
   }
 
+  const examDate = typeof request.body.exam_date === 'string' ? request.body.exam_date.trim() : undefined
+  const examTime = typeof request.body.exam_time === 'string' ? request.body.exam_time.trim() : undefined
+  const venue = typeof request.body.venue === 'string' ? request.body.venue.trim() : undefined
+  const seatNumber = typeof request.body.seat_number === 'string' ? request.body.seat_number.trim() : undefined
+  const instructions = typeof request.body.instructions === 'string' ? request.body.instructions.trim() : undefined
+
+  if (typeof instructions !== 'undefined' && instructions.length > 2000) {
+    response.status(400).json({ message: 'Instructions must be 2000 characters or fewer.' })
+    return
+  }
+
   const identityConflictMessage = getIdentityConflictMessage({
     email,
     phoneNumber,
@@ -1518,6 +1529,14 @@ app.patch('/profiles/:id/admin', authenticate, requireAdminPermission('manage_st
   if (typeof profileImage !== 'undefined') updates.profile_image = profileImage
   if (typeof totalFees !== 'undefined') updates.total_fees = totalFees
   if (typeof studentCategory !== 'undefined' && typeof totalFees === 'undefined') updates.total_fees = getDefaultFeeForStudentCategory(studentCategory)
+  if (typeof examDate !== 'undefined') updates.exam_date = examDate || null
+  if (typeof examTime !== 'undefined') updates.exam_time = examTime || null
+  if (typeof venue !== 'undefined') updates.venue = venue || null
+  if (typeof seatNumber !== 'undefined') updates.seat_number = seatNumber || null
+  if (typeof instructions !== 'undefined') updates.instructions = instructions || null
+  if (Array.isArray(request.body.exams)) {
+    updates.exams = request.body.exams
+  }
 
   try {
     const updatedProfile = adminUpdateStudentProfile(request.params.id, updates)
@@ -3024,7 +3043,7 @@ async function startServer() {
   const startPort = Number(process.env.PORT ?? 4000)
   let port
   try {
-    port = await findAvailablePort(startPort)
+    port = process.env.REST_BIND_STRICT === '1' ? startPort : await findAvailablePort(startPort)
   } catch (e) {
     console.error(e)
     process.exit(1)

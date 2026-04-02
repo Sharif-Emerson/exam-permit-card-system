@@ -11,6 +11,37 @@ type InvigilatorPermitPayload = {
   exams?: { examDate: string }[]
 }
 
+/** Accept raw token, full verify URL from QR, or compact `KIU-PERMIT|token|...` offline payload. */
+function extractPermitTokenFromScanInput(raw: string): string {
+  const t = raw.trim()
+  if (!t) {
+    return ''
+  }
+  if (/^https?:\/\//i.test(t)) {
+    try {
+      const u = new URL(t)
+      const fromPermits = u.pathname.match(/\/permits\/([^/?#]+)/i)
+      if (fromPermits?.[1]) {
+        return decodeURIComponent(fromPermits[1])
+      }
+      const segments = u.pathname.split('/').filter(Boolean)
+      const last = segments[segments.length - 1]
+      if (last) {
+        return decodeURIComponent(last)
+      }
+    } catch {
+      /* ignore malformed URL */
+    }
+  }
+  if (t.toUpperCase().startsWith('KIU-PERMIT|')) {
+    const parts = t.split('|')
+    if (parts[1]?.trim()) {
+      return parts[1].trim()
+    }
+  }
+  return t
+}
+
 export default function InvigilatorCheckIn() {
   const [token, setToken] = useState('')
   const [permit, setPermit] = useState<InvigilatorPermitPayload | null>(null)
@@ -47,7 +78,10 @@ export default function InvigilatorCheckIn() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (token.trim()) fetchPermit(token.trim())
+    const extracted = extractPermitTokenFromScanInput(token)
+    if (extracted) {
+      void fetchPermit(extracted)
+    }
   }
 
   return (
@@ -58,7 +92,7 @@ export default function InvigilatorCheckIn() {
         <input
           type="text"
           className="flex-1 border rounded px-3 py-2"
-          placeholder="Enter or scan permit token"
+          placeholder="Token, verify URL, or scanned text"
           value={token}
           onChange={e => setToken(e.target.value)}
         />
@@ -77,7 +111,9 @@ export default function InvigilatorCheckIn() {
           <div><strong>Valid Until:</strong> {permit.exams && permit.exams.length > 0 ? new Date(Math.max(...permit.exams.map((exam) => new Date(exam.examDate).getTime()))).toLocaleDateString() : 'N/A'}</div>
         </div>
       )}
-      <div className="mt-6 text-xs text-slate-500">Scan the QR code on the student permit or enter the token manually to verify exam access.</div>
+      <div className="mt-6 text-xs text-slate-500">
+        Student permits encode a short verification link when the server URL is configured; otherwise a compact code. Paste the raw scan result, the full URL, or only the permit token.
+      </div>
     </div>
   )
 }

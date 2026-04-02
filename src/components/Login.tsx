@@ -71,19 +71,20 @@ export default function Login() {
     }
 
     const params = new URLSearchParams(raw)
-    const token = params.get('oidc_token')
+    const oidcToken = params.get('oidc_token')
 
-    if (!token) {
+    if (!oidcToken) {
       return
     }
 
+    const tokenString: string = oidcToken
     let cancelled = false
 
     async function completeOidc() {
       setOidcCompleting(true)
       setError('')
       try {
-        const signedIn = await signInWithTokenRef.current(token)
+        const signedIn = await signInWithTokenRef.current(tokenString)
         if (cancelled) {
           return
         }

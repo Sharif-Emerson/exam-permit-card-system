@@ -34,20 +34,19 @@ type PermitCardProps = {
 type PermitCardFieldKey = 'photo' | 'department' | 'semester' | 'course'
 
 type DepartmentPrintTheme = {
-  cardBg: string
-  cardBorder: string
-  headerBg: string
-  headerBorder: string
-  headerText: string
+  /** Tailwind classes for permit sheet surface (background + border color). */
+  cardClass: string
+  /** Tailwind classes for print-only header strip (background + border color). */
+  headerClass: string
 }
 
 const DEPARTMENT_PRINT_THEMES: DepartmentPrintTheme[] = [
-  { cardBg: '#eff6ff', cardBorder: '#93c5fd', headerBg: '#dbeafe', headerBorder: '#93c5fd', headerText: '#1e3a8a' },
-  { cardBg: '#f0fdf4', cardBorder: '#86efac', headerBg: '#dcfce7', headerBorder: '#86efac', headerText: '#14532d' },
-  { cardBg: '#fff7ed', cardBorder: '#fdba74', headerBg: '#ffedd5', headerBorder: '#fdba74', headerText: '#9a3412' },
-  { cardBg: '#fdf4ff', cardBorder: '#e9a8fd', headerBg: '#fae8ff', headerBorder: '#e9a8fd', headerText: '#86198f' },
-  { cardBg: '#ecfeff', cardBorder: '#67e8f9', headerBg: '#cffafe', headerBorder: '#67e8f9', headerText: '#155e75' },
-  { cardBg: '#fefce8', cardBorder: '#fde047', headerBg: '#fef9c3', headerBorder: '#fde047', headerText: '#854d0e' },
+  { cardClass: 'bg-[#eff6ff] border-[#93c5fd]', headerClass: 'border-[#93c5fd] bg-[#dbeafe]' },
+  { cardClass: 'bg-[#f0fdf4] border-[#86efac]', headerClass: 'border-[#86efac] bg-[#dcfce7]' },
+  { cardClass: 'bg-[#fff7ed] border-[#fdba74]', headerClass: 'border-[#fdba74] bg-[#ffedd5]' },
+  { cardClass: 'bg-[#fdf4ff] border-[#e9a8fd]', headerClass: 'border-[#e9a8fd] bg-[#fae8ff]' },
+  { cardClass: 'bg-[#ecfeff] border-[#67e8f9]', headerClass: 'border-[#67e8f9] bg-[#cffafe]' },
+  { cardClass: 'bg-[#fefce8] border-[#fde047]', headerClass: 'border-[#fde047] bg-[#fef9c3]' },
 ]
 
 function getDepartmentPrintTheme(department: string | undefined) {
@@ -151,41 +150,24 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
         </div>
 
         <div
-          className="permit-sheet rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border relative"
-          style={{ backgroundColor: departmentTheme.cardBg, borderColor: departmentTheme.cardBorder }}
+          className={`permit-sheet rounded-2xl border shadow-lg p-4 sm:p-6 lg:p-8 relative ${departmentTheme.cardClass}`}
         >
           {/* Watermark for print/download view */}
-          <div className="hidden print:block pointer-events-none select-none" style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: 0,
-            opacity: 0.08,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '5rem',
-            fontWeight: 900,
-            textTransform: 'uppercase',
-            color: '#0f5132',
-            letterSpacing: '0.2em',
-            userSelect: 'none',
-            pointerEvents: 'none',
-          }}>
+          <div
+            className="pointer-events-none hidden select-none print:absolute print:inset-0 print:z-0 print:flex print:h-full print:w-full print:items-center print:justify-center print:text-[5rem] print:font-black print:uppercase print:tracking-[0.2em] print:text-[#0f5132] print:opacity-[0.08]"
+            aria-hidden
+          >
             {name}
           </div>
           <div className="text-center mb-6 sm:mb-8 border-b border-slate-200 pb-5 print:hidden">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-2">Official Examination Access Card</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-600 mb-2">Official Examination Access Card</p>
             {logo && <img src={logo} alt="Permit Logo" className="h-12 mx-auto mb-2" />}
             <div className="text-2xl sm:text-3xl font-bold text-emerald-700">{name}</div>
           </div>
 
           {/* Print-only permit header with custom logo */}
           <div
-            className="mb-5 hidden rounded-xl border px-4 py-4 text-center print:block print:mb-4"
-            style={{ borderColor: departmentTheme.headerBorder, backgroundColor: departmentTheme.headerBg }}
+            className={`mb-5 hidden rounded-xl border px-4 py-4 text-center print:mb-4 print:block ${departmentTheme.headerClass}`}
           >
             <div className="flex flex-col items-center gap-2">
               {logo && <img src={logo} alt="Permit Logo" className="h-14 w-14 object-contain" draggable={false} />}
@@ -222,7 +204,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
 
             <div className="space-y-2 print:hidden">
               <div className="flex items-center space-x-2">
-                <User className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 flex-shrink-0" />
+                <User className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 flex-shrink-0" />
                 <span className="font-medium text-sm sm:text-base">Course:</span>
                 <span className="text-sm sm:text-base">{studentData.course}</span>
               </div>
@@ -464,7 +446,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                     <img
                       src={qrCodeUrl}
                       alt="Verification QR code"
-                      className="h-32 w-32 print:h-20 print:w-20"
+                      className="h-40 w-40 max-w-full rounded-md bg-white p-1 print:h-28 print:w-28 sm:h-44 sm:w-44"
                     />
                   ) : (
                     <span className="text-sm text-slate-500 print:text-[10px]">QR data unavailable</span>

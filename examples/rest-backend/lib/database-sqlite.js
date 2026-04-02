@@ -529,6 +529,57 @@ function mapExamRecord(row) {
   }
 }
 
+function normExamField(s) {
+  return String(s ?? '').trim().toLowerCase()
+}
+
+function isPlaceholderExamDateValue(value) {
+  const t = normExamField(value)
+  return !t || t === 'not scheduled' || t === 'to be announced' || t === 'tba' || t === 'n/a'
+}
+
+function isPlaceholderExamTimeValue(value) {
+  return isPlaceholderExamDateValue(value)
+}
+
+function isPlaceholderVenueValue(value) {
+  const t = normExamField(value)
+  return !t || t === 'not assigned' || t === 'to be announced' || t === 'tba' || t === 'n/a'
+}
+
+function isPlaceholderSeatValue(value) {
+  const t = normExamField(value)
+  return !t || t === 'not assigned' || t === 'to be assigned' || t === 'to be announced' || t === 'tba' || t === 'n/a'
+}
+
+/** Apply profiles.exam_date (and related) when unit rows still hold curriculum placeholders like “To be announced”. */
+function mergeExamsWithProfileAnnouncements(profileRow, exams) {
+  if (!Array.isArray(exams) || exams.length === 0) {
+    return exams
+  }
+
+  const pd = profileRow?.exam_date?.trim()
+  const pt = profileRow?.exam_time?.trim()
+  const pv = profileRow?.venue?.trim()
+  const ps = profileRow?.seat_number?.trim()
+  const dateOk = pd && !isPlaceholderExamDateValue(pd)
+  const timeOk = pt && !isPlaceholderExamTimeValue(pt)
+  const venueOk = pv && !isPlaceholderVenueValue(pv)
+  const seatOk = ps && !isPlaceholderSeatValue(ps)
+
+  if (!dateOk && !timeOk && !venueOk && !seatOk) {
+    return exams
+  }
+
+  return exams.map((exam) => ({
+    ...exam,
+    examDate: dateOk && isPlaceholderExamDateValue(exam.examDate) ? pd : exam.examDate,
+    examTime: timeOk && isPlaceholderExamTimeValue(exam.examTime) ? pt : exam.examTime,
+    venue: venueOk && isPlaceholderVenueValue(exam.venue) ? pv : exam.venue,
+    seatNumber: seatOk && isPlaceholderSeatValue(exam.seatNumber) ? ps : exam.seatNumber,
+  }))
+}
+
 function getPermitPrintMonthKey(dateValue = new Date()) {
   const year = dateValue.getUTCFullYear()
   const month = String(dateValue.getUTCMonth() + 1).padStart(2, '0')
@@ -634,7 +685,10 @@ function mapProfile(row, examsByProfileId = new Map()) {
     return null
   }
 
-  const exams = examsByProfileId.get(row.id) ?? parseLegacyExamAssignments(row)
+  let exams = examsByProfileId.get(row.id) ?? parseLegacyExamAssignments(row)
+  if (row.role === 'student') {
+    exams = mergeExamsWithProfileAnnouncements(row, exams)
+  }
   const profile = { ...row }
   const permitAccess = row.role === 'student' ? getStudentPermitAccess(row) : {}
   delete profile.campus_id
@@ -1211,7 +1265,8 @@ export function getPermitByToken(permitToken) {
     return null
   }
 
-  const exams = listProfileExamsByIds([row.id]).get(row.id) ?? parseLegacyExamAssignments(row)
+  let exams = listProfileExamsByIds([row.id]).get(row.id) ?? parseLegacyExamAssignments(row)
+  exams = mergeExamsWithProfileAnnouncements(row, exams)
 
   const cleared = Number(row.amount_paid ?? 0) >= Number(row.total_fees ?? 0)
   const base = {
@@ -1508,13 +1563,28 @@ export function adminUpdateStudentProfile(profileId, updates) {
   const nextCourseUnitsJson = 'course_units' in updates
     ? serializeCourseUnits(updates.course_units)
     : profileRow.course_units_json
+  const nextExamDate = 'exam_date' in updates
+    ? (updates.exam_date == null ? null : String(updates.exam_date).trim() || null)
+    : profileRow.exam_date
+  const nextExamTime = 'exam_time' in updates
+    ? (updates.exam_time == null ? null : String(updates.exam_time).trim() || null)
+    : profileRow.exam_time
+  const nextVenue = 'venue' in updates
+    ? (updates.venue == null ? null : String(updates.venue).trim() || null)
+    : profileRow.venue
+  const nextSeatNumber = 'seat_number' in updates
+    ? (updates.seat_number == null ? null : String(updates.seat_number).trim() || null)
+    : profileRow.seat_number
+  const nextInstructions = 'instructions' in updates
+    ? (updates.instructions == null ? null : String(updates.instructions).trim() || null)
+    : profileRow.instructions
   const fallbackForExams = {
     id: profileId,
-    course: profileRow.course,
-    exam_date: profileRow.exam_date,
-    exam_time: profileRow.exam_time,
-    venue: profileRow.venue,
-    seat_number: profileRow.seat_number,
+    course: nextCourse,
+    exam_date: nextExamDate,
+    exam_time: nextExamTime,
+    venue: nextVenue,
+    seat_number: nextSeatNumber,
   }
   let nextExamsJson = profileRow.exams_json
   let examsToReplace = null
@@ -1537,9 +1607,33 @@ export function adminUpdateStudentProfile(profileId, updates) {
 
     db.prepare(`
       UPDATE profiles
-      SET email = ?, phone_number = ?, name = ?, student_id = ?, student_category = ?, gender = ?, enrollment_status = ?, course = ?, program = ?, college = ?, department = ?, semester = ?, course_units_json = ?, profile_image = ?, total_fees = ?, exams_json = ?, updated_at = ?
+      SET email = ?, phone_number = ?, name = ?, student_id = ?, student_category = ?, gender = ?, enrollment_status = ?, course = ?, program = ?, college = ?, department = ?, semester = ?, course_units_json = ?, profile_image = ?, total_fees = ?, exams_json = ?, exam_date = ?, exam_time = ?, venue = ?, seat_number = ?, instructions = ?, updated_at = ?
       WHERE id = ?
-    `).run(nextEmail, nextPhoneNumber, nextName, nextStudentId, nextStudentCategory, nextGender, nextEnrollmentStatus, nextCourse, nextProgram, nextCollege, nextDepartment, nextSemester, nextCourseUnitsJson, nextProfileImage, nextTotalFees, nextExamsJson, updatedAt, profileId)
+    `).run(
+      nextEmail,
+      nextPhoneNumber,
+      nextName,
+      nextStudentId,
+      nextStudentCategory,
+      nextGender,
+      nextEnrollmentStatus,
+      nextCourse,
+      nextProgram,
+      nextCollege,
+      nextDepartment,
+      nextSemester,
+      nextCourseUnitsJson,
+      nextProfileImage,
+      nextTotalFees,
+      nextExamsJson,
+      nextExamDate,
+      nextExamTime,
+      nextVenue,
+      nextSeatNumber,
+      nextInstructions,
+      updatedAt,
+      profileId,
+    )
 
     if (examsToReplace) {
       replaceProfileExams(profileId, examsToReplace)

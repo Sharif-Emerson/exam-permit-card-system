@@ -255,6 +255,12 @@ export interface AdminProfileUpdateInput {
   courseUnits?: string[]
   profileImage?: string | null
   totalFees?: number
+  /** Profile-level exam announcement (shown on permit when unit rows are still placeholders). */
+  examDate?: string | null
+  examTime?: string | null
+  venue?: string | null
+  seatNumber?: string | null
+  instructions?: string | null
   exams?: StudentExam[]
 }
 
@@ -264,6 +270,7 @@ export interface CreateStudentInput {
   password: string
   studentId: string
   studentCategory: StudentCategory
+  gender?: StudentGender
   enrollmentStatus?: EnrollmentStatus
   phoneNumber?: string
   course: string

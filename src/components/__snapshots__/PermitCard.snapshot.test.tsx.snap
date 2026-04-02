@@ -86,11 +86,11 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
       </div>
     </div>
     <div
-      class="permit-sheet bg-amber-50 rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border border-amber-200 relative"
+      class="permit-sheet rounded-2xl border shadow-lg p-4 sm:p-6 lg:p-8 relative bg-[#fefce8] border-[#fde047]"
     >
       <div
-        class="hidden print:block pointer-events-none select-none"
-        style="position: absolute; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 0; opacity: 0.08; display: flex; align-items: center; justify-content: center; font-size: 5rem; font-weight: 900; text-transform: uppercase; color: rgb(15, 81, 50); letter-spacing: 0.2em; user-select: none; pointer-events: none;"
+        aria-hidden="true"
+        class="pointer-events-none hidden select-none print:absolute print:inset-0 print:z-0 print:flex print:h-full print:w-full print:items-center print:justify-center print:text-[5rem] print:font-black print:uppercase print:tracking-[0.2em] print:text-[#0f5132] print:opacity-[0.08]"
       >
         Kampala International University (KIU)
       </div>
@@ -98,7 +98,7 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
         class="text-center mb-6 sm:mb-8 border-b border-slate-200 pb-5 print:hidden"
       >
         <p
-          class="text-xs uppercase tracking-[0.3em] text-slate-500 mb-2"
+          class="text-xs uppercase tracking-[0.3em] text-slate-600 mb-2"
         >
           Official Examination Access Card
         </p>
@@ -108,13 +108,13 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
           src="https://images.seeklogo.com/logo-png/55/1/kampala-international-university-kiu-logo-png_seeklogo-550306.png"
         />
         <div
-          class="text-2xl sm:text-3xl font-bold text-gray-900"
+          class="text-2xl sm:text-3xl font-bold text-emerald-700"
         >
           Kampala International University (KIU)
         </div>
       </div>
       <div
-        class="mb-5 hidden rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-center print:block print:mb-4"
+        class="mb-5 hidden rounded-xl border px-4 py-4 text-center print:mb-4 print:block border-[#fde047] bg-[#fef9c3]"
       >
         <div
           class="flex flex-col items-center gap-2"
@@ -127,12 +127,12 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
           />
           <div>
             <p
-              class="text-[10px] font-semibold uppercase tracking-[0.26em] text-emerald-700"
+              class="text-[10px] font-semibold uppercase tracking-[0.26em] text-emerald-800"
             >
               Official Examination Permit
             </p>
             <p
-              class="mt-0.5 text-sm font-bold text-emerald-900"
+              class="mt-0.5 text-sm font-bold text-emerald-700"
             >
               Kampala International University (KIU)
             </p>
@@ -192,7 +192,7 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
             class="flex items-center space-x-2"
           >
             <svg
-              class="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 flex-shrink-0"
+              class="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 flex-shrink-0"
               fill="none"
               height="24"
               stroke="currentColor"
@@ -299,6 +299,20 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
             <span
               class="font-medium text-sm sm:text-base"
             >
+              Gender:
+            </span>
+            <span
+              class="text-sm sm:text-base"
+            >
+              Not assigned
+            </span>
+          </div>
+          <div
+            class="flex items-center space-x-2"
+          >
+            <span
+              class="font-medium text-sm sm:text-base"
+            >
               Phone:
             </span>
             <span
@@ -384,6 +398,15 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
              
             International
           </p>
+          <p>
+            <span
+              class="font-semibold"
+            >
+              Gender:
+            </span>
+             
+            Not assigned
+          </p>
           <p
             class="col-span-2"
           >
@@ -411,7 +434,7 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
         class="hidden print:block print:mb-1.5 text-center text-[9px] text-slate-700 font-semibold tracking-wide"
       >
         Permit Valid: 
-        30/03/2026
+        02/04/2026
          — 
         15/04/2026
       </div>
@@ -891,7 +914,7 @@ exports[`PermitCard snapshot > matches the cleared student permit layout 1`] = `
             >
               <img
                 alt="Verification QR code"
-                class="h-32 w-32 print:h-20 print:w-20"
+                class="h-40 w-40 max-w-full rounded-md bg-white p-1 print:h-28 print:w-28 sm:h-44 sm:w-44"
                 src="data:image/png;base64,permit-qr"
               />
             </div>

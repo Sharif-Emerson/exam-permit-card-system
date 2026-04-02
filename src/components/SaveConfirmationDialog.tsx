@@ -20,7 +20,7 @@ export function SaveConfirmationDialog({ isOpen, onConfirm, onCancel, onDontSave
             </svg>
           </div>
           <h3 className="text-lg font-semibold text-gray-900">Save changes?</h3>
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-gray-600">
             Do you want to save your changes before leaving? Unsaved work will be lost if you choose not to save.
           </p>
         </div>
@@ -43,7 +43,7 @@ export function SaveConfirmationDialog({ isOpen, onConfirm, onCancel, onDontSave
           <button
             type="button"
             onClick={onCancel}
-            className="w-full rounded-lg border border-transparent px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700"
+            className="w-full rounded-lg border border-transparent px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             Cancel
           </button>

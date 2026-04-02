@@ -15,7 +15,7 @@ describe('Login', () => {
 
   it('submits the entered credentials through the auth provider', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
-      const url = typeof input === 'string' ? input : input.url
+      const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
       if (url.includes('/auth/oidc/status')) {
         return Promise.resolve({
           ok: true,
