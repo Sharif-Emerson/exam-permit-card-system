@@ -2676,7 +2676,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      <div className="admin-theme-shell flex h-screen overflow-hidden bg-[radial-gradient(circle_at_10%_15%,_rgba(59,130,246,0.16),_transparent_34%),radial-gradient(circle_at_90%_18%,_rgba(239,68,68,0.13),_transparent_30%),radial-gradient(circle_at_50%_100%,_rgba(234,179,8,0.16),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#f1f5f9_100%)] text-gray-900 dark:bg-slate-950 dark:text-slate-100">
+      <div className="admin-theme-shell flex h-dvh min-h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_10%_15%,_rgba(59,130,246,0.16),_transparent_34%),radial-gradient(circle_at_90%_18%,_rgba(239,68,68,0.13),_transparent_30%),radial-gradient(circle_at_50%_100%,_rgba(234,179,8,0.16),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#f1f5f9_100%)] text-gray-900 dark:bg-slate-950 dark:text-slate-100">
 
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
@@ -2688,10 +2688,10 @@ export default function AdminPanel() {
 
       {/* â”€â”€ Sidebar â”€â”€ */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-white pt-[env(safe-area-inset-top)] shadow-lg transition-transform duration-300 dark:border-r dark:border-slate-800 dark:bg-slate-950 lg:static lg:translate-x-0 lg:pt-0 lg:shadow-none lg:border-r lg:border-gray-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-white pt-[max(env(safe-area-inset-top),0.75rem)] shadow-lg transition-transform duration-300 dark:border-r dark:border-slate-800 dark:bg-slate-950 lg:static lg:translate-x-0 lg:pt-0 lg:shadow-none lg:border-r lg:border-gray-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-5 dark:border-slate-800">
+        <div className="flex min-h-16 items-center gap-3 border-b border-gray-200 px-5 dark:border-slate-800">
           <BrandMark
             titleClassName="text-base font-bold leading-tight text-gray-900 dark:text-white"
             subtitleClassName="text-xs text-emerald-600 dark:text-emerald-300"
@@ -2767,7 +2767,7 @@ export default function AdminPanel() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 
         {/* Top header */}
-        <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 pt-[env(safe-area-inset-top)] dark:border-slate-800 dark:bg-slate-950 sm:px-6 lg:pt-0">
+        <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-slate-800 dark:bg-slate-950 sm:px-6 lg:pt-0">
           <button
             type="button"
             title="Open sidebar"
