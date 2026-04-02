@@ -266,18 +266,17 @@ function buildPermitBlockers(
 function deriveStatus(student: StudentProfile, history: PermitApplicationRecord[]): PermitStatus {
   const latestApplication = history[0]
 
+  // Admin explicitly rejected — always honour
   if (latestApplication?.status === 'rejected') {
     return 'rejected'
   }
 
-  if (latestApplication?.status === 'pending') {
-    return 'pending'
-  }
-
+  // Admin explicitly approved — always honour
   if (latestApplication?.status === 'approved') {
     return 'approved'
   }
 
+  // Fees cleared — auto-approve regardless of pending application
   if (student.feesBalance === 0) {
     return 'approved'
   }
