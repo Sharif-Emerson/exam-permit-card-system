@@ -116,11 +116,23 @@ body {
 	color: rgb(148 163 184);
 }
 
+
 .dark .admin-theme-shell .font-bold[class*='text-gray'],
 .dark .admin-theme-shell .font-semibold[class*='text-gray'],
 .dark .admin-theme-shell .font-bold[class*='text-slate'],
 .dark .admin-theme-shell .font-semibold[class*='text-slate'] {
 	color: rgb(241 245 249) !important;
+}
+
+/* Make bold 'Students' and similar headings red in dark mode */
+.dark .admin-theme-shell .font-bold,
+.dark .admin-theme-shell .font-bold,
+.dark .admin-theme-shell .font-semibold,
+.dark .admin-theme-shell h1,
+.dark .admin-theme-shell h2,
+.dark .admin-theme-shell h3 {
+	color: rgb(239, 68, 68) !important;
+	/* Tailwind red-500 */
 }
 
 .dark .admin-theme-shell h1,
@@ -160,7 +172,8 @@ body {
 .dark .admin-theme-shell main .text-slate-700,
 .dark .admin-theme-shell main .text-slate-600,
 .dark .admin-theme-shell main .text-slate-500 {
-	color: rgb(203 213 225) !important;
+	color: rgb(226 232 240) !important;
+	/* lighter for visibility */
 }
 
 .dark .student-dashboard-app .text-gray-900 {
