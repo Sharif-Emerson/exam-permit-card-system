@@ -1523,7 +1523,7 @@ export default function Dashboard() {
           </aside>
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <header className="sticky top-0 z-20 border-b border-sky-100/80 bg-[linear-gradient(90deg,_rgba(255,255,255,0.82),_rgba(239,246,255,0.78),_rgba(254,252,232,0.75))] px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/75 sm:px-6 lg:px-8">
+            <header className={`sticky top-0 ${showNotifications ? 'z-[120]' : 'z-20'} border-b border-sky-100/80 bg-[linear-gradient(90deg,_rgba(255,255,255,0.82),_rgba(239,246,255,0.78),_rgba(254,252,232,0.75))] px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/75 sm:px-6 lg:px-8`}>
               <div className="flex flex-wrap items-center gap-3 lg:gap-4">
                 <button
                   type="button"
