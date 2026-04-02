@@ -72,6 +72,14 @@ body {
 	color: rgb(15 23 42);
 }
 
+.dark .admin-theme-shell .text-gray-900 {
+	color: rgb(241 245 249);
+}
+
+.dark .admin-theme-shell .text-gray-700 {
+	color: rgb(226 232 240);
+}
+
 .payment-progress {
 	width: 100%;
 	height: 100%;

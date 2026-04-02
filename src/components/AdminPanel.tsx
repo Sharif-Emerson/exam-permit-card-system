@@ -2688,7 +2688,7 @@ export default function AdminPanel() {
 
       {/* â”€â”€ Sidebar â”€â”€ */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-white shadow-lg transition-transform duration-300 dark:border-r dark:border-slate-800 dark:bg-slate-950 lg:static lg:translate-x-0 lg:shadow-none lg:border-r lg:border-gray-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-white pt-[env(safe-area-inset-top)] shadow-lg transition-transform duration-300 dark:border-r dark:border-slate-800 dark:bg-slate-950 lg:static lg:translate-x-0 lg:pt-0 lg:shadow-none lg:border-r lg:border-gray-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Logo */}
         <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-5 dark:border-slate-800">
@@ -2767,7 +2767,7 @@ export default function AdminPanel() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 
         {/* Top header */}
-        <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-950 sm:px-6">
+        <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 pt-[env(safe-area-inset-top)] dark:border-slate-800 dark:bg-slate-950 sm:px-6 lg:pt-0">
           <button
             type="button"
             title="Open sidebar"
