@@ -192,8 +192,6 @@ describe('Dashboard', () => {
 
     await waitFor(() => {
       expect(updateStudentAccount).toHaveBeenCalledWith('student-id', {
-        name: 'John Doe',
-        email: 'student@example.com',
         phoneNumber: '+256700999888',
         profileImage: 'https://cdn.example.com/new-avatar.png',
         currentPassword: 'Permit@2026',

@@ -75,7 +75,10 @@ type CreateStudentDraft = Omit<CreateStudentInput, 'totalFees' | 'amountPaid' | 
   totalFees: string
   amountPaid: string
   courseUnitsText: string
+  currentYearOfStudy: string
 }
+
+const YEAR_OF_STUDY_OPTIONS = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5']
 
 type CreatedStudentWelcome = {
   name: string
@@ -462,6 +465,7 @@ function createEmptyStudentDraft(feeSettings: SystemFeeSettings = DEFAULT_SYSTEM
     program: '',
     college: '',
     department: '',
+    currentYearOfStudy: '',
     semester: '',
     courseUnitsText: '',
     profileImage: '',
@@ -1089,7 +1093,12 @@ export default function AdminPanel() {
 
     const resolvedProgram = (createDraft.program ?? '').trim()
     const resolvedDepartment = (createDraft.department ?? '').trim()
+    const resolvedYearOfStudy = (createDraft.currentYearOfStudy ?? '').trim()
+    const resolvedSemester = (createDraft.semester ?? '').trim()
     const resolvedCourse = resolvedProgram || resolvedDepartment || 'General Studies'
+    const resolvedSemesterLabel = resolvedSemester
+      ? (resolvedYearOfStudy ? `${resolvedYearOfStudy} - ${resolvedSemester}` : resolvedSemester)
+      : undefined
     const generatedEmail = buildSystemStudentEmail(createDraft.name)
     const totalFeesNum = getFeeForStudentCategory(systemFeeSettings, createDraft.studentCategory)
     const amountPaidNum = 0
@@ -1113,7 +1122,7 @@ export default function AdminPanel() {
         program: resolvedProgram,
         college: undefined,
         department: resolvedDepartment,
-        semester: undefined,
+        semester: resolvedSemesterLabel,
         courseUnits,
         profileImage: null,
         totalFees: totalFeesNum,
@@ -6145,6 +6154,43 @@ export default function AdminPanel() {
                   >
                     <option value="">Select Program</option>
                     {KIU_COURSES.map((program) => <option key={program} value={program}>{program}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="create-student-phone" className="mb-1 block text-xs font-medium text-gray-700">Phone Number</label>
+                  <input
+                    id="create-student-phone"
+                    type="tel"
+                    value={createDraft.phoneNumber ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, phoneNumber: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    placeholder="e.g. +256700123456"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-student-year" className="mb-1 block text-xs font-medium text-gray-700">Current Year of Study</label>
+                  <select
+                    id="create-student-year"
+                    required
+                    value={createDraft.currentYearOfStudy}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, currentYearOfStudy: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="">Select Year</option>
+                    {YEAR_OF_STUDY_OPTIONS.map((year) => <option key={year} value={year}>{year}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="create-student-semester" className="mb-1 block text-xs font-medium text-gray-700">Semester</label>
+                  <select
+                    id="create-student-semester"
+                    required
+                    value={createDraft.semester ?? ''}
+                    onChange={(event) => setCreateDraft((current) => ({ ...current, semester: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="">Select Semester</option>
+                    {KIU_SEMESTERS.map((semester) => <option key={semester} value={semester}>{semester}</option>)}
                   </select>
                 </div>
                 <div>

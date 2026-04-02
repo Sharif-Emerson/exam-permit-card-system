@@ -1099,9 +1099,7 @@ export default function Dashboard() {
       setError('')
       setSuccessMessage('')
       const updatedProfile = await updateStudentAccount(studentData.id, {
-        name: settingsDraft.name,
-        email: settingsDraft.email,
-        phoneNumber: settingsDraft.phoneNumber || undefined,
+        phoneNumber: settingsDraft.phoneNumber.trim() || undefined,
         profileImage: settingsDraft.profileImage || null,
         currentPassword: settingsDraft.currentPassword || undefined,
         password: settingsDraft.password || undefined,
