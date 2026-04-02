@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell,
   CheckCircle2,
@@ -22,7 +22,6 @@ import {
   ShieldClose,
   Sun,
   TrendingUp,
-  Upload,
   UserCircle2,
   Wallet,
   X,
@@ -31,13 +30,12 @@ import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { permitPublicBaseUrl } from '../config/provider'
 import { examPermitConfig } from '../config/branding'
+import { DIALOG_Z } from '../constants/dialogLayers'
 import PermitCard from './PermitCard'
 import { createSemesterRegistration, createSupportRequest, fetchPermitActivityHistory, fetchSemesterRegistrations, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, fetchSystemFeeSettings, recordPermitActivity, sendSupportRequestMessage, updateStudentAccount } from '../services/profileService'
 import type { PermitActivityRecord, StudentProfile, SupportContact, SupportRequest, UniversityDeadline } from '../types'
 import { FALLBACK_PROFILE_IMAGE } from './PermitCard'
 import SignOutDialog from './SignOutDialog'
-import Select from 'react-select'
-
 type PermitStatus = 'approved' | 'pending' | 'rejected'
 type PortalSection = 'overview' | 'permit_courses' | 'finance' | 'applications' | 'settings' | 'support'
 type HistoryStatusFilter = PermitStatus | 'all'
@@ -508,6 +506,8 @@ export default function Dashboard() {
   const [supportContacts, setSupportContacts] = useState<SupportContact[]>([])
   const [permitHistory, setPermitHistory] = useState<PermitActivityRecord[]>([])
   const hasInitializedProfileRef = useRef(false)
+  const notificationButtonRef = useRef<HTMLButtonElement>(null)
+  const notificationPanelRef = useRef<HTMLDivElement>(null)
   // Add state for button-level loading
   const [refreshing, setRefreshing] = useState(false)
 
@@ -763,6 +763,39 @@ export default function Dashboard() {
 
     setReadNotificationIds(readStudentNotificationReadSet(user.id))
   }, [user?.id, user?.role])
+
+  useEffect(() => {
+    if (!showNotifications || typeof document === 'undefined') {
+      return
+    }
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null
+      if (!target) {
+        return
+      }
+      if (notificationPanelRef.current?.contains(target) || notificationButtonRef.current?.contains(target)) {
+        return
+      }
+      setShowNotifications(false)
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowNotifications(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('touchstart', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('touchstart', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showNotifications])
 
   async function handleRefresh() {
     if (!user || user.role !== 'student') {
@@ -1488,10 +1521,16 @@ export default function Dashboard() {
 
                 <div className="relative">
                   <button
+                    ref={notificationButtonRef}
                     type="button"
                     title="Notifications"
                     aria-label="Notifications"
-                    onClick={() => setShowNotifications((current) => !current)}
+                    aria-haspopup="dialog"
+                    aria-controls="student-notification-center"
+                    onClick={() => {
+                      setSidebarOpen(false)
+                      setShowNotifications((current) => !current)
+                    }}
                     className="relative rounded-full border border-slate-200 bg-white p-3 text-slate-700 shadow-sm transition hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                   >
                     <Bell className="h-4 w-4" />
@@ -1503,7 +1542,13 @@ export default function Dashboard() {
                   </button>
 
                   {showNotifications && (
-                    <div className="absolute right-0 top-14 z-30 w-[22rem] rounded-3xl border border-white/70 bg-white/95 p-4 shadow-2xl shadow-slate-300/30 backdrop-blur dark:border-slate-700 dark:bg-slate-950/95">
+                    <div
+                      ref={notificationPanelRef}
+                      id="student-notification-center"
+                      role="dialog"
+                      aria-label="Student notifications"
+                      className={`fixed inset-x-4 top-20 ${DIALOG_Z.toast} max-h-[70vh] overflow-y-auto rounded-3xl border border-white/70 bg-white/95 p-4 shadow-2xl shadow-slate-300/30 backdrop-blur dark:border-slate-700 dark:bg-slate-950/95 sm:left-auto sm:right-6 sm:w-[22rem] lg:absolute lg:right-0 lg:top-14 lg:w-[22rem] lg:max-h-[32rem]`}
+                    >
                       <div className="mb-3 flex items-center justify-between gap-2">
                         <h2 className="text-sm font-semibold">Notifications</h2>
                         <div className="flex items-center gap-1">

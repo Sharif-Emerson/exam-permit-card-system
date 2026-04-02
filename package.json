@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "setup": "npm install",
     "dev": "node scripts/run-vite-rest.mjs dev",
     "dev:rest": "node scripts/dev-rest-stack.mjs",
     "dev:rest:e2e": "node scripts/dev-rest-e2e.mjs",
@@ -28,7 +29,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --max-warnings 0",
     "test": "npm run check:rest && vitest run",
-    "preview": "node scripts/run-vite-rest.mjs preview"
+    "preview": "node scripts/run-vite-rest.mjs preview",
+    "postinstall": "npm --prefix examples/rest-backend install"
   },
   "dependencies": {
     "cors": "^2.8.6",

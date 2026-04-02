@@ -45,25 +45,37 @@ Exam Permit System is a React application backed by a REST API for managing stud
 ## Setup
 
 1. Install dependencies:
+
    ```bash
    npm install
    ```
+
+  This now installs both the frontend dependencies and the bundled REST backend dependencies, so a fresh machine can start the project directly from `cmd` after the root install completes.
 2. Create your local environment file:
+
    ```bash
    copy .env.example .env
    ```
+
 3. For an explicit backend URL, use:
    - `VITE_BACKEND_PROVIDER=rest`
    - `VITE_API_BASE_URL=http://localhost:4000`
    - Optional for QR scanning on phones: `VITE_PERMIT_PUBLIC_BASE_URL=http://<your-lan-ip>:4000`
-4. Start the full local stack:
+2. Start the full local stack:
+
    ```bash
    npm run dev:rest
    ```
 
+For a one-command first-time setup on a new machine, you can also run:
+
+```bash
+npm run setup
+```
+
 For local real-data work, create `examples/rest-backend/.env.local` with your persistent `APP_DB_PATH` and `BOOTSTRAP_ADMIN_*` values. The backend now loads that file automatically on `npm run dev:rest` and `npm run dev:rest:backend`.
 
-This launcher streams both backend and frontend output and is configured to work on Windows shells as well.
+This launcher streams both backend and frontend output and is configured to work from Windows `cmd`, PowerShell, and standard npm shells.
 
 During local Vite development, frontend requests first go through `/api` using the built-in dev proxy, then fall back to `http://<current-host>:4000` when needed. This keeps fetches working on localhost, machine hostnames, and LAN IPs without extra CORS setup.
 
@@ -165,9 +177,9 @@ The backend starter includes:
 
 1. Sign in with a student account
 2. The app loads the student profile from the active REST API
-4. The student can review permit status, recent application history, and profile settings
-5. The student sees exam details, QR verification data, and current fee status
-6. Printing and PDF download remain disabled until `feesBalance === 0`
+3. The student can review permit status, recent application history, and profile settings
+4. The student sees exam details, QR verification data, and current fee status
+5. Printing and PDF download remain disabled until `feesBalance === 0`
 
 ### Admin
 
@@ -275,17 +287,20 @@ To deploy:
 
 1. Deploy the frontend to Vercel or Netlify.
 2. Choose one API strategy:
-  - Set frontend environment variables:
-   - `VITE_BACKEND_PROVIDER=rest`
-   - `VITE_API_BASE_URL=https://your-backend.example.com`
-  - or expose your backend behind the same origin at `/api`
+
+- Set frontend environment variables:
+- `VITE_BACKEND_PROVIDER=rest`
+- `VITE_API_BASE_URL=https://your-backend.example.com`
+- or expose your backend behind the same origin at `/api`
+
 3. Deploy [examples/rest-backend](c:/Users/kabuy/OneDrive/Desktop/project/examples/rest-backend) as a separate Node service using its Dockerfile.
-4. Set backend environment variables:
+2. Set backend environment variables:
    - `PORT`
    - `APP_DB_PATH`
-  - `APP_UPLOADS_DIR`
-   - `SESSION_TTL_HOURS`
-   - `CORS_ALLOWED_ORIGINS`
+
+- `APP_UPLOADS_DIR`
+- `SESSION_TTL_HOURS`
+- `CORS_ALLOWED_ORIGINS`
 
 For Vercel Preview deployments, this repository now includes a same-origin `/api` proxy function. Set `API_BASE_URL=https://your-backend.example.com` in the Vercel project settings for `Preview` and `Production` so the proxy knows where to forward requests. If `API_BASE_URL` is missing, `/api/*` returns a deployment error instead of silently falling through to the SPA.
 
@@ -313,11 +328,13 @@ To run it on a public server:
 1. Install Docker and Docker Compose on the host.
 2. Copy the repository to the host.
 3. Start the stack:
+
   ```bash
   docker compose -f docker-compose.deploy.yml up -d --build
   ```
+
 4. Point your domain at that server.
-5. Put TLS in front of it with your platform load balancer, Caddy, Nginx Proxy Manager, or another reverse proxy.
+2. Put TLS in front of it with your platform load balancer, Caddy, Nginx Proxy Manager, or another reverse proxy.
 
 With this setup, the frontend can use the default `/api` production path and does not need `VITE_API_BASE_URL` at build time.
 

@@ -13,7 +13,7 @@ function parseCourseUnitRow(unit: string, index: number): { serial: number; code
     const title = unit.slice(colon + 1).trim()
     return { serial, code: code || '—', title: title || '—' }
   }
-  const dash = unit.match(/^([A-Za-z]{2,6}\s*\d+[A-Za-z0-9.\-]*)\s*-\s*(.+)$/)
+  const dash = unit.match(/^([A-Za-z]{2,6}\s*\d+[A-Za-z0-9.-]*)\s*-\s*(.+)$/)
   if (dash) {
     return { serial, code: dash[1].trim(), title: dash[2].trim() }
   }

@@ -26,8 +26,6 @@ export default function Login() {
   const [oidcCompleting, setOidcCompleting] = useState(false)
   const signInWithTokenRef = useRef(signInWithToken)
   signInWithTokenRef.current = signInWithToken
-  const accountProviderLabel = backendProvider === 'rest' ? 'your connected account' : 'your account'
-
   function normalizeLoginErrorMessage(message: string) {
     const text = message.toLowerCase()
     const isCredentialProblem = text.includes('invalid login credentials')

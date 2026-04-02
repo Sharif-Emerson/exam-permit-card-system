@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect, useRef, type ReactNode, useMemo } from 'react'
+import { useState, useCallback, useEffect, useRef, type MutableRefObject, type ReactNode, useMemo } from 'react'
 import { useBlocker, useLocation } from 'react-router-dom'
 import { SaveConfirmationDialog } from '../components/SaveConfirmationDialog'
 import { DIALOG_Z } from '../constants/dialogLayers'
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges'
 import { UnsavedChangesContext } from './UnsavedChangesContextInstance'
 
-function UnsavedRouteBlocker({ discardRef }: { discardRef: React.MutableRefObject<(() => void) | null> }) {
+function UnsavedRouteBlocker({ discardRef }: { discardRef: MutableRefObject<(() => void) | null> }) {
   const { hasUnsavedChanges, savePendingChanges } = useUnsavedChanges()
   const shouldBlock = useCallback(
     ({

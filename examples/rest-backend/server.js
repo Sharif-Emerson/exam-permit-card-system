@@ -2445,7 +2445,7 @@ app.post('/support-requests', authenticate, upload.single('attachment'), async (
   let attachmentMimeType = null
   let attachmentSizeBytes = null
   if (attachment) {
-    const safeName = attachment.originalname.replace(/[^\w.\-]/g, '_')
+    const safeName = attachment.originalname.replace(/[^\w.-]/g, '_')
     const fileName = `support_${Date.now()}_${Math.floor(Math.random() * 10000)}_${safeName}`
     const filePath = path.join(uploadsDir, fileName)
     await fs.writeFile(filePath, attachment.buffer)
@@ -2538,7 +2538,7 @@ app.post('/support-requests/:id/messages', authenticate, upload.single('attachme
   let attachmentMimeType = null
   let attachmentSizeBytes = null
   if (attachment) {
-    const safeName = attachment.originalname.replace(/[^\w.\-]/g, '_')
+    const safeName = attachment.originalname.replace(/[^\w.-]/g, '_')
     const fileName = `support_${Date.now()}_${Math.floor(Math.random() * 10000)}_${safeName}`
     const filePath = path.join(uploadsDir, fileName)
     await fs.writeFile(filePath, attachment.buffer)
