@@ -1,3 +1,39 @@
+/* Ensure numbers are visible in dark mode for admin dashboards */
+.dark .admin-theme-shell .text-xs,
+.dark .admin-theme-shell .text-sm,
+.dark .admin-theme-shell .text-base,
+.dark .admin-theme-shell .text-lg,
+.dark .admin-theme-shell .text-xl,
+.dark .admin-theme-shell .text-2xl,
+.dark .admin-theme-shell .text-3xl,
+.dark .admin-theme-shell .text-4xl,
+.dark .admin-theme-shell .text-5xl,
+.dark .admin-theme-shell .font-mono,
+.dark .admin-theme-shell .font-bold,
+.dark .admin-theme-shell .font-semibold,
+.dark .admin-theme-shell .font-medium {
+	color: rgb(255, 255, 255) !important;
+}
+
+/* Also target numbers in spans/divs/tags directly */
+.dark .admin-theme-shell span,
+.dark .admin-theme-shell div,
+.dark .admin-theme-shell td,
+.dark .admin-theme-shell th,
+.dark .admin-theme-shell p {
+	color: inherit;
+}
+
+.dark .admin-theme-shell span:has(> .text-xs),
+.dark .admin-theme-shell span:has(> .text-sm),
+.dark .admin-theme-shell span:has(> .text-lg),
+.dark .admin-theme-shell span:has(> .text-xl),
+.dark .admin-theme-shell span:has(> .text-2xl),
+.dark .admin-theme-shell span:has(> .text-3xl),
+.dark .admin-theme-shell span:has(> .text-4xl),
+.dark .admin-theme-shell span:has(> .text-5xl) {
+	color: rgb(255,255,255) !important;
+}
 /* Animations moved from App.tsx */
 .kiu-fade-in {
 	animation: kiu-fade-in 0.35s ease-out both;
