@@ -2689,7 +2689,7 @@ export default function AdminPanel() {
 
       {/* â”€â”€ Sidebar â”€â”€ */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-sky-200/70 bg-[linear-gradient(180deg,_rgba(239,246,255,0.95),_rgba(240,253,250,0.94)_52%,_rgba(254,252,232,0.92))] px-4 py-5 shadow-2xl shadow-sky-200/55 backdrop-blur-xl transition-transform duration-300 dark:border-slate-800 dark:bg-slate-950/85 dark:shadow-none lg:static lg:translate-x-0 lg:pt-0 lg:shadow-none lg:border-r lg:border-gray-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-sky-200/70 bg-[linear-gradient(180deg,_rgba(239,246,255,0.95),_rgba(240,253,250,0.94)_52%,_rgba(254,252,232,0.92))] px-4 py-5 shadow-2xl shadow-sky-200/55 backdrop-blur-xl transition-transform duration-300 dark:border-slate-800 dark:bg-[linear-gradient(180deg,_#0f172a_0%,_#0c1a2e_52%,_#111827_100%)] dark:shadow-none lg:static lg:translate-x-0 lg:pt-0 lg:shadow-none lg:border-r lg:border-gray-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Logo */}
         <div className="flex min-h-16 items-center gap-3 border-b border-gray-200 px-5 dark:border-slate-800">

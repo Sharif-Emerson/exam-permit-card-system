@@ -1448,7 +1448,7 @@ export default function Dashboard() {
         )}
 
         <div className="flex min-h-screen">
-          <aside className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-sky-200/70 bg-[linear-gradient(180deg,_rgba(239,246,255,0.95),_rgba(240,253,250,0.94)_52%,_rgba(254,252,232,0.92))] px-4 py-5 shadow-2xl shadow-sky-200/55 backdrop-blur-xl transition-transform duration-300 dark:border-slate-800 dark:bg-slate-950/85 dark:shadow-none lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <aside className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-sky-200/70 bg-[linear-gradient(180deg,_rgba(239,246,255,0.95),_rgba(240,253,250,0.94)_52%,_rgba(254,252,232,0.92))] px-4 py-5 shadow-2xl shadow-sky-200/55 backdrop-blur-xl transition-transform duration-300 dark:border-slate-800 dark:bg-[linear-gradient(180deg,_#0f172a_0%,_#0c1a2e_52%,_#111827_100%)] dark:shadow-none lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
             <div className="flex items-center justify-between px-2 pb-5">
               <div>
                 <BrandMark titleClassName="text-base font-bold leading-tight text-gray-900 dark:text-white" subtitleClassName="text-xs text-emerald-600 dark:text-emerald-300" />
