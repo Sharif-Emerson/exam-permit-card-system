@@ -16,13 +16,42 @@ export default function BrandMark({
   const centered = align === 'center'
   return (
     <div className={`flex gap-3 ${centered ? 'flex-col items-center justify-center text-center' : 'items-center justify-start text-left'}`}>
-      <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full border border-emerald-400 bg-white p-1 shadow-sm dark:border-emerald-700 dark:bg-slate-900">
-        <img
-          src={institutionLogo}
-          alt={`${institutionName} logo`}
-          className="h-full w-full rounded-full object-cover"
-          draggable={false}
-        />
+      <style>{`
+        @keyframes brand-ribbon-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .brand-ribbon-border {
+          position: relative;
+          border-radius: 50%;
+          padding: 2px;
+          overflow: hidden;
+          flex-shrink: 0;
+        }
+        .brand-ribbon-border::before {
+          content: '';
+          position: absolute;
+          inset: -120%;
+          border-radius: 50%;
+          background: conic-gradient(from 0deg, #2563eb 0deg, #dc2626 120deg, #eab308 240deg, #2563eb 360deg);
+          animation: brand-ribbon-spin 3s linear infinite;
+          z-index: 0;
+          opacity: 0.95;
+        }
+        .brand-ribbon-border > * {
+          position: relative;
+          z-index: 1;
+        }
+      `}</style>
+      <div className="brand-ribbon-border h-20 w-20">
+        <div className="flex h-full w-full items-center justify-center rounded-full bg-white shadow-sm dark:bg-slate-900">
+          <img
+            src={institutionLogo}
+            alt={`${institutionName} logo`}
+            className="h-full w-full rounded-full object-cover"
+            draggable={false}
+          />
+        </div>
       </div>
       <div className={centered ? 'space-y-1' : ''}>
         <div className={titleClassName}>{institutionName}</div>
