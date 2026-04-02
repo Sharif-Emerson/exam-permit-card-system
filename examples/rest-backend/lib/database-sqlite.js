@@ -220,6 +220,7 @@ ensureColumn('users', 'phone_number TEXT')
 ensureColumn('users', "admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations', 'assistant-admin'))")
 ensureColumn('users', "assistant_role TEXT CHECK (assistant_role IN ('support_help', 'department_prints'))")
 ensureColumn('users', "assistant_departments_json TEXT NOT NULL DEFAULT '[]'")
+ensureColumn('users', 'first_login_required INTEGER NOT NULL DEFAULT 0')
 ensureColumn('profiles', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
 ensureColumn('profiles', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
 ensureColumn('profiles', 'phone_number TEXT')
@@ -490,6 +491,7 @@ function mapUser(row) {
     name: row.name,
     campusId: row.campus_id,
     campusName: row.campus_name,
+    first_login_required: Number(row.first_login_required ?? 0),
   }
 }
 
@@ -1055,7 +1057,7 @@ export function getSessionUser(token) {
   pruneExpiredSessions()
   const tokenHash = hashToken(token)
   const row = db.prepare(`
-    SELECT users.id, users.email, users.role, users.admin_scope, users.assistant_role, users.assistant_departments_json, users.name, users.campus_id, users.campus_name, sessions.expires_at AS expiresAt
+    SELECT users.id, users.email, users.role, users.admin_scope, users.assistant_role, users.assistant_departments_json, users.name, users.campus_id, users.campus_name, users.first_login_required, sessions.expires_at AS expiresAt
     FROM sessions
     JOIN users ON users.id = sessions.user_id
     WHERE sessions.token_hash = ?
@@ -1182,7 +1184,7 @@ function parseAssistantDepartments(raw) {
 
 export function listAssistantAdmins() {
   const rows = db.prepare(`
-    SELECT id, email, phone_number, name, assistant_role, assistant_departments_json, campus_id, campus_name
+    SELECT id, email, phone_number, name, assistant_role, assistant_departments_json, campus_id, campus_name, first_login_required
     FROM users
     WHERE role = 'admin' AND admin_scope = 'assistant-admin'
     ORDER BY created_at DESC
@@ -1196,6 +1198,7 @@ export function listAssistantAdmins() {
     departments: parseAssistantDepartments(row.assistant_departments_json),
     campusId: row.campus_id ?? 'main-campus',
     campusName: row.campus_name ?? 'Main Campus',
+    firstLoginRequired: Number(row.first_login_required ?? 0) === 1,
   }))
 }
 
@@ -1216,8 +1219,8 @@ export function createAssistantAdmin(input) {
   db.exec('BEGIN')
   try {
     db.prepare(`
-      INSERT INTO users (id, email, phone_number, role, admin_scope, assistant_role, assistant_departments_json, name, campus_id, campus_name, password_hash, created_at, updated_at)
-      VALUES (?, ?, ?, 'admin', 'assistant-admin', ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (id, email, phone_number, role, admin_scope, assistant_role, assistant_departments_json, name, campus_id, campus_name, password_hash, first_login_required, created_at, updated_at)
+      VALUES (?, ?, ?, 'admin', 'assistant-admin', ?, ?, ?, ?, ?, ?, 1, ?, ?)
     `).run(id, email, phoneNumber, role, departmentsJson, name, campusId, campusName, hashPassword(password), timestamp, timestamp)
 
     db.prepare(`
@@ -1250,6 +1253,46 @@ export function updateAssistantAdmin(id, updates) {
     WHERE id = ?
   `).run(role, JSON.stringify(departments), updatedAt, id)
   return listAssistantAdmins().find((item) => item.id === id) ?? null
+}
+
+export function updateAssistantAdminCredentials(id, updates) {
+  const existing = db.prepare(`SELECT * FROM users WHERE id = ? AND role = 'admin' AND admin_scope = 'assistant-admin'`).get(id)
+  if (!existing) {
+    return null
+  }
+  const nextName = typeof updates.name === 'string' && updates.name.trim() ? updates.name.trim() : existing.name
+  const nextEmail = typeof updates.email === 'string' && updates.email.trim() ? updates.email.trim().toLowerCase() : existing.email
+  const nextPasswordHash = typeof updates.password === 'string' && updates.password.trim()
+    ? hashPassword(updates.password.trim())
+    : existing.password_hash
+  const updatedAt = nowIso()
+  db.exec('BEGIN')
+  try {
+    db.prepare(`
+      UPDATE users
+      SET name = ?, email = ?, password_hash = ?, updated_at = ?
+      WHERE id = ?
+    `).run(nextName, nextEmail, nextPasswordHash, updatedAt, id)
+    db.prepare(`
+      UPDATE profiles
+      SET name = ?, email = ?, updated_at = ?
+      WHERE id = ?
+    `).run(nextName, nextEmail, updatedAt, id)
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+  return listAssistantAdmins().find((item) => item.id === id) ?? null
+}
+
+export function clearAdminFirstLoginFlag(id) {
+  const existing = db.prepare(`SELECT id FROM users WHERE id = ? AND role = 'admin'`).get(id)
+  if (!existing) {
+    return false
+  }
+  db.prepare(`UPDATE users SET first_login_required = 0, updated_at = ? WHERE id = ?`).run(nowIso(), id)
+  return true
 }
 
 export function listProfilesPage({ role, search, status, department, program, course, college, page = 1, pageSize = 25 } = {}) {

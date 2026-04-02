@@ -3,7 +3,7 @@ import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, u
   // Ref to preserve search input focus
 import {
   BarChart2, Bell, CheckCircle2, CreditCard, Download, FileCheck,
-  FileSpreadsheet, FileUp, LayoutDashboard, LogOut, Menu,
+  FileSpreadsheet, FileUp, KeyRound, LayoutDashboard, LogOut, Menu,
   Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Sun, Trash2, Upload, Users, X,
 } from 'lucide-react'
 import { KIU_BURSARY_RATE, KIU_COLLEGES, KIU_COURSES, KIU_CURRICULUM, KIU_DEPARTMENT_DEFAULT_PROGRAM, KIU_DEPARTMENTS, KIU_SEMESTERS, KiuCourseUnit, getProgramsForDepartment, getTuitionForProgram } from '../config/universityData'
@@ -18,7 +18,8 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync } from '../services/profileService'
+import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync } from '../services/profileService'
+import { completeAdminFirstLogin } from '../services/authService'
 import type { SisStatus, SisSyncResult } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
 import type { FaqItem } from './faqStorage'
@@ -105,7 +106,7 @@ type FeeSettingsDraft = {
 }
 
 type AdminCapabilityProfile = {
-  scope: 'super-admin' | 'registrar' | 'finance' | 'operations'
+  scope: 'super-admin' | 'registrar' | 'finance' | 'operations' | 'assistant-admin'
   label: string
   sections: NavSection[]
   canImportFinancials: boolean
@@ -237,15 +238,17 @@ function getAdminCapabilityLabel(scope: AdminCapabilityProfile['scope']) {
       return 'Registrar Desk'
     case 'finance':
       return 'Finance Desk'
+    case 'assistant-admin':
+      return 'Sub-Admin'
     default:
       return 'Operations Desk'
   }
 }
 
-function getAdminSections(permissions: Set<AdminPermission>): NavSection[] {
+function getAdminSections(permissions: Set<AdminPermission>, scope: AdminCapabilityProfile['scope']): NavSection[] {
   const sections = new Set<NavSection>(['dashboard', 'settings'])
 
-  if (permissions.size > 0) {
+  if (scope === 'super-admin') {
     sections.add('assistants')
   }
 
@@ -286,7 +289,7 @@ function getAdminCapabilityProfile(user: AuthUser | null | undefined): AdminCapa
   return {
     scope,
     label: getAdminCapabilityLabel(scope),
-    sections: getAdminSections(permissions),
+    sections: getAdminSections(permissions, scope),
     canImportFinancials: permissions.has('manage_financials'),
     canGenerateBulkPermits: permissions.has('manage_student_profiles'),
     canSendReminders: hasAnyPermission(permissions, ['manage_student_profiles', 'manage_financials', 'manage_support_requests']),
@@ -663,6 +666,11 @@ export default function AdminPanel() {
     role: 'department_prints',
     departments: [],
   })
+  const [assistantAdminCredEditingId, setAssistantAdminCredEditingId] = useState('')
+  const [assistantAdminCredDraft, setAssistantAdminCredDraft] = useState<{ name: string; emailPrefix: string; password: string }>({ name: '', emailPrefix: '', password: '' })
+  const [assistantAdminCredSavingId, setAssistantAdminCredSavingId] = useState<string | null>(null)
+  const [adminFirstLoginDraft, setAdminFirstLoginDraft] = useState<{ email: string; password: string; confirmPassword: string }>({ email: '', password: '', confirmPassword: '' })
+  const [adminFirstLoginSaving, setAdminFirstLoginSaving] = useState(false)
   const [settingsDraft, setSettingsDraft] = useState<AdminSettingsDraft>({
     name: user?.name ?? '',
     email: user?.email ?? '',
@@ -820,6 +828,88 @@ export default function AdminPanel() {
       setError(nextError)
     } finally {
       setAssistantAdminUpdatingId(null)
+    }
+  }
+
+  function handleStartAssistantCredEdit(assistant: AssistantAdminAccount) {
+    setAssistantAdminCredEditingId(assistant.id)
+    setAssistantAdminCredDraft({
+      name: assistant.name,
+      emailPrefix: assistant.email.split('@')[0] ?? '',
+      password: '',
+    })
+  }
+
+  function handleCancelAssistantCredEdit() {
+    setAssistantAdminCredEditingId('')
+    setAssistantAdminCredDraft({ name: '', emailPrefix: '', password: '' })
+  }
+
+  async function handleSaveAssistantCredentials(assistantId: string) {
+    if (!canManageAssistantAdmins) {
+      setError('Only super admin can update assistant admin credentials.')
+      return
+    }
+
+    const name = assistantAdminCredDraft.name.trim()
+    const emailPrefix = assistantAdminCredDraft.emailPrefix.trim()
+    const email = emailPrefix ? `${emailPrefix}@${ADMIN_EMAIL_DOMAIN}` : ''
+    const password = assistantAdminCredDraft.password.trim()
+
+    if (!name && !email && !password) {
+      setError('Enter at least one field to update.')
+      return
+    }
+
+    if (name && (name.length < 2 || name.length > 120)) {
+      setError('Name must be between 2 and 120 characters.')
+      return
+    }
+
+    try {
+      setAssistantAdminCredSavingId(assistantId)
+      setError('')
+      await updateAssistantAdminCredentials(assistantId, {
+        ...(name ? { name } : {}),
+        ...(email ? { email } : {}),
+        ...(password ? { password } : {}),
+      })
+      await loadAssistantAdmins({ silent: true })
+      handleCancelAssistantCredEdit()
+      setSuccessMessage('Credentials updated successfully.')
+    } catch (updateError) {
+      const nextError = updateError instanceof Error ? updateError.message : 'Unable to update credentials.'
+      setError(nextError)
+    } finally {
+      setAssistantAdminCredSavingId(null)
+    }
+  }
+
+  async function handleCompleteAdminFirstLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const password = adminFirstLoginDraft.password.trim()
+    const confirmPassword = adminFirstLoginDraft.confirmPassword.trim()
+    const emailInput = adminFirstLoginDraft.email.trim().toLowerCase()
+
+    if (password !== confirmPassword) {
+      setError('Password confirmation does not match.')
+      return
+    }
+
+    try {
+      setAdminFirstLoginSaving(true)
+      setError('')
+      await completeAdminFirstLogin({
+        password,
+        ...(emailInput && emailInput !== (user?.email ?? '') ? { email: emailInput } : {}),
+      })
+      await refreshUser()
+      setAdminFirstLoginDraft({ email: '', password: '', confirmPassword: '' })
+    } catch (setupError) {
+      const nextError = setupError instanceof Error ? setupError.message : 'Unable to complete account setup.'
+      setError(nextError)
+    } finally {
+      setAdminFirstLoginSaving(false)
     }
   }
 
@@ -2641,6 +2731,75 @@ export default function AdminPanel() {
 
       <div className="admin-theme-shell flex h-dvh min-h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_10%_15%,_rgba(6,182,212,0.18),_transparent_34%),radial-gradient(circle_at_90%_18%,_rgba(20,184,166,0.16),_transparent_30%),radial-gradient(circle_at_50%_100%,_rgba(59,130,246,0.12),_transparent_28%),linear-gradient(180deg,_#ecfeff_0%,_#f0fdfa_100%)] text-gray-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(30,58,138,0.45),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(127,29,29,0.35),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#052e16_55%,_#1f2937_100%)] dark:text-slate-100">
 
+      {/* First-login security setup for sub-admins */}
+      {user?.firstLoginRequired && user?.scope === 'assistant-admin' && (
+        <div className="fixed inset-0 z-[90] overflow-y-auto bg-black/60">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900">
+                  <KeyRound className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-white">Account security setup</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Set a new password before continuing</p>
+                </div>
+              </div>
+              {error && (
+                <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</div>
+              )}
+              <form onSubmit={(event) => void handleCompleteAdminFirstLogin(event)} className="space-y-4">
+                <div>
+                  <label htmlFor="admin-firstlogin-email" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Email address (optional update)</label>
+                  <p className="mb-1 text-[11px] text-gray-400">Current: <span className="font-medium">{user.email}</span></p>
+                  <input
+                    id="admin-firstlogin-email"
+                    type="email"
+                    value={adminFirstLoginDraft.email}
+                    onChange={(event) => setAdminFirstLoginDraft((current) => ({ ...current, email: event.target.value }))}
+                    placeholder={user.email}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="admin-firstlogin-password" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">New strong password <span className="text-red-500">*</span></label>
+                  <input
+                    id="admin-firstlogin-password"
+                    type="password"
+                    required
+                    minLength={8}
+                    value={adminFirstLoginDraft.password}
+                    onChange={(event) => setAdminFirstLoginDraft((current) => ({ ...current, password: event.target.value }))}
+                    placeholder="Min 8 chars, uppercase, number &amp; symbol"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="admin-firstlogin-confirm" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Confirm new password <span className="text-red-500">*</span></label>
+                  <input
+                    id="admin-firstlogin-confirm"
+                    type="password"
+                    required
+                    minLength={8}
+                    value={adminFirstLoginDraft.confirmPassword}
+                    onChange={(event) => setAdminFirstLoginDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
+                    placeholder="Re-enter new password"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={adminFirstLoginSaving}
+                  className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {adminFirstLoginSaving ? 'Saving…' : 'Complete setup &amp; continue'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -4051,7 +4210,12 @@ export default function AdminPanel() {
                           {assistantAdmins.map((assistant) => (
                             <div key={assistant.id} className="rounded-lg border border-gray-200 px-4 py-3">
                               <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-sm font-semibold text-gray-800">{assistant.name}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold text-gray-800">{assistant.name}</p>
+                                  {assistant.firstLoginRequired && (
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Awaiting setup</span>
+                                  )}
+                                </div>
                                 <div className="flex items-center gap-2">
                                   <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600">
                                     {assistant.role === 'support_help' ? 'Support and Help' : 'Department Prints'}
@@ -4063,6 +4227,14 @@ export default function AdminPanel() {
                                   >
                                     <Pencil className="h-3 w-3" />
                                     Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => assistantAdminCredEditingId === assistant.id ? handleCancelAssistantCredEdit() : handleStartAssistantCredEdit(assistant)}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+                                  >
+                                    <KeyRound className="h-3 w-3" />
+                                    Credentials
                                   </button>
                                 </div>
                               </div>
@@ -4128,6 +4300,71 @@ export default function AdminPanel() {
                                     <button
                                       type="button"
                                       onClick={handleCancelAssistantEdit}
+                                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {assistantAdminCredEditingId === assistant.id && (
+                                <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50/60 p-3">
+                                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-sky-700">Update credentials</p>
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                      <label htmlFor={`assistant-cred-name-${assistant.id}`} className="mb-1 block text-xs font-medium text-gray-600">Full name</label>
+                                      <input
+                                        id={`assistant-cred-name-${assistant.id}`}
+                                        type="text"
+                                        value={assistantAdminCredDraft.name}
+                                        minLength={2}
+                                        maxLength={120}
+                                        onChange={(event) => setAssistantAdminCredDraft((current) => ({ ...current, name: event.target.value }))}
+                                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label htmlFor={`assistant-cred-email-${assistant.id}`} className="mb-1 block text-xs font-medium text-gray-600">Email</label>
+                                      <div className="flex items-center rounded-lg border border-gray-200 focus-within:ring-2 focus-within:ring-sky-400 overflow-hidden">
+                                        <input
+                                          id={`assistant-cred-email-${assistant.id}`}
+                                          type="text"
+                                          value={assistantAdminCredDraft.emailPrefix}
+                                          onChange={(event) => setAssistantAdminCredDraft((current) => ({ ...current, emailPrefix: event.target.value }))}
+                                          placeholder="prefix"
+                                          className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm focus:outline-none"
+                                        />
+                                        <span className="shrink-0 select-none bg-gray-50 px-2 py-2 text-xs text-gray-500 border-l border-gray-200">@{ADMIN_EMAIL_DOMAIN}</span>
+                                      </div>
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                      <label htmlFor={`assistant-cred-password-${assistant.id}`} className="mb-1 block text-xs font-medium text-gray-600">New password (leave blank to keep current)</label>
+                                      <input
+                                        id={`assistant-cred-password-${assistant.id}`}
+                                        type="password"
+                                        minLength={8}
+                                        maxLength={128}
+                                        value={assistantAdminCredDraft.password}
+                                        onChange={(event) => setAssistantAdminCredDraft((current) => ({ ...current, password: event.target.value }))}
+                                        placeholder="Min 8 characters"
+                                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="mt-3 flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleSaveAssistantCredentials(assistant.id)}
+                                      disabled={assistantAdminCredSavingId === assistant.id}
+                                      className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                                    >
+                                      <Save className="h-3.5 w-3.5" />
+                                      {assistantAdminCredSavingId === assistant.id ? 'Saving...' : 'Update credentials'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleCancelAssistantCredEdit}
                                       className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
                                     >
                                       Cancel

@@ -221,6 +221,7 @@ export interface AuthUser {
   scope?: AdminScope
   assistantRole?: 'support_help' | 'department_prints'
   permissions?: AdminPermission[]
+  firstLoginRequired?: boolean
 }
 
 export interface AssistantAdminAccount {
@@ -230,6 +231,7 @@ export interface AssistantAdminAccount {
   phoneNumber: string
   role: 'support_help' | 'department_prints'
   departments: string[]
+  firstLoginRequired: boolean
 }
 
 export interface StudentAccountUpdateInput {

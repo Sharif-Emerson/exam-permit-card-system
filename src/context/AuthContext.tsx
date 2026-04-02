@@ -27,7 +27,11 @@ function mapAuthUser(profile: Awaited<ReturnType<typeof fetchProfileById>>, sess
 
   if (nextUser.role === 'admin' && sessionUser?.role === 'admin') {
     nextUser.scope = sessionUser.scope
+    nextUser.assistantRole = sessionUser.assistantRole
     nextUser.permissions = sessionUser.permissions ?? []
+    if (sessionUser.firstLoginRequired) {
+      nextUser.firstLoginRequired = true
+    }
   }
 
   return nextUser

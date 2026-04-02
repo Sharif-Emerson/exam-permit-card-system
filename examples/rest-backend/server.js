@@ -36,6 +36,8 @@ import {
   listAssistantAdmins,
   createAssistantAdmin,
   updateAssistantAdmin,
+  updateAssistantAdminCredentials,
+  clearAdminFirstLoginFlag,
   listProfilesPage,
   listTrashedStudentProfiles,
   permanentlyDeleteTrashedProfile,
@@ -847,12 +849,18 @@ function createAuthenticatedUser(user) {
     return user
   }
 
-  return {
+  const result = {
     ...user,
     scope: resolveAdminScope(user),
     assistantRole: user.assistant_role === 'support_help' ? 'support_help' : (user.assistant_role === 'department_prints' ? 'department_prints' : undefined),
     permissions: getAdminPermissions(user),
   }
+
+  if (Number(user.first_login_required ?? 0) === 1) {
+    result.firstLoginRequired = true
+  }
+
+  return result
 }
 
 function requireAdminPermission(permission, message = 'You do not have access to this action.') {
@@ -1221,6 +1229,9 @@ app.post('/auth/login', loginLimiter, (request, response) => {
       name: user.name,
       campus_id: user.campus_id ?? user.campusId,
       campus_name: user.campus_name ?? user.campusName,
+      first_login_required: user.first_login_required,
+      assistant_role: user.assistant_role,
+      assistant_departments_json: user.assistant_departments_json,
     }),
   })
 })
@@ -1248,6 +1259,49 @@ app.post('/auth/reset-password', resetPasswordLimiter, (request, response) => {
   response.json({
     message: 'Password reset successful. You can now sign in with the new password.',
   })
+})
+
+app.patch('/auth/admin-first-login', authenticate, (request, response) => {
+  if (request.userRole !== 'admin' || request.adminScope !== 'assistant-admin') {
+    response.status(403).json({ message: 'This endpoint is only for sub-admin first login setup.' })
+    return
+  }
+
+  if (!request.user?.firstLoginRequired) {
+    response.status(400).json({ message: 'First login setup is not required for this account.' })
+    return
+  }
+
+  const password = typeof request.body?.password === 'string' ? request.body.password.trim() : ''
+  const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : ''
+
+  if (!isStrongPassword(password)) {
+    response.status(400).json({ message: 'Set a strong password with uppercase, lowercase, number, and special character (min 8 chars).' })
+    return
+  }
+
+  if (email && !isValidEmailAddress(email)) {
+    response.status(400).json({ message: 'A valid email address is required.' })
+    return
+  }
+
+  if (email && email !== request.user.email) {
+    const conflict = getIdentityConflictMessage({ email, excludeUserId: request.userId })
+    if (conflict) {
+      response.status(400).json({ message: conflict })
+      return
+    }
+  }
+
+  const updates = { password }
+  if (email && email !== request.user.email) {
+    updates.email = email
+  }
+
+  updateAssistantAdminCredentials(request.userId, updates)
+  clearAdminFirstLoginFlag(request.userId)
+
+  response.json({ message: 'Account setup complete. You can now use the system.' })
 })
 
 app.post('/profiles', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to manage student profiles.'), (request, response) => {
@@ -2474,6 +2528,58 @@ app.patch('/admin/assistants/:id', authenticate, requireAdminPermission('manage_
     response.status(404).json({ message: 'Assistant admin not found.' })
     return
   }
+  response.json(updated)
+})
+
+app.patch('/admin/assistants/:id/credentials', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to update assistant admins.'), (request, response) => {
+  if (request.adminScope !== 'super-admin') {
+    response.status(403).json({ message: 'Only super admin can update assistant admin credentials.' })
+    return
+  }
+
+  const name = typeof request.body?.name === 'string' ? request.body.name.trim() : undefined
+  const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : undefined
+  const password = typeof request.body?.password === 'string' ? request.body.password.trim() : undefined
+
+  if (!name && !email && !password) {
+    response.status(400).json({ message: 'Provide at least one of name, email, or password to update.' })
+    return
+  }
+
+  if (name !== undefined && (name.length < 2 || name.length > 120)) {
+    response.status(400).json({ message: 'Name must be between 2 and 120 characters.' })
+    return
+  }
+
+  if (email !== undefined && !isValidEmailAddress(email)) {
+    response.status(400).json({ message: 'A valid email address is required.' })
+    return
+  }
+
+  if (password !== undefined && (password.length < 8 || password.length > 128)) {
+    response.status(400).json({ message: 'Password must be between 8 and 128 characters.' })
+    return
+  }
+
+  if (email) {
+    const conflict = getIdentityConflictMessage({ email, excludeUserId: request.params.id })
+    if (conflict) {
+      response.status(400).json({ message: conflict })
+      return
+    }
+  }
+
+  const updated = updateAssistantAdminCredentials(request.params.id, { name, email, password })
+  if (!updated) {
+    response.status(404).json({ message: 'Assistant admin not found.' })
+    return
+  }
+
+  // If super-admin changes the password, clear first_login_required flag
+  if (password) {
+    clearAdminFirstLoginFlag(request.params.id)
+  }
+
   response.json(updated)
 })
 

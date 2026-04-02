@@ -203,6 +203,10 @@ export async function updateAssistantAdmin(assistantId: string, values: { role: 
   return activeDataAdapter.updateAssistantAdmin(assistantId, values)
 }
 
+export async function updateAssistantAdminCredentials(assistantId: string, values: { name?: string; email?: string; password?: string }): Promise<AssistantAdminAccount> {
+  return activeDataAdapter.updateAssistantAdminCredentials(assistantId, values)
+}
+
 export async function fetchSemesterRegistrations(): Promise<SemesterRegistration[]> {
   return activeDataAdapter.fetchSemesterRegistrations()
 }

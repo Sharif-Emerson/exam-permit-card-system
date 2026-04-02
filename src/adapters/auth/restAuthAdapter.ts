@@ -114,6 +114,10 @@ function extractAuthUser(payload: unknown): AuthUser | null {
         return typeof permission === 'string'
       })
     }
+
+    if (candidate.firstLoginRequired === true) {
+      nextUser.firstLoginRequired = true
+    }
   }
 
   return nextUser

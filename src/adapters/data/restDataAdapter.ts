@@ -402,6 +402,7 @@ function toAssistantAdminAccount(payload: unknown): AssistantAdminAccount {
     phoneNumber: String(record.phoneNumber ?? record.phone_number ?? ''),
     role: record.role === 'support_help' ? 'support_help' : 'department_prints',
     departments: Array.isArray(record.departments) ? record.departments.map((item) => String(item ?? '').trim()).filter(Boolean) : [],
+    firstLoginRequired: record.firstLoginRequired === true,
   }
 }
 
@@ -823,6 +824,13 @@ export const restDataAdapter: DataAdapter = {
   },
   async updateAssistantAdmin(assistantId: string, values: { role: 'support_help' | 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
     const payload = await request(`/admin/assistants/${assistantId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(values),
+    })
+    return toAssistantAdminAccount(payload)
+  },
+  async updateAssistantAdminCredentials(assistantId: string, values: { name?: string; email?: string; password?: string }): Promise<AssistantAdminAccount> {
+    const payload = await request(`/admin/assistants/${assistantId}/credentials`, {
       method: 'PATCH',
       body: JSON.stringify(values),
     })
