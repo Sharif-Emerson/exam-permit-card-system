@@ -1061,11 +1061,18 @@ app.post('/admin/email-test', authenticate, requireAdminPermission('manage_finan
     response.status(400).json({ message: 'A valid recipient email address is required.' })
     return
   }
-  const result = await sendEmail(
-    to,
-    'KIU Exam Portal — Test Email',
-    `This is a test email from the KIU Exam Portal notification system.\n\nIf you received this, your email configuration is working correctly.\n\nSent at: ${new Date().toISOString()}`
-  )
+  let result
+  try {
+    result = await sendEmail(
+      to,
+      'KIU Exam Portal — Test Email',
+      `This is a test email from the KIU Exam Portal notification system.\n\nIf you received this, your email configuration is working correctly.\n\nSent at: ${new Date().toISOString()}`
+    )
+  } catch (emailError) {
+    const msg = emailError instanceof Error ? emailError.message : String(emailError)
+    response.status(502).json({ message: `Failed to send test email: ${msg}` })
+    return
+  }
   if (result.skipped) {
     response.status(503).json({ message: 'Email provider is not configured. Add SMTP_HOST, SMTP_USER, SMTP_PASS (and optionally EMAIL_FROM) to your .env file.' })
     return
