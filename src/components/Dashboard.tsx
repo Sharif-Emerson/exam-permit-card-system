@@ -167,11 +167,12 @@ function buildPermitBlockers(
   }
 
   if (student.canPrintPermit === false) {
+    const isWindowBlock = student.printAccessMessage?.includes('days of your scheduled exam')
     items.push({
-      id: 'print-cap',
-      title: 'Monthly print limit',
+      id: isWindowBlock ? 'exam-window' : 'print-cap',
+      title: isWindowBlock ? 'Too early to print' : 'Monthly print limit',
       detail: student.printAccessMessage ?? 'You have used your permitted prints for this month. Contact administration if you need an extra copy.',
-      tone: 'amber',
+      tone: isWindowBlock ? 'amber' : 'amber',
     })
   }
 
@@ -1207,7 +1208,6 @@ export default function Dashboard() {
         : studentData.feesBalance > 0
           ? 'Please clear all outstanding fees before printing or downloading your permit.'
           : studentData.printAccessMessage || 'You have reached the monthly permit print limit. Contact administration for access.'
-
   const permitBlockers = useMemo(() => {
     if (!studentData) {
       return []

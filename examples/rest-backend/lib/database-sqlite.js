@@ -600,19 +600,52 @@ function getStudentPermitOutputCountForMonth(profileId, monthKey = getCurrentPer
   `).get(profileId, monthKey)?.total ?? 0)
 }
 
-function getStudentPermitAccess(row) {
+function getDaysUntilEarliestExam(exams) {
+  if (!Array.isArray(exams) || exams.length === 0) return null
+  const now = Date.now()
+  const msPerDay = 1000 * 60 * 60 * 24
+  let smallest = Infinity
+  for (const exam of exams) {
+    const dateStr = exam.examDate ?? exam.exam_date
+    if (!dateStr || String(dateStr).startsWith('Not')) continue
+    const ms = new Date(dateStr).getTime()
+    if (!isNaN(ms)) {
+      const diff = (ms - now) / msPerDay
+      if (diff < smallest) smallest = diff
+    }
+  }
+  return isFinite(smallest) ? smallest : null
+}
+
+const PRINT_WINDOW_DAYS = 2
+
+function getStudentPermitAccess(row, exams = []) {
   const monthKey = getCurrentPermitPrintMonthKey()
   const monthlyPrintCount = getStudentPermitOutputCountForMonth(row.id, monthKey)
   const grantedPrintsRemaining = row.permit_print_grant_month === monthKey
     ? Number(row.permit_print_grants_remaining ?? 0)
     : 0
   const monthlyPrintLimit = 2 + grantedPrintsRemaining
-  const canPrintPermit = monthlyPrintCount < monthlyPrintLimit
-  const printAccessMessage = canPrintPermit
-    ? grantedPrintsRemaining > 0 && monthlyPrintCount >= 2
+  const withinMonthlyLimit = monthlyPrintCount < monthlyPrintLimit
+
+  // Exam window check — admins bypass this by granting extra prints
+  const adminApproved = grantedPrintsRemaining > 0
+  const daysUntil = getDaysUntilEarliestExam(exams)
+  const withinExamWindow = daysUntil === null || adminApproved || daysUntil <= PRINT_WINDOW_DAYS
+
+  const canPrintPermit = withinMonthlyLimit && withinExamWindow
+
+  let printAccessMessage
+  if (!withinExamWindow) {
+    const daysStr = daysUntil !== null ? Math.ceil(daysUntil) : '?'
+    printAccessMessage = `Exam permits can only be printed within ${PRINT_WINDOW_DAYS} days of your scheduled exam. Your exam is in ${daysStr} day(s). Contact administration if you need early access.`
+  } else if (!withinMonthlyLimit) {
+    printAccessMessage = 'You have used your two monthly permit print copies. Contact administration to request extra print permission.'
+  } else {
+    printAccessMessage = grantedPrintsRemaining > 0 && monthlyPrintCount >= 2
       ? `Administration has granted ${grantedPrintsRemaining} extra permit print ${grantedPrintsRemaining === 1 ? 'copy' : 'copies'} for this month.`
       : `You have used ${monthlyPrintCount} of ${monthlyPrintLimit} permit print copies this month.`
-    : 'You have used your two monthly permit print copies. Contact administration to request extra print permission.'
+  }
 
   return {
     monthly_print_count: monthlyPrintCount,
@@ -690,7 +723,7 @@ function mapProfile(row, examsByProfileId = new Map()) {
     exams = mergeExamsWithProfileAnnouncements(row, exams)
   }
   const profile = { ...row }
-  const permitAccess = row.role === 'student' ? getStudentPermitAccess(row) : {}
+  const permitAccess = row.role === 'student' ? getStudentPermitAccess(row, exams) : {}
   delete profile.campus_id
   delete profile.campus_name
   delete profile.exams_json
