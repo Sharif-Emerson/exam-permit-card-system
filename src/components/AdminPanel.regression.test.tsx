@@ -200,6 +200,7 @@ describe('AdminPanel regression guard', () => {
     expect(screen.getByRole('button', { name: /permit cards/i })).toBeTruthy()
     expect(screen.getAllByRole('button', { name: /bulk import/i }).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: /reports/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /sub-admins/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /settings/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /open bulk import/i })).toBeTruthy()
   })

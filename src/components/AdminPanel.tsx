@@ -3104,7 +3104,7 @@ export default function AdminPanel() {
                   </div>
                 )}
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-2xl border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(254,252,232,0.9))] p-5 shadow-sm shadow-blue-200/40">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center justify-between mb-6">
                       <button
@@ -3138,7 +3138,7 @@ export default function AdminPanel() {
                         type="button"
                         disabled={action.disabled}
                         onClick={action.action}
-                        className="rounded-2xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-2xl border border-blue-100 bg-white/90 p-4 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <span className="text-emerald-600">{action.icon}</span>
@@ -3222,7 +3222,7 @@ export default function AdminPanel() {
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="rounded-xl border border-red-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.94),_rgba(255,251,235,0.9))] shadow-sm shadow-red-200/40">
                     <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
                       <div>
                         <h2 className="font-semibold text-gray-800">Pending Approvals</h2>
@@ -3231,7 +3231,7 @@ export default function AdminPanel() {
                       <button
                         type="button"
                         onClick={() => setActiveSection('students')}
-                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                        className="rounded-lg border border-red-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
                       >
                         Review list
                       </button>
@@ -3255,7 +3255,7 @@ export default function AdminPanel() {
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="rounded-xl border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.95),_rgba(240,249,255,0.92))] shadow-sm shadow-blue-200/40">
                     <div className="border-b border-gray-100 px-5 py-4">
                       <h2 className="font-semibold text-gray-800">Permit Assignment Overview</h2>
                       <p className="text-xs text-gray-400">Assigned permit items pulled from current student records</p>
@@ -3281,7 +3281,7 @@ export default function AdminPanel() {
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-2">
-                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <div className="rounded-xl border border-amber-200/80 bg-[linear-gradient(145deg,_rgba(254,252,232,0.95),_rgba(255,247,237,0.92))] p-6 shadow-sm shadow-amber-200/45">
                     <div className="flex items-center justify-between">
                       <h2 className="font-semibold text-gray-800">Permit Status Breakdown</h2>
                       <FileCheck className="h-4 w-4 text-gray-400" />
@@ -3307,23 +3307,23 @@ export default function AdminPanel() {
                     <p className="mt-4 text-xs text-gray-400">Rejected permits are not currently tracked by the backend workflow, so this value remains informational until that state is added.</p>
                   </div>
 
-                  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <div className="rounded-xl border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.95),_rgba(250,245,255,0.9))] p-6 shadow-sm shadow-blue-200/40">
                     <div className="flex items-center justify-between">
                       <h2 className="font-semibold text-gray-800">Analytics &amp; Insights</h2>
                       <BarChart2 className="h-4 w-4 text-gray-400" />
                     </div>
                     <div className="mt-4 space-y-4">
-                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-4">
                         <p className="text-xs uppercase tracking-wide text-gray-400">Most At-Risk Department</p>
                         <p className="mt-1 text-lg font-semibold text-gray-900">{busiestOutstandingDepartment?.[0] ?? 'No outstanding balances'}</p>
                         <p className="text-xs text-gray-500">{busiestOutstandingDepartment ? `${busiestOutstandingDepartment[1]} student(s) still pending financial clearance.` : 'All currently loaded students are financially cleared.'}</p>
                       </div>
-                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <div className="rounded-xl border border-amber-100 bg-amber-50/85 p-4">
                         <p className="text-xs uppercase tracking-wide text-gray-400">Reminder Queue</p>
                         <p className="mt-1 text-lg font-semibold text-gray-900">{outstandingStudents}</p>
                         <p className="text-xs text-gray-500">Students who would receive fee reminders from the current in-app notification workflow.</p>
                       </div>
-                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <div className="rounded-xl border border-rose-100 bg-rose-50/80 p-4">
                         <p className="text-xs uppercase tracking-wide text-gray-400">Recent Reminder Activity</p>
                         <p className="mt-1 text-sm font-semibold text-gray-900">{lastReminderAt ? new Date(lastReminderAt).toLocaleString() : 'No reminders queued in this session'}</p>
                         <p className="text-xs text-gray-500">External email, SMS, and biometric integrations are not yet connected in this environment.</p>
@@ -3333,7 +3333,7 @@ export default function AdminPanel() {
                 </div>
 
                 {/* Recent permit activity table */}
-                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div className="rounded-xl border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.95),_rgba(248,250,252,0.92))] shadow-sm shadow-blue-200/40">
                   <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
                     <h2 className="font-semibold text-gray-800">Recent Permit Activity</h2>
                     <p className="text-xs text-gray-400">{permitActivityLogs.length} event{permitActivityLogs.length !== 1 ? 's' : ''} on this page</p>
@@ -3341,7 +3341,7 @@ export default function AdminPanel() {
                       type="button"
                       onClick={handleExportPermitActivity}
                       disabled={!adminCapability.canExportReports || permitActivityLogs.length === 0}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
                     >
                       <Download className="h-3.5 w-3.5" />
                       Export CSV
@@ -3379,14 +3379,14 @@ export default function AdminPanel() {
                       </tbody>
                     </table>
                   </div>
-                  <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3 text-xs text-gray-500">
+                  <div className="flex items-center justify-between border-t border-blue-100 px-5 py-3 text-xs text-blue-700">
                     <span>Page {activityPage} of {activityTotalPages}</span>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         disabled={activityPage <= 1}
                         onClick={() => setActivityPage((current) => Math.max(current - 1, 1))}
-                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                        className="rounded-lg border border-blue-200 bg-white/90 px-3 py-1.5 hover:bg-blue-50 disabled:opacity-50"
                       >
                         Previous
                       </button>
@@ -3394,7 +3394,7 @@ export default function AdminPanel() {
                         type="button"
                         disabled={activityPage >= activityTotalPages}
                         onClick={() => setActivityPage((current) => Math.min(current + 1, activityTotalPages))}
-                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+                        className="rounded-lg border border-blue-200 bg-white/90 px-3 py-1.5 hover:bg-blue-50 disabled:opacity-50"
                       >
                         Next
                       </button>
@@ -3403,7 +3403,7 @@ export default function AdminPanel() {
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-2">
-                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="rounded-xl border border-rose-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(248,250,252,0.9))] shadow-sm shadow-rose-200/40">
                     <div className="border-b border-gray-100 px-5 py-4">
                       <h2 className="font-semibold text-gray-800">Audit Trail</h2>
                       <p className="text-xs text-gray-400">Recent administrative actions captured by the backend</p>
@@ -3424,7 +3424,7 @@ export default function AdminPanel() {
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="rounded-xl border border-yellow-200/80 bg-[linear-gradient(145deg,_rgba(254,252,232,0.95),_rgba(255,247,237,0.9))] shadow-sm shadow-yellow-200/40">
                     <div className="border-b border-gray-100 px-5 py-4">
                       <h2 className="font-semibold text-gray-800">Section Shortcuts</h2>
                       <p className="text-xs text-gray-400">Jump into the areas available for this admin scope</p>

@@ -1630,7 +1630,7 @@ export default function Dashboard() {
               )}
 
               <section className="mb-6 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-                <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-green-100/40 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                <div className="rounded-[2rem] border border-emerald-200/80 bg-[linear-gradient(135deg,_rgba(236,253,245,0.95),_rgba(239,246,255,0.92)_52%,_rgba(254,252,232,0.9))] p-6 shadow-xl shadow-emerald-200/55 backdrop-blur dark:border-emerald-900/30 dark:bg-[linear-gradient(135deg,_rgba(2,44,34,0.9),_rgba(15,23,42,0.9)_55%,_rgba(120,53,15,0.65))] dark:shadow-none">
                   <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.3em] text-green-600 dark:text-green-300">Welcome Section</p>
@@ -1697,7 +1697,7 @@ export default function Dashboard() {
                 {activeSection === 'overview' && (
                   <div className="grid gap-6 xl:grid-cols-[1.55fr_1fr]">
                     <div className="space-y-6">
-                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-green-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <section className="rounded-[2rem] border border-sky-200/75 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(254,252,232,0.92)_48%,_rgba(254,242,242,0.9))] p-6 shadow-xl shadow-sky-200/45 backdrop-blur dark:border-sky-900/30 dark:bg-[linear-gradient(145deg,_rgba(12,26,46,0.92),_rgba(30,41,59,0.9)_52%,_rgba(69,10,10,0.65))] dark:shadow-none">
                         <div className="mb-5 flex items-center justify-between">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-green-600 dark:text-green-300">Permit Card Preview</p>
@@ -1814,7 +1814,7 @@ export default function Dashboard() {
                         </div>
                       </section>
 
-                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-green-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <section className="rounded-[2rem] border border-amber-200/80 bg-[linear-gradient(140deg,_rgba(255,251,235,0.95),_rgba(239,246,255,0.92))] p-6 shadow-xl shadow-amber-200/45 backdrop-blur dark:border-amber-900/30 dark:bg-[linear-gradient(140deg,_rgba(69,26,3,0.7),_rgba(15,23,42,0.9))] dark:shadow-none">
                         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Semester Registration</p>
@@ -1860,7 +1860,7 @@ export default function Dashboard() {
                     </div>
 
                     <div className="space-y-6">
-                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <section className="rounded-[2rem] border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(224,242,254,0.92))] p-6 shadow-xl shadow-blue-200/45 backdrop-blur dark:border-blue-900/30 dark:bg-[linear-gradient(145deg,_rgba(10,25,47,0.92),_rgba(30,58,138,0.45))] dark:shadow-none">
                         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Notifications Panel</p>
                         <h2 className="mt-2 text-2xl font-semibold">Latest updates</h2>
                         <div className="mt-5 space-y-3">
@@ -1873,7 +1873,7 @@ export default function Dashboard() {
                         </div>
                       </section>
 
-                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <section className="rounded-[2rem] border border-rose-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(254,252,232,0.9))] p-6 shadow-xl shadow-rose-200/45 backdrop-blur dark:border-rose-900/30 dark:bg-[linear-gradient(145deg,_rgba(60,9,9,0.72),_rgba(69,10,10,0.65)_55%,_rgba(51,65,85,0.8))] dark:shadow-none">
                         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Application History</p>
                         <h2 className="mt-2 text-2xl font-semibold">Recent requests</h2>
                         <div className="mt-5 space-y-3">
@@ -1902,7 +1902,7 @@ export default function Dashboard() {
 
                 {activeSection === 'applications' && (
                   <div className="space-y-6">
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                    <section className="rounded-[2rem] border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(250,245,255,0.92))] p-6 shadow-xl shadow-blue-200/45 backdrop-blur dark:border-blue-900/30 dark:bg-[linear-gradient(145deg,_rgba(15,23,42,0.92),_rgba(30,58,138,0.42))] dark:shadow-none">
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Filters</p>
@@ -1940,7 +1940,7 @@ export default function Dashboard() {
                     </section>
 
                     <div className="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
-                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <section className="rounded-[2rem] border border-amber-200/80 bg-[linear-gradient(140deg,_rgba(254,252,232,0.95),_rgba(239,246,255,0.9))] p-6 shadow-xl shadow-amber-200/45 backdrop-blur dark:border-amber-900/30 dark:bg-[linear-gradient(140deg,_rgba(69,26,3,0.72),_rgba(15,23,42,0.9))] dark:shadow-none">
                         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Semester Registration</p>
                         <h2 className="mt-2 text-2xl font-semibold">Submit a semester request</h2>
                         <form className="mt-6 space-y-4" onSubmit={(event) => void handleApplicationSubmit(event)}>
@@ -1968,7 +1968,7 @@ export default function Dashboard() {
                         </form>
                       </section>
 
-                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                      <section className="rounded-[2rem] border border-red-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(239,246,255,0.92))] p-6 shadow-xl shadow-red-200/45 backdrop-blur dark:border-red-900/30 dark:bg-[linear-gradient(145deg,_rgba(69,10,10,0.72),_rgba(30,41,59,0.88))] dark:shadow-none">
                         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Application History</p>
                         <h2 className="mt-2 text-2xl font-semibold">Permit requests</h2>
                         <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800">
@@ -2007,7 +2007,7 @@ export default function Dashboard() {
                       </section>
                     </div>
 
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                    <section className="rounded-[2rem] border border-yellow-200/80 bg-[linear-gradient(145deg,_rgba(254,252,232,0.95),_rgba(240,249,255,0.9))] p-6 shadow-xl shadow-yellow-200/45 backdrop-blur dark:border-yellow-900/30 dark:bg-[linear-gradient(145deg,_rgba(66,32,6,0.7),_rgba(15,23,42,0.9))] dark:shadow-none">
                       <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Printed Permit History</p>
                       <h2 className="mt-2 text-2xl font-semibold">One record per semester</h2>
                       <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800">
@@ -2045,7 +2045,7 @@ export default function Dashboard() {
 
                 {activeSection === 'settings' && (
                   <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                    <section className="rounded-[2rem] border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(224,242,254,0.9))] p-6 shadow-xl shadow-blue-200/45 backdrop-blur dark:border-blue-900/30 dark:bg-[linear-gradient(145deg,_rgba(10,25,47,0.92),_rgba(30,58,138,0.42))] dark:shadow-none">
                       <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Profile Settings</p>
                       <h2 className="mt-2 text-2xl font-semibold">Update your info</h2>
                       <div className="flex justify-end mb-2">
@@ -2185,7 +2185,7 @@ export default function Dashboard() {
                       </form>
                     </section>
 
-                    <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
+                    <section className="rounded-[2rem] border border-red-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(254,252,232,0.9))] p-6 shadow-xl shadow-red-200/45 backdrop-blur dark:border-red-900/30 dark:bg-[linear-gradient(145deg,_rgba(69,10,10,0.72),_rgba(66,32,6,0.68))] dark:shadow-none">
                       <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Preview</p>
                       <h2 className="mt-2 text-2xl font-semibold">Current profile</h2>
                       <div className="mt-6 rounded-[2rem] bg-slate-50 p-5 dark:bg-slate-900/70">
