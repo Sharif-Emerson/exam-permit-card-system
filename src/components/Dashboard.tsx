@@ -1754,13 +1754,34 @@ export default function Dashboard() {
                     </div>
                     <statusView.icon className="h-10 w-10 shrink-0" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveSection('applications')}
-                    className="mt-5 inline-flex items-center rounded-full bg-white/80 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-white dark:bg-slate-950/70 dark:text-white dark:hover:bg-slate-900"
-                  >
-                    Apply for Permit
-                  </button>
+                  {permitStatus !== 'approved' ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection('applications')}
+                      className="mt-5 inline-flex items-center rounded-full bg-white/80 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-white dark:bg-slate-950/70 dark:text-white dark:hover:bg-slate-900"
+                    >
+                      Apply for Permit
+                    </button>
+                  ) : (
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={handleDownload}
+                        className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-white dark:bg-slate-950/70 dark:text-white dark:hover:bg-slate-900"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePrint}
+                        className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-white dark:bg-slate-950/70 dark:text-white dark:hover:bg-slate-900"
+                      >
+                        <Printer className="h-4 w-4" />
+                        Print
+                      </button>
+                    </div>
+                  )}
                 </div>
               </section>}
 
