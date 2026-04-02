@@ -246,6 +246,59 @@ ensureColumn('support_request_messages', 'attachment_url TEXT')
 ensureColumn('support_request_messages', 'attachment_mime_type TEXT')
 ensureColumn('support_request_messages', 'attachment_size_bytes INTEGER')
 
+// Migration: rebuild users table if admin_scope CHECK constraint is missing 'assistant-admin'
+;(function migrateAdminScopeCheckConstraint() {
+  const schemaRow = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='users'`).get()
+  if (!schemaRow || typeof schemaRow.sql !== 'string') return
+  if (schemaRow.sql.includes("'assistant-admin'")) return // Already up-to-date
+
+  const existingCols = db.pragma('table_info(users)').map((c) => c.name)
+  const allCols = [
+    'id', 'email', 'phone_number', 'role', 'admin_scope', 'assistant_role',
+    'assistant_departments_json', 'name', 'password_hash', 'created_at', 'updated_at',
+    'campus_id', 'campus_name',
+  ]
+  const selectParts = allCols.map((col) => {
+    if (existingCols.includes(col)) return col
+    if (col === 'campus_id') return "'main-campus' AS campus_id"
+    if (col === 'campus_name') return "'Main Campus' AS campus_name"
+    if (col === 'assistant_departments_json') return "'[]' AS assistant_departments_json"
+    return `NULL AS ${col}`
+  }).join(', ')
+
+  db.pragma('foreign_keys = OFF')
+  try {
+    db.exec('BEGIN')
+    db.exec(`
+      CREATE TABLE users_rebuilt (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        phone_number TEXT,
+        role TEXT NOT NULL CHECK (role IN ('admin', 'student')),
+        admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations', 'assistant-admin')),
+        assistant_role TEXT CHECK (assistant_role IN ('support_help', 'department_prints')),
+        assistant_departments_json TEXT NOT NULL DEFAULT '[]',
+        name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        campus_id TEXT NOT NULL DEFAULT 'main-campus',
+        campus_name TEXT NOT NULL DEFAULT 'Main Campus'
+      )
+    `)
+    db.exec(`INSERT INTO users_rebuilt SELECT ${selectParts} FROM users`)
+    db.exec('DROP TABLE users')
+    db.exec('ALTER TABLE users_rebuilt RENAME TO users')
+    db.exec('COMMIT')
+  } catch (migrationError) {
+    try { db.exec('ROLLBACK') } catch { /* ignore */ }
+    try { db.exec('DROP TABLE IF EXISTS users_rebuilt') } catch { /* ignore */ }
+    db.pragma('foreign_keys = ON')
+    throw migrationError
+  }
+  db.pragma('foreign_keys = ON')
+})()
+
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_users_campus_id ON users(campus_id);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_number ON users(phone_number) WHERE phone_number IS NOT NULL;
