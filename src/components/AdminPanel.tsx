@@ -18,7 +18,7 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById } from '../services/profileService'
+import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail } from '../services/profileService'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
 import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AssistantAdminAccount, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline } from '../types'
 import { DIALOG_Z } from '../constants/dialogLayers'
@@ -616,6 +616,10 @@ export default function AdminPanel() {
   const [savingSettings, setSavingSettings] = useState(false)
   const [savingFeeStructure, setSavingFeeStructure] = useState(false)
   const [savingDeadlines, setSavingDeadlines] = useState(false)
+  const [emailStatus, setEmailStatus] = useState<{ configured: boolean; provider: string; from: string; host: string | null } | null>(null)
+  const [emailTestRecipient, setEmailTestRecipient] = useState('')
+  const [emailTestSending, setEmailTestSending] = useState(false)
+  const [emailTestResult, setEmailTestResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [assistantAdmins, setAssistantAdmins] = useState<AssistantAdminAccount[]>([])
   const [assistantAdminsLoading, setAssistantAdminsLoading] = useState(false)
   const [assistantAdminsSaving, setAssistantAdminsSaving] = useState(false)
@@ -1302,6 +1306,11 @@ export default function AdminPanel() {
     }
 
     void loadAssistantAdmins()
+
+    // Load email configuration status from backend
+    void fetchEmailStatus()
+      .then((status) => setEmailStatus(status))
+      .catch(() => setEmailStatus(null))
   }, [activeSection, canManageAssistantAdmins, loadAssistantAdmins])
 
   useEffect(() => {
@@ -2245,6 +2254,21 @@ export default function AdminPanel() {
     }
   }, [user, settingsDraft, refreshUser])
 
+  async function handleSendTestEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setEmailTestResult(null)
+    if (!emailTestRecipient.trim()) return
+    setEmailTestSending(true)
+    try {
+      const result = await sendTestEmail(emailTestRecipient.trim())
+      setEmailTestResult({ ok: result.success, message: result.message })
+    } catch (err) {
+      setEmailTestResult({ ok: false, message: err instanceof Error ? err.message : 'Failed to send test email.' })
+    } finally {
+      setEmailTestSending(false)
+    }
+  }
+
   async function handleSaveFeeStructure(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -3035,8 +3059,8 @@ export default function AdminPanel() {
                     </div>
                     <p className="mt-2 text-4xl font-bold text-blue-700">{totalStudents}</p>
                     <div className="mt-2 flex gap-3 text-xs text-blue-500">
-                      <span className="font-semibold text-emerald-600">{clearedStudents} cleared</span>
-                      <span className="text-amber-600">{outstandingStudents} outstanding</span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">{clearedStudents} cleared</span>
+                      <span className="text-amber-600 dark:text-amber-400">{outstandingStudents} outstanding</span>
                     </div>
                     <p className="mt-0.5 text-[10px] text-blue-400">enrolled student accounts</p>
                   </div>
@@ -3053,21 +3077,21 @@ export default function AdminPanel() {
                     <p className="mt-0.5 text-[10px] text-indigo-400">active admin accounts</p>
                   </div>
                   {/* --- Permit stats --- */}
-                  <div className="rounded-xl border border-emerald-200 bg-[linear-gradient(145deg,_rgba(209,250,229,0.95),_rgba(236,253,245,0.92))] p-5 shadow-sm shadow-emerald-200/60">
+                  <div className="rounded-xl border border-emerald-200 bg-[linear-gradient(145deg,_rgba(209,250,229,0.95),_rgba(236,253,245,0.92))] p-5 shadow-sm shadow-emerald-200/60 dark:border-emerald-800 dark:bg-emerald-950/60">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Cleared</p>
-                      <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500 dark:text-emerald-300">Cleared</p>
+                      <CheckCircle2 className="h-5 w-5 text-emerald-400 dark:text-emerald-300" />
                     </div>
-                    <p className="mt-2 text-3xl font-bold text-emerald-700">{clearedStudents}</p>
-                    <p className="mt-1 text-xs text-emerald-400">fees fully paid</p>
+                    <p className="mt-2 text-3xl font-bold text-emerald-700 dark:text-emerald-200">{clearedStudents}</p>
+                    <p className="mt-1 text-xs text-emerald-400 dark:text-emerald-500">fees fully paid</p>
                   </div>
-                  <div className="rounded-xl border border-amber-200 bg-[linear-gradient(145deg,_rgba(254,243,199,0.95),_rgba(255,251,235,0.92))] p-5 shadow-sm shadow-amber-200/60">
+                  <div className="rounded-xl border border-amber-200 bg-[linear-gradient(145deg,_rgba(254,243,199,0.95),_rgba(255,251,235,0.92))] p-5 shadow-sm shadow-amber-200/60 dark:border-amber-800 dark:bg-amber-950/60">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-500">Outstanding</p>
-                      <FileSpreadsheet className="h-5 w-5 text-amber-400" />
+                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-500 dark:text-amber-300">Outstanding</p>
+                      <FileSpreadsheet className="h-5 w-5 text-amber-400 dark:text-amber-300" />
                     </div>
-                    <p className="mt-2 text-3xl font-bold text-amber-700">{outstandingStudents}</p>
-                    <p className="mt-1 text-xs text-amber-400">balance remaining</p>
+                    <p className="mt-2 text-3xl font-bold text-amber-700 dark:text-amber-200">{outstandingStudents}</p>
+                    <p className="mt-1 text-xs text-amber-400 dark:text-amber-500">balance remaining</p>
                   </div>
                   <div className="rounded-xl border border-purple-200 bg-[linear-gradient(145deg,_rgba(243,232,255,0.95),_rgba(250,245,255,0.92))] p-5 shadow-sm shadow-purple-200/60">
                     <div className="flex items-center justify-between">
@@ -3187,20 +3211,20 @@ export default function AdminPanel() {
                       <BarChart2 className="h-4 w-4 text-gray-400" />
                     </div>
                     <div className="mt-4 space-y-4">
-                      <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-4">
-                        <p className="text-xs uppercase tracking-wide text-gray-400">Most At-Risk Department</p>
-                        <p className="mt-1 text-lg font-semibold text-gray-900">{busiestOutstandingDepartment?.[0] ?? 'No outstanding balances'}</p>
-                        <p className="text-xs text-gray-500">{busiestOutstandingDepartment ? `${busiestOutstandingDepartment[1]} student(s) still pending financial clearance.` : 'All currently loaded students are financially cleared.'}</p>
+                      <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-4 dark:border-blue-900/50 dark:bg-blue-950/40">
+                        <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-slate-400">Most At-Risk Department</p>
+                        <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{busiestOutstandingDepartment?.[0] ?? 'No outstanding balances'}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">{busiestOutstandingDepartment ? `${busiestOutstandingDepartment[1]} student(s) still pending financial clearance.` : 'All currently loaded students are financially cleared.'}</p>
                       </div>
-                      <div className="rounded-xl border border-amber-100 bg-amber-50/85 p-4">
-                        <p className="text-xs uppercase tracking-wide text-gray-400">Reminder Queue</p>
-                        <p className="mt-1 text-lg font-semibold text-gray-900">{outstandingStudents}</p>
-                        <p className="text-xs text-gray-500">Students who would receive fee reminders from the current in-app notification workflow.</p>
+                      <div className="rounded-xl border border-amber-100 bg-amber-50/85 p-4 dark:border-amber-900/50 dark:bg-amber-950/40">
+                        <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-slate-400">Reminder Queue</p>
+                        <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-amber-300">{outstandingStudents}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">Students who would receive fee reminders from the current in-app notification workflow.</p>
                       </div>
-                      <div className="rounded-xl border border-rose-100 bg-rose-50/80 p-4">
-                        <p className="text-xs uppercase tracking-wide text-gray-400">Recent Reminder Activity</p>
-                        <p className="mt-1 text-sm font-semibold text-gray-900">{lastReminderAt ? new Date(lastReminderAt).toLocaleString() : 'No reminders queued in this session'}</p>
-                        <p className="text-xs text-gray-500">External email, SMS, and biometric integrations are not yet connected in this environment.</p>
+                      <div className="rounded-xl border border-rose-100 bg-rose-50/80 p-4 dark:border-rose-900/50 dark:bg-rose-950/40">
+                        <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-slate-400">Recent Reminder Activity</p>
+                        <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{lastReminderAt ? new Date(lastReminderAt).toLocaleString() : 'No reminders queued in this session'}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">External email, SMS, and biometric integrations are not yet connected in this environment.</p>
                       </div>
                     </div>
                   </div>
@@ -3454,7 +3478,7 @@ export default function AdminPanel() {
                                 </span>
                               </td>
                               <td className="px-5 py-3">
-                                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${student.feesBalance === 0 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${student.feesBalance === 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'}`}>
                                   {student.feesBalance === 0 ? 'Cleared' : 'Outstanding'}
                                 </span>
                               </td>
@@ -4592,16 +4616,16 @@ export default function AdminPanel() {
                             </svg>
                             <div className="space-y-3 text-sm">
                               <div>
-                                <p className="text-xs uppercase tracking-wide text-gray-400">Cleared</p>
-                                <p className="text-2xl font-bold text-emerald-600">{clearedStudents}</p>
+                                <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-slate-400">Cleared</p>
+                                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{clearedStudents}</p>
                               </div>
                               <div>
-                                <p className="text-xs uppercase tracking-wide text-gray-400">Outstanding</p>
-                                <p className="text-2xl font-bold text-amber-500">{outstandingStudents}</p>
+                                <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-slate-400">Outstanding</p>
+                                <p className="text-2xl font-bold text-amber-500 dark:text-amber-400">{outstandingStudents}</p>
                               </div>
                               <div>
-                                <p className="text-xs uppercase tracking-wide text-gray-400">Total</p>
-                                <p className="text-2xl font-bold text-gray-700">{totalStudents}</p>
+                                <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-slate-400">Total</p>
+                                <p className="text-2xl font-bold text-gray-700 dark:text-slate-200">{totalStudents}</p>
                               </div>
                             </div>
                           </div>
@@ -4809,15 +4833,15 @@ export default function AdminPanel() {
 
                 {/* Summary strip */}
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center">
-                    <p className="text-2xl font-bold text-emerald-700">{clearedStudents}</p>
-                    <p className="mt-1 text-xs text-emerald-500">Cleared — Can Print</p>
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center dark:border-emerald-900 dark:bg-emerald-950/50">
+                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{clearedStudents}</p>
+                    <p className="mt-1 text-xs text-emerald-500 dark:text-emerald-400">Cleared — Can Print</p>
                   </div>
-                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-center">
-                    <p className="text-2xl font-bold text-amber-700">{outstandingStudents}</p>
-                    <p className="mt-1 text-xs text-amber-500">Outstanding — Blocked</p>
+                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-center dark:border-amber-900 dark:bg-amber-950/50">
+                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{outstandingStudents}</p>
+                    <p className="mt-1 text-xs text-amber-500 dark:text-amber-400">Outstanding — Blocked</p>
                   </div>
-                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-center">
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-center dark:border-blue-900 dark:bg-blue-950/50">
                     <p className="text-2xl font-bold text-blue-700">
                       {new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
                     </p>
@@ -5325,6 +5349,72 @@ export default function AdminPanel() {
                       {savingSettings ? 'Saving...' : 'Save account settings'}
                     </button>
                   </form>
+                </div>
+
+                <div className="mt-8 rounded-[1.5rem] border border-sky-100 bg-sky-50 dark:border-sky-900/40 dark:bg-sky-950/30 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900 text-sky-600 dark:text-sky-300">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-sky-800 dark:text-sky-200">Email &amp; Notifications</p>
+                      <p className="text-xs text-sky-500 dark:text-sky-400">Configure outgoing email for student notifications and reminders</p>
+                    </div>
+                  </div>
+
+                  {emailStatus === null ? (
+                    <p className="text-xs text-sky-400 dark:text-sky-500">Loading email status…</p>
+                  ) : (
+                    <div className="mb-4 flex flex-wrap items-center gap-3">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${emailStatus.configured ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${emailStatus.configured ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                        {emailStatus.configured ? 'Email configured' : 'Email not configured'}
+                      </span>
+                      {emailStatus.configured && (
+                        <>
+                          <span className="text-xs text-sky-600 dark:text-sky-400">Provider: <strong>{emailStatus.provider.toUpperCase()}</strong></span>
+                          <span className="text-xs text-sky-600 dark:text-sky-400">From: <strong>{emailStatus.from}</strong></span>
+                          {emailStatus.host && <span className="text-xs text-sky-600 dark:text-sky-400">Host: <strong>{emailStatus.host}</strong></span>}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {!emailStatus?.configured && (
+                    <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50/80 p-4 text-xs dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+                      <p className="font-semibold text-amber-700 dark:text-amber-300 mb-1">How to enable email sending</p>
+                      <p className="mb-2 text-amber-700 dark:text-amber-300">Add the following to your backend <code className="rounded bg-amber-100 dark:bg-amber-900 px-1">examples/rest-backend/.env.local</code>:</p>
+                      <pre className="overflow-x-auto rounded bg-slate-900 text-emerald-200 p-3 text-[11px] leading-relaxed">{`# For custom domain (e.g. admin@kiu.examcard.com):\nSMTP_HOST=mail.kiu.examcard.com\nSMTP_PORT=587\nSMTP_SECURE=false\nSMTP_USER=admin@kiu.examcard.com\nSMTP_PASS=your-email-password\nEMAIL_FROM=KIU Exam Portal <admin@kiu.examcard.com>\n\n# Or for Gmail:\n# EMAIL_USER=you@gmail.com\n# EMAIL_PASS=your-app-password`}</pre>
+                      <p className="mt-2 text-amber-600 dark:text-amber-400">Restart the backend after saving. Then use the test form below to confirm delivery.</p>
+                    </div>
+                  )}
+
+                  <form className="flex flex-wrap items-end gap-3 mt-2" onSubmit={(event) => void handleSendTestEmail(event)}>
+                    <div className="flex-1 min-w-[16rem]">
+                      <label htmlFor="email-test-recipient" className="mb-1 block text-xs font-medium text-sky-700 dark:text-sky-300">Send a test email to</label>
+                      <input
+                        id="email-test-recipient"
+                        type="email"
+                        required
+                        placeholder="recipient@example.com"
+                        value={emailTestRecipient}
+                        onChange={(e) => { setEmailTestRecipient(e.target.value); setEmailTestResult(null) }}
+                        className="w-full rounded-lg border border-sky-200 dark:border-sky-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={emailTestSending}
+                      className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                    >
+                      {emailTestSending ? 'Sending…' : 'Send test email'}
+                    </button>
+                  </form>
+                  {emailTestResult && (
+                    <p className={`mt-3 text-xs font-medium ${emailTestResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {emailTestResult.ok ? '✓' : '✗'} {emailTestResult.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="mt-8 rounded-[1.5rem] border border-red-100 bg-red-50 p-6">

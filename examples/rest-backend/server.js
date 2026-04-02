@@ -53,7 +53,7 @@ import {
   // Session helpers
   createSession,
 } from './lib/database.js'
-import { sendEmail, sendSms } from './lib/notification.js'
+import { sendEmail, sendSms, getEmailStatus } from './lib/notification.js'
 import * as oidcFlow from './lib/oidc-flow.js'
 import { getSisStatus, previewSisConnection } from './lib/sis-client.js'
 import { isPermitIntegrityEnabled, verifyPermitPayload } from './lib/permit-integrity.js'
@@ -1047,6 +1047,30 @@ app.get('/system-settings', authenticate, (request, response) => {
   }
 
   response.json(settings)
+})
+
+// ── Email status & test ────────────────────────────────────────────────────
+app.get('/admin/email-status', authenticate, requireAdminPermission('manage_financials', 'You do not have permission to view email settings.'), async (_request, response) => {
+  const status = await getEmailStatus()
+  response.json(status)
+})
+
+app.post('/admin/email-test', authenticate, requireAdminPermission('manage_financials', 'You do not have permission to send test emails.'), async (request, response) => {
+  const to = typeof request.body.to === 'string' ? request.body.to.trim() : ''
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    response.status(400).json({ message: 'A valid recipient email address is required.' })
+    return
+  }
+  const result = await sendEmail(
+    to,
+    'KIU Exam Portal — Test Email',
+    `This is a test email from the KIU Exam Portal notification system.\n\nIf you received this, your email configuration is working correctly.\n\nSent at: ${new Date().toISOString()}`
+  )
+  if (result.skipped) {
+    response.status(503).json({ message: 'Email provider is not configured. Add SMTP_HOST, SMTP_USER, SMTP_PASS (and optionally EMAIL_FROM) to your .env file.' })
+    return
+  }
+  response.json({ success: true, message: `Test email sent to ${to}.` })
 })
 
 app.put('/system-settings', authenticate, requireAdminPermission('manage_financials', 'You do not have permission to update fee settings.'), (request, response) => {

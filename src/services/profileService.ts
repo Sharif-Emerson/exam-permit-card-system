@@ -1,4 +1,6 @@
 import { activeDataAdapter } from '../adapters/data'
+import { fetchEmailStatus as _fetchEmailStatus, sendTestEmail as _sendTestEmail } from '../adapters/data/restDataAdapter'
+import type { EmailStatus } from '../adapters/data/restDataAdapter'
 import type { FinancialUpdateValues, StudentAccountsImportApplyResult, StudentProvisionPreviewRow } from '../adapters/data/types'
 import type {
   AssistantAdminAccount,
@@ -203,4 +205,14 @@ export async function createSemesterRegistration(requestedSemester: string): Pro
 
 export async function updateSemesterRegistration(id: string, values: { status: 'approved' | 'rejected'; adminNote?: string }): Promise<SemesterRegistration> {
   return activeDataAdapter.updateSemesterRegistration(id, values)
+}
+
+export type { EmailStatus }
+
+export async function fetchEmailStatus(): Promise<EmailStatus> {
+  return _fetchEmailStatus()
+}
+
+export async function sendTestEmail(to: string): Promise<{ success: boolean; message: string }> {
+  return _sendTestEmail(to)
 }
