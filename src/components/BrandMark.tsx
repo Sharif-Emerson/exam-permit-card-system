@@ -16,11 +16,11 @@ export default function BrandMark({
   const centered = align === 'center'
   return (
     <div className={`flex gap-3 ${centered ? 'flex-col items-center justify-center text-center' : 'items-center justify-start text-left'}`}>
-      <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center">
+      <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <img
           src={institutionLogo}
           alt={`${institutionName} logo`}
-          className="h-full w-full object-contain"
+          className="h-full w-full rounded-full object-cover"
           draggable={false}
         />
       </div>

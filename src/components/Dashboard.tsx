@@ -1373,7 +1373,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="student-dashboard-app min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(187,247,208,0.65),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(209,250,229,0.65),_transparent_28%),linear-gradient(180deg,_#ecfdf5_0%,_#f0fdf4_45%,_#dcfce7_100%)] text-slate-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(6,78,59,0.9),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(20,83,45,0.5),_transparent_26%),linear-gradient(180deg,_#022c22_0%,_#052e16_55%,_#022c22_100%)] dark:text-slate-100">
+      <div className="student-dashboard-app min-h-screen bg-[radial-gradient(circle_at_8%_12%,_rgba(59,130,246,0.16),_transparent_30%),radial-gradient(circle_at_92%_16%,_rgba(239,68,68,0.14),_transparent_28%),radial-gradient(circle_at_50%_98%,_rgba(234,179,8,0.16),_transparent_26%),linear-gradient(180deg,_#f8fafc_0%,_#f0fdf4_45%,_#fefce8_100%)] text-slate-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(30,58,138,0.45),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(127,29,29,0.35),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#052e16_55%,_#1f2937_100%)] dark:text-slate-100">
         {sidebarOpen && (
           <button
             type="button"

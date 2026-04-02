@@ -28,6 +28,21 @@ export default function Login() {
   signInWithTokenRef.current = signInWithToken
   const accountProviderLabel = backendProvider === 'rest' ? 'your connected account' : 'your account'
 
+  function normalizeLoginErrorMessage(message: string) {
+    const text = message.toLowerCase()
+    const isCredentialProblem = text.includes('invalid login credentials')
+      || text.includes('invalid credentials')
+      || text.includes('profile not found')
+      || text.includes('invalid or expired token')
+      || text.includes('unable to load the current profile')
+
+    if (isCredentialProblem) {
+      return 'Invalid credentials.'
+    }
+
+    return message
+  }
+
   useEffect(() => {
     if (backendProvider !== 'rest' || configError) {
       setOidcAvailable(false)
@@ -128,8 +143,8 @@ export default function Login() {
       const user = await signIn(identifier, password)
       navigate(user.role === 'admin' ? '/admin' : '/student', { replace: true })
     } catch (signInError) {
-      const nextError = signInError instanceof Error ? signInError.message : 'Unable to sign in'
-      setError(nextError)
+      const nextError = signInError instanceof Error ? signInError.message : 'Invalid credentials.'
+      setError(normalizeLoginErrorMessage(nextError))
     } finally {
       setLoading(false)
     }
@@ -178,21 +193,23 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(187,247,208,0.75),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(254,249,195,0.75),_transparent_24%),linear-gradient(180deg,_#f0fdf4_0%,_#ecfdf5_40%,_#f7fee7_100%)] px-4 py-8 text-emerald-950 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.2),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(250,204,21,0.12),_transparent_18%),linear-gradient(180deg,_#020617_0%,_#052e16_52%,_#111827_100%)] dark:text-emerald-50 sm:px-6 lg:px-8">
       <style>{`
-        @keyframes login-ribbon-move {
-          0% { background-position: 0% 50%; }
-          100% { background-position: 200% 50%; }
+        @keyframes login-ribbon-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
         .login-ribbon-border {
           position: relative;
+          border-radius: 1.6rem;
+          padding: 2px;
+          overflow: hidden;
         }
         .login-ribbon-border::before {
           content: '';
           position: absolute;
-          inset: -2px;
+          inset: -120%;
           border-radius: 1.6rem;
-          background: linear-gradient(90deg, #22c55e 0%, #10b981 25%, #34d399 50%, #10b981 75%, #22c55e 100%);
-          background-size: 200% 100%;
-          animation: login-ribbon-move 2.6s linear infinite;
+          background: conic-gradient(from 0deg, #2563eb 0deg, #dc2626 120deg, #eab308 240deg, #2563eb 360deg);
+          animation: login-ribbon-spin 3s linear infinite;
           z-index: 0;
           opacity: 0.95;
         }
@@ -220,7 +237,7 @@ export default function Login() {
             <img
               src={institutionLogo}
               alt={`${institutionName} logo`}
-              className="h-40 w-40 object-contain sm:h-48 sm:w-48"
+              className="h-40 w-40 rounded-full border-4 border-white object-cover shadow-lg sm:h-48 sm:w-48"
               draggable={false}
             />
             <h1 className="mt-3 text-2xl font-bold text-emerald-700 dark:text-emerald-400 sm:text-3xl">

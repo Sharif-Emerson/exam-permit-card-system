@@ -184,7 +184,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
           </div>
           <div className="text-center mb-6 sm:mb-8 border-b border-slate-200 pb-5 print:hidden">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-600 mb-2">Official Examination Access Card</p>
-            {logo && <img src={logo} alt="Permit Logo" className="h-12 mx-auto mb-2" />}
+            {logo && <img src={logo} alt="Permit Logo" className="h-12 w-12 rounded-full border border-white/80 object-cover mx-auto mb-2" />}
             <div className="text-2xl sm:text-3xl font-bold text-emerald-700">{name}</div>
           </div>
 
@@ -197,7 +197,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
             }}
           >
             <div className="flex flex-col items-center gap-2">
-              {logo && <img src={logo} alt="Permit Logo" className="h-14 w-14 object-contain" draggable={false} />}
+              {logo && <img src={logo} alt="Permit Logo" className="h-14 w-14 rounded-full border border-white/80 object-cover" draggable={false} />}
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-slate-800">Official Examination Permit</p>
                 <p className="mt-0.5 text-sm font-bold text-slate-900">{name}</p>

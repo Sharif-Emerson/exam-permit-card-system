@@ -35,7 +35,7 @@ type ImportPreviewRow = {
   reason?: string
   studentName?: string
 }
-type NavSection = 'dashboard' | 'students' | 'support' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'assistants' | 'settings'
+type NavSection = 'dashboard' | 'students' | 'dustbin' | 'support' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'assistants' | 'settings'
 type BulkImportSubSection = 'financial' | 'student_accounts' | 'api'
 
 type AdminPermitDesignFields = {
@@ -228,6 +228,10 @@ function getAdminSections(permissions: Set<AdminPermission>): NavSection[] {
 
   if (permissions.has('view_students')) {
     sections.add('students')
+  }
+
+  if (permissions.has('manage_student_profiles')) {
+    sections.add('dustbin')
   }
 
   if (permissions.has('view_audit_logs')) {
@@ -2476,6 +2480,7 @@ export default function AdminPanel() {
   const navItems: { id: string; key: NavSection; label: string; icon: ReactNode; badge?: number }[] = [
     { id: 'dashboard', key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'students', key: 'students', label: 'Students', icon: <Users className="w-5 h-5" />, badge: outstandingStudents > 0 ? outstandingStudents : undefined },
+    { id: 'dustbin', key: 'dustbin', label: 'General Dustbin', icon: <Trash2 className="w-5 h-5" />, badge: trashedStudents.length > 0 ? trashedStudents.length : undefined },
     { id: 'support-requests', key: 'support', label: 'Support Requests', icon: <Bell className="w-5 h-5" />, badge: openSupportRequestCount > 0 ? openSupportRequestCount : undefined },
     { id: 'sub-admins', key: 'assistants', label: 'Sub-Admins', icon: <Shield className="w-5 h-5" /> },
     { id: 'permit-activity', key: 'permits', label: 'Permit Activity', icon: <FileCheck className="w-5 h-5" />, badge: permitEventCount > 0 ? permitEventCount : undefined },
@@ -2662,7 +2667,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      <div className="admin-theme-shell flex h-screen overflow-hidden bg-gray-50 text-gray-900 dark:bg-slate-950 dark:text-slate-100">
+      <div className="admin-theme-shell flex h-screen overflow-hidden bg-[radial-gradient(circle_at_10%_15%,_rgba(59,130,246,0.16),_transparent_34%),radial-gradient(circle_at_90%_18%,_rgba(239,68,68,0.13),_transparent_30%),radial-gradient(circle_at_50%_100%,_rgba(234,179,8,0.16),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#f1f5f9_100%)] text-gray-900 dark:bg-slate-950 dark:text-slate-100">
 
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
@@ -3767,6 +3772,104 @@ export default function AdminPanel() {
                       ))}
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'dustbin' && (
+              <div className="space-y-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h1 className="text-xl font-bold text-gray-900">General Dustbin</h1>
+                    <p className="text-sm text-gray-500">Deleted records are retained for a limited period and can be restored or permanently removed.</p>
+                  </div>
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+                    Student records in trash: {trashedStudents.length}
+                  </span>
+                </div>
+
+                <div className="rounded-xl border border-amber-200 bg-white shadow-sm">
+                  <div className="border-b border-amber-100 px-5 py-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h2 className="font-semibold text-gray-800">Deleted Student Records</h2>
+                        <p className="text-xs text-gray-400">Records auto-purge on their retention date unless restored first.</p>
+                      </div>
+                      {canManageStudentProfiles && trashedStudents.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={handlePurgeEntireTrash}
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-800 hover:bg-red-100"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Empty dustbin permanently
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  {trashedStudents.length === 0 ? (
+                    <div className="px-5 py-8 text-sm text-gray-400">No deleted student records are waiting in the dustbin.</div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {trashedStudents.map((student) => (
+                        <div key={student.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="font-medium text-gray-900">{student.name}</p>
+                            <p className="text-xs text-gray-400">{student.studentId ?? 'No registration number'} · {student.email}</p>
+                            {(() => {
+                              const daysUntilPurge = getDaysUntilDate(student.purgeAfterAt)
+
+                              return (
+                                <p className="mt-1 text-xs text-gray-500">
+                                  Deleted {new Date(student.deletedAt).toLocaleString()} · auto-purge {new Date(student.purgeAfterAt).toLocaleDateString()}
+                                  {daysUntilPurge !== null ? ` • ${daysUntilPurge} day${daysUntilPurge === 1 ? '' : 's'} left` : ''}
+                                </p>
+                              )
+                            })()}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={!canManageStudentProfiles || restoringStudentId === student.id}
+                              onClick={() => handleRestoreStudentProfile(student)}
+                              className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                            >
+                              <RefreshCcw className="h-4 w-4" />
+                              {restoringStudentId === student.id ? 'Restoring…' : 'Restore'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!canManageStudentProfiles}
+                              onClick={() => handlePermanentTrashRow(student)}
+                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete forever
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-blue-200 bg-white shadow-sm">
+                  <div className="border-b border-blue-100 px-5 py-4">
+                    <h2 className="font-semibold text-gray-800">Permit Activity Cleanup</h2>
+                    <p className="text-xs text-gray-400">Permit print/download logs can be permanently cleared from here.</p>
+                  </div>
+                  <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-gray-600">Current permit activity rows on this page: {permitActivityLogs.length}</p>
+                    <button
+                      type="button"
+                      onClick={handleRequestPurgePermitActivity}
+                      disabled={!canDeleteAuditLogs || permitActivityLogs.length === 0}
+                      className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Clear permit activity permanently
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
