@@ -18,7 +18,7 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate, downloadStudentAccountsImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, applyStudentAccountsImport, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, previewStudentAccountsImport, purgePermitActivityLogs, restoreStudentProfile, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById } from '../services/profileService'
+import { adminUpdateStudentProfile, applyStudentAccountsImport, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, previewStudentAccountsImport, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById } from '../services/profileService'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
 import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AssistantAdminAccount, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline } from '../types'
 import type { StudentProvisionPreviewRow } from '../adapters/data/types'
@@ -119,6 +119,10 @@ type AssistantAdminDraft = {
   email: string
   phoneNumber: string
   password: string
+  role: AssistantAdminRole
+  departments: string[]
+}
+type AssistantAdminEditDraft = {
   role: AssistantAdminRole
   departments: string[]
 }
@@ -607,11 +611,17 @@ export default function AdminPanel() {
   const [assistantAdmins, setAssistantAdmins] = useState<AssistantAdminAccount[]>([])
   const [assistantAdminsLoading, setAssistantAdminsLoading] = useState(false)
   const [assistantAdminsSaving, setAssistantAdminsSaving] = useState(false)
+  const [assistantAdminEditingId, setAssistantAdminEditingId] = useState('')
+  const [assistantAdminUpdatingId, setAssistantAdminUpdatingId] = useState<string | null>(null)
   const [assistantAdminDraft, setAssistantAdminDraft] = useState<AssistantAdminDraft>({
     name: '',
     email: '',
     phoneNumber: '',
     password: '',
+    role: 'department_prints',
+    departments: [],
+  })
+  const [assistantAdminEditDraft, setAssistantAdminEditDraft] = useState<AssistantAdminEditDraft>({
     role: 'department_prints',
     departments: [],
   })
@@ -728,6 +738,49 @@ export default function AdminPanel() {
       setError(nextError)
     } finally {
       setAssistantAdminsSaving(false)
+    }
+  }
+
+  function handleStartAssistantEdit(assistant: AssistantAdminAccount) {
+    setAssistantAdminEditingId(assistant.id)
+    setAssistantAdminEditDraft({
+      role: assistant.role,
+      departments: assistant.departments,
+    })
+  }
+
+  function handleCancelAssistantEdit() {
+    setAssistantAdminEditingId('')
+    setAssistantAdminEditDraft({ role: 'department_prints', departments: [] })
+  }
+
+  async function handleSaveAssistantEdit(assistantId: string) {
+    if (!canManageAssistantAdmins) {
+      setError('Only super admin can update assistant admins.')
+      return
+    }
+
+    const normalizedDepartments = assistantAdminEditDraft.departments.map((value) => value.trim()).filter(Boolean)
+    if (assistantAdminEditDraft.role === 'department_prints' && normalizedDepartments.length === 0) {
+      setError('Assign at least one department for department print assistants.')
+      return
+    }
+
+    try {
+      setAssistantAdminUpdatingId(assistantId)
+      setError('')
+      await updateAssistantAdmin(assistantId, {
+        role: assistantAdminEditDraft.role,
+        departments: assistantAdminEditDraft.role === 'department_prints' ? normalizedDepartments : [],
+      })
+      await loadAssistantAdmins({ silent: true })
+      handleCancelAssistantEdit()
+      setSuccessMessage('Assistant admin updated successfully.')
+    } catch (updateError) {
+      const nextError = updateError instanceof Error ? updateError.message : 'Unable to update assistant admin.'
+      setError(nextError)
+    } finally {
+      setAssistantAdminUpdatingId(null)
     }
   }
 
@@ -3856,13 +3909,88 @@ export default function AdminPanel() {
                             <div key={assistant.id} className="rounded-lg border border-gray-200 px-4 py-3">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <p className="text-sm font-semibold text-gray-800">{assistant.name}</p>
-                                <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600">
-                                  {assistant.role === 'support_help' ? 'Support and Help' : 'Department Prints'}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600">
+                                    {assistant.role === 'support_help' ? 'Support and Help' : 'Department Prints'}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartAssistantEdit(assistant)}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                    Edit
+                                  </button>
+                                </div>
                               </div>
                               <p className="mt-1 text-xs text-gray-500">{assistant.email}{assistant.phoneNumber ? ` • ${assistant.phoneNumber}` : ''}</p>
                               {assistant.role === 'department_prints' && (
                                 <p className="mt-1 text-xs text-gray-500">Departments: {assistant.departments.length > 0 ? assistant.departments.join(', ') : 'None assigned'}</p>
+                              )}
+
+                              {assistantAdminEditingId === assistant.id && (
+                                <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                      <label htmlFor={`assistant-edit-role-${assistant.id}`} className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Role</label>
+                                      <select
+                                        id={`assistant-edit-role-${assistant.id}`}
+                                        value={assistantAdminEditDraft.role}
+                                        onChange={(event) => {
+                                          const nextRole = event.target.value === 'support_help' ? 'support_help' : 'department_prints'
+                                          setAssistantAdminEditDraft((current) => ({
+                                            ...current,
+                                            role: nextRole,
+                                            departments: nextRole === 'department_prints' ? current.departments : [],
+                                          }))
+                                        }}
+                                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                      >
+                                        <option value="department_prints">Department Prints</option>
+                                        <option value="support_help">Support and Help</option>
+                                      </select>
+                                    </div>
+
+                                    {assistantAdminEditDraft.role === 'department_prints' && (
+                                      <div>
+                                        <label htmlFor={`assistant-edit-departments-${assistant.id}`} className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Departments</label>
+                                        <select
+                                          id={`assistant-edit-departments-${assistant.id}`}
+                                          multiple
+                                          value={assistantAdminEditDraft.departments}
+                                          onChange={(event) => {
+                                            const selected = Array.from(event.target.selectedOptions).map((option) => option.value)
+                                            setAssistantAdminEditDraft((current) => ({ ...current, departments: selected }))
+                                          }}
+                                          className="h-28 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        >
+                                          {KIU_DEPARTMENTS.map((department) => (
+                                            <option key={department} value={department}>{department}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="mt-3 flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleSaveAssistantEdit(assistant.id)}
+                                      disabled={assistantAdminUpdatingId === assistant.id}
+                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                                    >
+                                      <Save className="h-3.5 w-3.5" />
+                                      {assistantAdminUpdatingId === assistant.id ? 'Saving...' : 'Save'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleCancelAssistantEdit}
+                                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
                               )}
                             </div>
                           ))}
