@@ -527,6 +527,7 @@ export default function AdminPanel() {
   }, [canManageFinancials, canManageStudentProfiles])
   const canDeleteAuditLogs = Boolean(user?.role === 'admin' && user.permissions?.includes('write_audit_logs'))
   const canAccessReports = adminCapability.sections.includes('reports')
+  const showAssistantAdminPanel = user?.role === 'admin'
   const canManageAssistantAdmins = user?.role === 'admin' && user.scope === 'super-admin'
   const [students, setStudents] = useState<StudentProfile[]>([])
   // Ref for search input (no focus logic)
@@ -3779,11 +3780,16 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
-                {canManageAssistantAdmins && (
+                {showAssistantAdminPanel && (
                   <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                     <div className="border-b border-gray-100 px-6 py-4">
                       <h2 className="font-semibold text-gray-800">Assistant Admin Delegation</h2>
                       <p className="mt-1 text-xs text-gray-400">Create sub-admin accounts for support/help and department-based permit printing.</p>
+                      {!canManageAssistantAdmins && (
+                        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          Only the super admin account can create or edit sub-admin accounts. Sign in with the main admin account to manage this area.
+                        </p>
+                      )}
                     </div>
                     <form className="space-y-4 border-b border-gray-100 px-6 py-5" onSubmit={(event) => void handleCreateAssistantAdmin(event)}>
                       <div className="grid gap-4 sm:grid-cols-2">
@@ -3795,6 +3801,7 @@ export default function AdminPanel() {
                             required
                             minLength={2}
                             maxLength={120}
+                            disabled={!canManageAssistantAdmins}
                             value={assistantAdminDraft.name}
                             onChange={(event) => setAssistantAdminDraft((current) => ({ ...current, name: event.target.value }))}
                             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
@@ -3806,6 +3813,7 @@ export default function AdminPanel() {
                             id="assistant-admin-email"
                             type="email"
                             required
+                            disabled={!canManageAssistantAdmins}
                             value={assistantAdminDraft.email}
                             onChange={(event) => setAssistantAdminDraft((current) => ({ ...current, email: event.target.value }))}
                             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
@@ -3816,6 +3824,7 @@ export default function AdminPanel() {
                           <input
                             id="assistant-admin-phone"
                             type="tel"
+                            disabled={!canManageAssistantAdmins}
                             value={assistantAdminDraft.phoneNumber}
                             onChange={(event) => setAssistantAdminDraft((current) => ({ ...current, phoneNumber: event.target.value }))}
                             placeholder="e.g. +256700123456"
@@ -3830,6 +3839,7 @@ export default function AdminPanel() {
                             required
                             minLength={8}
                             maxLength={128}
+                            disabled={!canManageAssistantAdmins}
                             value={assistantAdminDraft.password}
                             onChange={(event) => setAssistantAdminDraft((current) => ({ ...current, password: event.target.value }))}
                             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
@@ -3839,6 +3849,7 @@ export default function AdminPanel() {
                           <label htmlFor="assistant-admin-role" className="mb-2 block text-sm font-medium text-gray-700">Assistant role</label>
                           <select
                             id="assistant-admin-role"
+                            disabled={!canManageAssistantAdmins}
                             value={assistantAdminDraft.role}
                             onChange={(event) => {
                               const nextRole = event.target.value === 'support_help' ? 'support_help' : 'department_prints'
@@ -3860,6 +3871,7 @@ export default function AdminPanel() {
                             <select
                               id="assistant-admin-departments"
                               multiple
+                              disabled={!canManageAssistantAdmins}
                               value={assistantAdminDraft.departments}
                               onChange={(event) => {
                                 const selected = Array.from(event.target.selectedOptions).map((option) => option.value)
@@ -3877,7 +3889,7 @@ export default function AdminPanel() {
                       </div>
                       <button
                         type="submit"
-                        disabled={assistantAdminsSaving}
+                        disabled={assistantAdminsSaving || !canManageAssistantAdmins}
                         className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         <Users className="h-4 w-4" />
@@ -3891,7 +3903,7 @@ export default function AdminPanel() {
                         <button
                           type="button"
                           onClick={() => void loadAssistantAdmins()}
-                          disabled={assistantAdminsLoading}
+                          disabled={assistantAdminsLoading || !canManageAssistantAdmins}
                           className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                         >
                           <RefreshCcw className={`h-3.5 w-3.5 ${assistantAdminsLoading ? 'animate-spin' : ''}`} />
@@ -3899,11 +3911,15 @@ export default function AdminPanel() {
                         </button>
                       </div>
 
-                      {assistantAdmins.length === 0 && !assistantAdminsLoading && (
+                      {!canManageAssistantAdmins && (
+                        <p className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500">Sign in as `admin@example.com` to view and manage existing sub-admin accounts.</p>
+                      )}
+
+                      {canManageAssistantAdmins && assistantAdmins.length === 0 && !assistantAdminsLoading && (
                         <p className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500">No sub-admin accounts created yet.</p>
                       )}
 
-                      {assistantAdmins.length > 0 && (
+                      {canManageAssistantAdmins && assistantAdmins.length > 0 && (
                         <div className="space-y-2">
                           {assistantAdmins.map((assistant) => (
                             <div key={assistant.id} className="rounded-lg border border-gray-200 px-4 py-3">
