@@ -18,7 +18,8 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail } from '../services/profileService'
+import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync } from '../services/profileService'
+import type { SisStatus, SisSyncResult } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
 import type { FaqItem } from './faqStorage'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
@@ -622,6 +623,9 @@ export default function AdminPanel() {
   const [emailTestRecipient, setEmailTestRecipient] = useState('')
   const [emailTestSending, setEmailTestSending] = useState(false)
   const [emailTestResult, setEmailTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [sisStatus, setSisStatus] = useState<SisStatus | null>(null)
+  const [sisSyncing, setSisSyncing] = useState(false)
+  const [sisSyncResult, setSisSyncResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [faqDraft, setFaqDraft] = useState<FaqItem[]>(() => loadFaqs())
   const [faqSaved, setFaqSaved] = useState(false)
   const [assistantAdmins, setAssistantAdmins] = useState<AssistantAdminAccount[]>([])
@@ -1315,6 +1319,11 @@ export default function AdminPanel() {
     void fetchEmailStatus()
       .then((status) => setEmailStatus(status))
       .catch(() => setEmailStatus(null))
+
+    // Load SIS status from backend
+    void fetchSisStatus()
+      .then((status) => setSisStatus(status))
+      .catch(() => setSisStatus(null))
   }, [activeSection, canManageAssistantAdmins, loadAssistantAdmins])
 
   useEffect(() => {
@@ -4486,16 +4495,78 @@ export default function AdminPanel() {
                         Use <code className="rounded bg-gray-100 px-1 text-xs">password</code> (8–128 characters) or, instead of <code className="rounded bg-gray-100 px-1 text-xs">password</code>, a <code className="rounded bg-gray-100 px-1 text-xs">password_hash</code> string beginning with <code className="rounded bg-gray-100 px-1 text-xs">scrypt:</code>.
                       </p>
                     </div>
-                    <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-900">
-                      <p className="font-semibold">SIS connector setup (ready for your endpoint)</p>
-                      <p className="mt-1">
-                        The backend now supports staged SIS configuration through environment variables:
-                        <code className="mx-1 rounded bg-white px-1">SIS_BASE_URL</code>,
-                        <code className="mx-1 rounded bg-white px-1">SIS_STUDENTS_PATH</code>,
-                        <code className="mx-1 rounded bg-white px-1">SIS_AUTH_TYPE</code>, and
-                        <code className="mx-1 rounded bg-white px-1">SIS_API_KEY</code>.
-                        Health endpoints are available at <code className="mx-1 rounded bg-white px-1">GET /sis/status</code> and <code className="mx-1 rounded bg-white px-1">POST /sis/sync</code>.
-                      </p>
+                    <div className="rounded-lg border border-blue-100 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/30 p-4 space-y-3">
+                      <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div>
+                          <p className="font-semibold text-sm text-blue-900 dark:text-blue-200">SIS Connector</p>
+                          {sisStatus ? (
+                            <span className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-semibold ${
+                              sisStatus.enabled
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
+                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'
+                            }`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${sisStatus.enabled ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                              {sisStatus.enabled ? 'Connected' : 'Not configured'}
+                            </span>
+                          ) : (
+                            <span className="mt-1 inline-block text-xs text-blue-500 dark:text-blue-400">Checking status…</span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={sisSyncing}
+                          onClick={async () => {
+                            setSisSyncing(true)
+                            setSisSyncResult(null)
+                            try {
+                              const result: SisSyncResult = await triggerSisSync()
+                              setSisSyncResult({ ok: true, message: result.message })
+                              // Refresh status after sync
+                              void fetchSisStatus().then(setSisStatus).catch(() => null)
+                            } catch (err) {
+                              setSisSyncResult({ ok: false, message: err instanceof Error ? err.message : 'Sync failed.' })
+                            } finally {
+                              setSisSyncing(false)
+                            }
+                          }}
+                          className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold text-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                            sisSyncing
+                              ? 'cursor-not-allowed bg-blue-400'
+                              : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                          }`}
+                        >
+                          {sisSyncing ? (
+                            <>
+                              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                              Syncing…
+                            </>
+                          ) : (
+                            'Sync from SIS'
+                          )}
+                        </button>
+                      </div>
+                      {sisStatus && (
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-blue-800 dark:text-blue-300">
+                          {sisStatus.baseUrl && <span>URL: <strong>{sisStatus.baseUrl}</strong></span>}
+                          <span>Auth: <strong>{sisStatus.authType}</strong></span>
+                          <span>Path: <strong>{sisStatus.studentsPath}</strong></span>
+                          <span>Key: <strong>{sisStatus.hasApiKey ? 'set' : 'missing'}</strong></span>
+                        </div>
+                      )}
+                      {sisSyncResult && (
+                        <p className={`text-xs rounded px-2 py-1 ${
+                          sisSyncResult.ok
+                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                            : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                        }`}>
+                          {sisSyncResult.message}
+                        </p>
+                      )}
+                      {!sisStatus?.enabled && (
+                        <p className="text-xs text-blue-700 dark:text-blue-400">
+                          Set <code className="rounded bg-white dark:bg-slate-800 px-1">SIS_BASE_URL</code> and <code className="rounded bg-white dark:bg-slate-800 px-1">SIS_API_KEY</code> in your backend <code className="rounded bg-white dark:bg-slate-800 px-1">.env</code> to activate pull sync.
+                        </p>
+                      )}
                     </div>
                     <h2 className="pt-2 text-lg font-semibold text-gray-900">University sign-in (OIDC)</h2>
                     <p className="text-sm text-gray-600">

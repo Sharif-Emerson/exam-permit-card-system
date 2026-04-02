@@ -1,6 +1,6 @@
 import { activeDataAdapter } from '../adapters/data'
-import { fetchEmailStatus as _fetchEmailStatus, sendTestEmail as _sendTestEmail } from '../adapters/data/restDataAdapter'
-import type { EmailStatus } from '../adapters/data/restDataAdapter'
+import { fetchEmailStatus as _fetchEmailStatus, sendTestEmail as _sendTestEmail, fetchSisStatus as _fetchSisStatus, triggerSisSync as _triggerSisSync } from '../adapters/data/restDataAdapter'
+import type { EmailStatus, SisStatus, SisSyncResult } from '../adapters/data/restDataAdapter'
 import type { FinancialUpdateValues, StudentAccountsImportApplyResult, StudentProvisionPreviewRow } from '../adapters/data/types'
 import type {
   AssistantAdminAccount,
@@ -207,7 +207,7 @@ export async function updateSemesterRegistration(id: string, values: { status: '
   return activeDataAdapter.updateSemesterRegistration(id, values)
 }
 
-export type { EmailStatus }
+export type { EmailStatus, SisStatus, SisSyncResult }
 
 export async function fetchEmailStatus(): Promise<EmailStatus> {
   return _fetchEmailStatus()
@@ -215,4 +215,12 @@ export async function fetchEmailStatus(): Promise<EmailStatus> {
 
 export async function sendTestEmail(to: string): Promise<{ success: boolean; message: string }> {
   return _sendTestEmail(to)
+}
+
+export async function fetchSisStatus(): Promise<SisStatus> {
+  return _fetchSisStatus()
+}
+
+export async function triggerSisSync(): Promise<SisSyncResult> {
+  return _triggerSisSync()
 }

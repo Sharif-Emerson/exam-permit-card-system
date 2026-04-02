@@ -840,6 +840,20 @@ export const restDataAdapter: DataAdapter = {
   },
 }
 
+export type SisStatus = { enabled: boolean; provider: string; baseUrl: string | null; studentsPath: string; authType: string; hasApiKey: boolean; timeoutMs: number; message: string }
+
+export type SisSyncResult = { message: string; preview?: { ok: boolean; status: number | null; sampleCount: number; message: string } }
+
+export async function fetchSisStatus(): Promise<SisStatus> {
+  const payload = await request('/sis/status')
+  return payload as SisStatus
+}
+
+export async function triggerSisSync(): Promise<SisSyncResult> {
+  const payload = await request('/sis/sync', { method: 'POST' })
+  return payload as SisSyncResult
+}
+
 export type EmailStatus = { configured: boolean; provider: string; from: string; host: string | null }
 
 export async function fetchEmailStatus(): Promise<EmailStatus> {
