@@ -3062,10 +3062,10 @@ export default function AdminPanel() {
                     <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
                     <p className="text-sm text-gray-500">Operational overview for {adminCapability.label.toLowerCase()}.</p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Real-time refresh every 30s</span>
-                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Session timeout after 15 min inactivity</span>
-                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Last sync: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : 'Waiting'}</span>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                    <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-blue-700 shadow-sm shadow-blue-100/70">Real-time refresh every 30s</span>
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-amber-700 shadow-sm shadow-amber-100/70">Session timeout after 15 min inactivity</span>
+                    <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-rose-700 shadow-sm shadow-rose-100/70">Last sync: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : 'Waiting'}</span>
                   </div>
                 </div>
 
@@ -3129,7 +3129,7 @@ export default function AdminPanel() {
                       <h2 className="font-semibold text-gray-900">Quick Actions</h2>
                       <p className="text-sm text-gray-500">High-frequency actions for permit operations, reporting, and alerts.</p>
                     </div>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">Access scope: {adminCapability.label}</span>
+                    <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 shadow-sm shadow-blue-100/70">Access scope: {adminCapability.label}</span>
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {quickActions.map((action) => (
@@ -3154,7 +3154,7 @@ export default function AdminPanel() {
                 {/* Analytics cards */}
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-8">
                   {/* --- People counts --- */}
-                  <div className="col-span-2 sm:col-span-2 rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
+                  <div className="col-span-2 sm:col-span-2 rounded-xl border border-blue-300 bg-[linear-gradient(145deg,_rgba(219,234,254,0.95),_rgba(239,246,255,0.92))] p-5 shadow-sm shadow-blue-200/60">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Students</p>
                       <Users className="h-5 w-5 text-blue-500" />
@@ -3166,7 +3166,7 @@ export default function AdminPanel() {
                     </div>
                     <p className="mt-0.5 text-[10px] text-blue-400">enrolled student accounts</p>
                   </div>
-                  <div className="col-span-2 sm:col-span-2 rounded-xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm">
+                  <div className="col-span-2 sm:col-span-2 rounded-xl border border-indigo-300 bg-[linear-gradient(145deg,_rgba(224,231,255,0.95),_rgba(238,242,255,0.92))] p-5 shadow-sm shadow-indigo-200/60">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Administrators</p>
                       <Shield className="h-5 w-5 text-indigo-500" />
@@ -3179,7 +3179,7 @@ export default function AdminPanel() {
                     <p className="mt-0.5 text-[10px] text-indigo-400">active admin accounts</p>
                   </div>
                   {/* --- Permit stats --- */}
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+                  <div className="rounded-xl border border-emerald-200 bg-[linear-gradient(145deg,_rgba(209,250,229,0.95),_rgba(236,253,245,0.92))] p-5 shadow-sm shadow-emerald-200/60">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Cleared</p>
                       <CheckCircle2 className="h-5 w-5 text-emerald-400" />
@@ -3187,7 +3187,7 @@ export default function AdminPanel() {
                     <p className="mt-2 text-3xl font-bold text-emerald-700">{clearedStudents}</p>
                     <p className="mt-1 text-xs text-emerald-400">fees fully paid</p>
                   </div>
-                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
+                  <div className="rounded-xl border border-amber-200 bg-[linear-gradient(145deg,_rgba(254,243,199,0.95),_rgba(255,251,235,0.92))] p-5 shadow-sm shadow-amber-200/60">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-wide text-amber-500">Outstanding</p>
                       <FileSpreadsheet className="h-5 w-5 text-amber-400" />
@@ -3195,7 +3195,7 @@ export default function AdminPanel() {
                     <p className="mt-2 text-3xl font-bold text-amber-700">{outstandingStudents}</p>
                     <p className="mt-1 text-xs text-amber-400">balance remaining</p>
                   </div>
-                  <div className="rounded-xl border border-purple-100 bg-purple-50 p-5 shadow-sm">
+                  <div className="rounded-xl border border-purple-200 bg-[linear-gradient(145deg,_rgba(243,232,255,0.95),_rgba(250,245,255,0.92))] p-5 shadow-sm shadow-purple-200/60">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-wide text-purple-500">Permit Events</p>
                       <FileCheck className="h-5 w-5 text-purple-400" />
@@ -3203,7 +3203,7 @@ export default function AdminPanel() {
                     <p className="mt-2 text-3xl font-bold text-purple-700">{permitEventCount}</p>
                     <p className="mt-1 text-xs text-purple-400">prints &amp; downloads</p>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+                  <div className="rounded-xl border border-slate-300 bg-[linear-gradient(145deg,_rgba(241,245,249,0.95),_rgba(248,250,252,0.92))] p-5 shadow-sm shadow-slate-200/60">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issued</p>
                       <CreditCard className="h-5 w-5 text-slate-400" />
@@ -3211,7 +3211,7 @@ export default function AdminPanel() {
                     <p className="mt-2 text-3xl font-bold text-slate-800">{permitStatusCounts.issued}</p>
                     <p className="mt-1 text-xs text-slate-500">active permits</p>
                   </div>
-                  <div className="rounded-xl border border-rose-100 bg-rose-50 p-5 shadow-sm">
+                  <div className="rounded-xl border border-rose-200 bg-[linear-gradient(145deg,_rgba(255,228,230,0.95),_rgba(255,241,242,0.92))] p-5 shadow-sm shadow-rose-200/60">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">Expired</p>
                       <Shield className="h-5 w-5 text-rose-400" />
@@ -3437,7 +3437,7 @@ export default function AdminPanel() {
                         key={item.id}
                         type="button"
                         onClick={() => setActiveSection(item.key)}
-                        className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-emerald-300 hover:bg-emerald-50"
+                        className="flex flex-col items-center gap-2 rounded-xl border border-yellow-200 bg-[linear-gradient(145deg,_rgba(255,255,255,0.94),_rgba(254,249,195,0.7))] p-5 shadow-sm shadow-yellow-100/70 transition-colors hover:border-emerald-300 hover:bg-emerald-50"
                       >
                         <span className="text-emerald-600">{item.icon}</span>
                         <span className="text-xs font-medium text-gray-700">{item.label}</span>

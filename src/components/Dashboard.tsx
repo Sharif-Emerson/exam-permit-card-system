@@ -1385,7 +1385,7 @@ export default function Dashboard() {
         )}
 
         <div className="flex min-h-screen">
-          <aside className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-white/60 bg-white/85 px-4 py-5 shadow-2xl shadow-slate-200/60 backdrop-blur-xl transition-transform duration-300 dark:border-slate-800 dark:bg-slate-950/85 dark:shadow-none lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <aside className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-sky-200/70 bg-[linear-gradient(180deg,_rgba(239,246,255,0.95),_rgba(240,253,250,0.94)_52%,_rgba(254,252,232,0.92))] px-4 py-5 shadow-2xl shadow-sky-200/55 backdrop-blur-xl transition-transform duration-300 dark:border-slate-800 dark:bg-slate-950/85 dark:shadow-none lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
             <div className="flex items-center justify-between px-2 pb-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.35em] text-green-600 dark:text-green-300">Student Exam Permit Portal</p>
@@ -1434,8 +1434,8 @@ export default function Dashboard() {
                         setSidebarOpen(false)
                       }}
                       className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all ${activeSection === item.key
-                        ? 'bg-slate-900 text-white shadow-lg shadow-slate-300/60 dark:bg-emerald-500 dark:text-slate-950 dark:shadow-none'
-                        : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white'}`}
+                        ? 'bg-[linear-gradient(135deg,_#1d4ed8,_#0f766e,_#ca8a04)] text-white shadow-lg shadow-sky-300/60 dark:bg-emerald-500 dark:text-slate-950 dark:shadow-none'
+                        : 'text-slate-700 hover:bg-white/85 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white'}`}
                     >
                       {item.icon}
                       <span className="flex-1 text-left">{item.label}</span>
@@ -1464,7 +1464,7 @@ export default function Dashboard() {
           </aside>
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <header className="sticky top-0 z-20 border-b border-white/70 bg-white/75 px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/75 sm:px-6 lg:px-8">
+            <header className="sticky top-0 z-20 border-b border-sky-100/80 bg-[linear-gradient(90deg,_rgba(255,255,255,0.82),_rgba(239,246,255,0.78),_rgba(254,252,232,0.75))] px-4 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/75 sm:px-6 lg:px-8">
               <div className="flex flex-wrap items-center gap-3 lg:gap-4">
                 <button
                   type="button"
@@ -1568,7 +1568,7 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                <div className="ml-auto flex items-center gap-3 rounded-full border border-white/70 bg-white/90 px-3 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-900/90">
+                <div className="ml-auto flex items-center gap-3 rounded-full border border-sky-100/80 bg-[linear-gradient(135deg,_rgba(255,255,255,0.95),_rgba(239,246,255,0.92))] px-3 py-2 shadow-sm shadow-sky-100/70 dark:border-slate-700 dark:bg-slate-900/90">
                   <img
                     src={profileImage}
                     alt={`${studentData.name} avatar`}
@@ -1654,20 +1654,20 @@ export default function Dashboard() {
                   </div>
 
                   <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
+                    <div className="rounded-3xl border border-sky-100 bg-sky-50/90 p-4 shadow-sm shadow-sky-100/70 dark:border-slate-800 dark:bg-slate-900/70">
                       <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Student ID</p>
                       <p className="mt-3 text-lg font-semibold">{studentData.studentId}</p>
                     </div>
-                    <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
+                    <div className="rounded-3xl border border-emerald-100 bg-emerald-50/90 p-4 shadow-sm shadow-emerald-100/70 dark:border-slate-800 dark:bg-slate-900/70">
                       <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Permit Courses</p>
                       <p className="mt-3 text-lg font-semibold">{studentData.courseUnits?.length || 0} Registered Units</p>
                       <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">View codes in permit preview</p>
                     </div>
-                    <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
+                    <div className="rounded-3xl border border-amber-100 bg-amber-50/90 p-4 shadow-sm shadow-amber-100/70 dark:border-slate-800 dark:bg-slate-900/70">
                       <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Year / Semester</p>
                       <p className="mt-3 text-lg font-semibold">{studentData.semester || currentSession}</p>
                     </div>
-                    <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900/70">
+                    <div className="rounded-3xl border border-rose-100 bg-rose-50/90 p-4 shadow-sm shadow-rose-100/70 dark:border-slate-800 dark:bg-slate-900/70">
                       <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Permit Status</p>
                       <p className="mt-3 text-lg font-semibold">{statusView.label}</p>
                     </div>
@@ -1878,7 +1878,7 @@ export default function Dashboard() {
                         <h2 className="mt-2 text-2xl font-semibold">Recent requests</h2>
                         <div className="mt-5 space-y-3">
                           {filteredHistory.slice(0, 3).map((record) => (
-                            <div key={record.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                            <div key={record.id} className="rounded-3xl border border-rose-100 bg-rose-50/85 p-4 shadow-sm shadow-rose-100/60 dark:border-slate-800 dark:bg-slate-900/70">
                               <div className="flex items-center justify-between gap-3">
                                 <p className="text-sm font-semibold">{record.semester}</p>
                                 <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusPresentation(record.status).badgeClass}`}>
@@ -2188,7 +2188,7 @@ export default function Dashboard() {
                     <section className="rounded-[2rem] border border-red-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(254,252,232,0.9))] p-6 shadow-xl shadow-red-200/45 backdrop-blur dark:border-red-900/30 dark:bg-[linear-gradient(145deg,_rgba(69,10,10,0.72),_rgba(66,32,6,0.68))] dark:shadow-none">
                       <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Preview</p>
                       <h2 className="mt-2 text-2xl font-semibold">Current profile</h2>
-                      <div className="mt-6 rounded-[2rem] bg-slate-50 p-5 dark:bg-slate-900/70">
+                      <div className="mt-6 rounded-[2rem] border border-red-100 bg-[linear-gradient(145deg,_rgba(255,241,242,0.88),_rgba(255,247,237,0.8))] p-5 dark:border-slate-800 dark:bg-slate-900/70">
                         <div className="flex items-center gap-4">
                           <img
                             src={profileImage}
