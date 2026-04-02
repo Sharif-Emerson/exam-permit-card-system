@@ -529,6 +529,7 @@ export default function Dashboard() {
     confirmPassword: '',
     profileImage: '',
   })
+  const [skipFirstLoginSetup, setSkipFirstLoginSetup] = useState(false)
   const [savingFirstLoginSetup, setSavingFirstLoginSetup] = useState(false)
   const [supportDraft, setSupportDraft] = useState<SupportDraft>({
     subject: '',
@@ -1297,7 +1298,7 @@ export default function Dashboard() {
 
   return (
     <div className={`${darkMode ? 'dark' : ''} student-dashboard-shell`}>
-      {studentData?.firstLoginRequired && (
+      {studentData?.firstLoginRequired && !skipFirstLoginSetup && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Security setup required</h3>
@@ -1383,6 +1384,18 @@ export default function Dashboard() {
                 />
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  disabled={savingFirstLoginSetup}
+                  onClick={() => {
+                    setError('')
+                    setSuccessMessage('You skipped security setup for now. Please update your password from Profile Settings soon.')
+                    setSkipFirstLoginSetup(true)
+                  }}
+                  className="w-full rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                >
+                  Skip for now
+                </button>
                 <button
                   type="button"
                   disabled={savingFirstLoginSetup}
