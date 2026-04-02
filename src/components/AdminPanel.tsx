@@ -1501,6 +1501,7 @@ export default function AdminPanel() {
       tone: 'critical' as const,
       actionLabel: 'Review Students',
       onAction: () => setActiveSection('students'),
+      style: { color: 'red' }, // Added inline style for red text in dark mode
     }] : []),
     ...(permitStatusCounts.expired > 0 ? [{
       id: 'expired',
@@ -2676,7 +2677,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      <div className="admin-theme-shell flex h-dvh min-h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_10%_15%,_rgba(59,130,246,0.16),_transparent_34%),radial-gradient(circle_at_90%_18%,_rgba(239,68,68,0.13),_transparent_30%),radial-gradient(circle_at_50%_100%,_rgba(234,179,8,0.16),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#f1f5f9_100%)] text-gray-900 dark:bg-slate-950 dark:text-slate-100">
+      <div className="admin-theme-shell flex h-dvh min-h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_10%_15%,_rgba(59,130,246,0.16),_transparent_34%),radial-gradient(circle_at_90%_18%,_rgba(239,68,68,0.13),_transparent_30%),radial-gradient(circle_at_50%_100%,_rgba(234,179,8,0.16),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#f1f5f9_100%)] text-gray-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(30,58,138,0.45),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(127,29,29,0.35),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#052e16_55%,_#1f2937_100%)] dark:text-slate-100">
 
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
@@ -2688,7 +2689,7 @@ export default function AdminPanel() {
 
       {/* â”€â”€ Sidebar â”€â”€ */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-white pt-[max(env(safe-area-inset-top),0.75rem)] shadow-lg transition-transform duration-300 dark:border-r dark:border-slate-800 dark:bg-slate-950 lg:static lg:translate-x-0 lg:pt-0 lg:shadow-none lg:border-r lg:border-gray-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-[linear-gradient(180deg,_rgba(239,246,255,0.95),_rgba(240,253,250,0.94)_52%,_rgba(254,252,232,0.92))] pt-[max(env(safe-area-inset-top),0.75rem)] shadow-lg transition-transform duration-300 dark:border-r dark:border-slate-800 dark:bg-slate-950/85 dark:shadow-none lg:static lg:translate-x-0 lg:pt-0 lg:shadow-none lg:border-r lg:border-gray-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Logo */}
         <div className="flex min-h-16 items-center gap-3 border-b border-gray-200 px-5 dark:border-slate-800">
@@ -2767,7 +2768,7 @@ export default function AdminPanel() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 
         {/* Top header */}
-        <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-slate-800 dark:bg-slate-950 sm:px-6 lg:pt-0">
+        <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(30,58,138,0.45),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(127,29,29,0.35),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#052e16_55%,_#1f2937_100%)] sm:px-6 lg:pt-0">
           <button
             type="button"
             title="Open sidebar"
@@ -2780,7 +2781,7 @@ export default function AdminPanel() {
 
           {/* Search */}
           <form
-            className="flex max-w-sm flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
+            className="flex max-w-sm flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80"
             onSubmit={(e) => e.preventDefault()}
           >
             <Search className="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-slate-500" />
