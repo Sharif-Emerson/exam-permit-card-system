@@ -2717,7 +2717,7 @@ export default function AdminPanel() {
                 <button
                   type="button"
                   onClick={() => setActiveSection(item.key)}
-                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`sidebar-menu-item flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     activeSection === item.key
                       ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white'

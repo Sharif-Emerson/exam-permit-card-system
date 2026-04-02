@@ -1,3 +1,9 @@
+/* Fix sidebar menu item text color in dark mode for admin dashboards */
+.dark .admin-theme-shell .sidebar-menu-item,
+.dark .admin-theme-shell .sidebar-menu-item span,
+.dark .admin-theme-shell .sidebar-menu-item .flex-1 {
+	color: rgb(203,213,225) !important; /* slate-300 for visibility */
+}
 /* Ensure numbers are visible in dark mode for admin dashboards */
 .dark .admin-theme-shell .text-xs,
 .dark .admin-theme-shell .text-sm,
@@ -32,8 +38,9 @@
 .dark .admin-theme-shell span:has(> .text-3xl),
 .dark .admin-theme-shell span:has(> .text-4xl),
 .dark .admin-theme-shell span:has(> .text-5xl) {
-	color: rgb(255,255,255) !important;
+	color: rgb(255, 255, 255) !important;
 }
+
 /* Animations moved from App.tsx */
 .kiu-fade-in {
 	animation: kiu-fade-in 0.35s ease-out both;
