@@ -57,7 +57,7 @@ Exam Permit System is a React application backed by a REST API for managing stud
    copy .env.example .env
    ```
 
-3. For an explicit backend URL, use:
+1. For an explicit backend URL, use:
    - `VITE_BACKEND_PROVIDER=rest`
    - `VITE_API_BASE_URL=http://localhost:4000`
    - Optional for QR scanning on phones: `VITE_PERMIT_PUBLIC_BASE_URL=http://<your-lan-ip>:4000`
@@ -293,7 +293,7 @@ To deploy:
 - `VITE_API_BASE_URL=https://your-backend.example.com`
 - or expose your backend behind the same origin at `/api`
 
-3. Deploy [examples/rest-backend](c:/Users/kabuy/OneDrive/Desktop/project/examples/rest-backend) as a separate Node service using its Dockerfile.
+1. Deploy [examples/rest-backend](c:/Users/kabuy/OneDrive/Desktop/project/examples/rest-backend) as a separate Node service using its Dockerfile.
 2. Set backend environment variables:
    - `PORT`
    - `APP_DB_PATH`
@@ -333,7 +333,7 @@ To run it on a public server:
   docker compose -f docker-compose.deploy.yml up -d --build
   ```
 
-4. Point your domain at that server.
+1. Point your domain at that server.
 2. Put TLS in front of it with your platform load balancer, Caddy, Nginx Proxy Manager, or another reverse proxy.
 
 With this setup, the frontend can use the default `/api` production path and does not need `VITE_API_BASE_URL` at build time.

@@ -10,15 +10,13 @@ type SignOutDialogProps = {
 export default function SignOutDialog({ onConfirm, onCancel, signingOut }: SignOutDialogProps) {
   return (
     <div
-      className={`fixed inset-0 ${DIALOG_Z.confirmBackdrop} flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm`}
-      style={{ animation: 'kiu-fade-in 0.2s ease-out both' }}
+      className={`kiu-fade-in-fast fixed inset-0 ${DIALOG_Z.confirmBackdrop} flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="signout-title"
     >
       <div
-        className={`relative ${DIALOG_Z.confirmContent} w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900`}
-        style={{ animation: 'kiu-dialog-up 0.25s ease-out both' }}
+        className={`kiu-dialog-up relative ${DIALOG_Z.confirmContent} w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900`}
       >
         {/* Green header */}
         <div className="relative bg-gradient-to-br from-emerald-600 to-green-500 px-6 py-6 text-center text-white">
@@ -64,16 +62,6 @@ export default function SignOutDialog({ onConfirm, onCancel, signingOut }: SignO
           </div>
         </div>
       </div>
-      <style>{`
-        @keyframes kiu-fade-in {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-        @keyframes kiu-dialog-up {
-          from { opacity: 0; transform: translateY(18px) scale(0.96); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-      `}</style>
     </div>
   )
 }

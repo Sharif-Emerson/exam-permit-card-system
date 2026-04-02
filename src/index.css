@@ -15,6 +15,14 @@
 	animation: kiu-page-in 0.3s ease-out both;
 }
 
+.kiu-fade-in-fast {
+	animation: kiu-fade-in 0.2s ease-out both;
+}
+
+.kiu-dialog-up {
+	animation: kiu-dialog-up 0.25s ease-out both;
+}
+
 @keyframes kiu-fade-in {
 	from {
 		opacity: 0;
@@ -40,6 +48,18 @@
 	to {
 		opacity: 1;
 		transform: translateY(0);
+	}
+}
+
+@keyframes kiu-dialog-up {
+	from {
+		opacity: 0;
+		transform: translateY(18px) scale(0.96);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
 	}
 }
 
