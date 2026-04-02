@@ -400,7 +400,7 @@ export default function Login() {
                   minLength={8}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="At least 8 characters"
+                  placeholder="e.g. Permit@2027"
                   className="block w-full rounded-md border border-emerald-200 bg-emerald-50/40 px-3 py-2 pr-10 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-emerald-500 dark:border-emerald-900/60 dark:bg-slate-900/80 dark:text-white sm:text-base"
                 />
                 <button
@@ -413,6 +413,7 @@ export default function Login() {
                   {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              <p className="mt-1 text-[11px] text-emerald-700 dark:text-emerald-300">Use uppercase, lowercase, number, and special character. Example: Permit@2027</p>
             </div>
             <div>
               <label htmlFor="reset-confirm-password" className="block text-sm font-medium text-emerald-900 dark:text-emerald-100">

@@ -6104,6 +6104,7 @@ export default function AdminPanel() {
                         setCreateDraft((current) => ({ ...current, password: event.target.value }))
                         setCreatePasswordGenerated(false)
                       }}
+                      placeholder="e.g. Permit@2027"
                       className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                     />
                     <button
@@ -6116,6 +6117,7 @@ export default function AdminPanel() {
                     </button>
                   </div>
                   <p className="mt-1 text-xs text-gray-400">Generate a temporary password automatically or enter one manually.</p>
+                  <p className="mt-1 text-xs text-gray-500">Use uppercase, lowercase, number, and special character. Example: Permit@2027</p>
                 </div>
                 <div>
                   <label htmlFor="create-student-id" className="mb-1 block text-xs font-medium text-gray-700">Registration No.</label>

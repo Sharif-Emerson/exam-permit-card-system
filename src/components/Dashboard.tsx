@@ -1366,7 +1366,9 @@ export default function Dashboard() {
                   required
                   minLength={8}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950"
+                  placeholder="e.g. Permit@2027"
                 />
+                <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-300">Use uppercase, lowercase, number, and special character. Example: Permit@2027</p>
               </div>
               <div>
                 <label htmlFor="first-login-confirm-password" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Confirm Password</label>
@@ -2201,9 +2203,10 @@ export default function Dashboard() {
                               type="password"
                               value={settingsDraft.password}
                               onChange={(event) => setSettingsDraft((current) => ({ ...current, password: event.target.value }))}
-                              placeholder="Leave blank to keep current password"
+                              placeholder="e.g. Permit@2027 (leave blank to keep current password)"
                               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
                             />
+                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-300">Use uppercase, lowercase, number, and special character. Example: Permit@2027</p>
                           </div>
                           <div>
                             <label htmlFor="settings-confirm-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Confirm password</label>
