@@ -238,7 +238,7 @@ export default function Login() {
             <img
               src={institutionLogo}
               alt={`${institutionName} logo`}
-              className="h-40 w-40 rounded-full border-4 border-white object-cover shadow-lg sm:h-48 sm:w-48"
+              className="h-40 w-40 rounded-full border-4 border-emerald-500 object-cover shadow-lg sm:h-48 sm:w-48"
               draggable={false}
             />
             <h1 className="mt-3 text-2xl font-bold text-emerald-700 dark:text-emerald-400 sm:text-3xl">
