@@ -535,7 +535,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
             </button>
           </div>
           {permitOutputLocked && (
-            <div className="text-center mt-3 sm:mt-4">
+            <div className="no-print text-center mt-3 sm:mt-4">
               <p className="text-red-600 text-xs sm:text-sm font-medium">
                 {permitOutputMessage}
               </p>

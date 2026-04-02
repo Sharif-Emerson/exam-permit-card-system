@@ -1425,7 +1425,7 @@ export default function AdminPanel() {
     filterCollege ? `College: ${filterCollege}` : null,
   ].filter((label): label is string => Boolean(label))
   const openSupportRequestCount = supportRequests.filter((request) => request.status !== 'resolved').length
-  const permitEventCount = activityTotalItems
+  const permitEventCount = permitActivityLogs.length
   const pageStart = totalItems === 0 ? 0 : ((page - 1) * pageSize) + 1
   const pageEnd = totalItems === 0 ? 0 : Math.min(page * pageSize, totalItems)
   const activityPageStart = activityTotalItems === 0 ? 0 : ((activityPage - 1) * ACTIVITY_PAGE_SIZE) + 1
@@ -3147,15 +3147,33 @@ export default function AdminPanel() {
                 </div>
 
                 {/* Analytics cards */}
-                <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
-                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-8">
+                  {/* --- People counts --- */}
+                  <div className="col-span-2 sm:col-span-2 rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Total Students</p>
-                      <Users className="h-5 w-5 text-blue-400" />
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Students</p>
+                      <Users className="h-5 w-5 text-blue-500" />
                     </div>
-                    <p className="mt-2 text-3xl font-bold text-blue-700">{totalStudents}</p>
-                    <p className="mt-1 text-xs text-blue-400">enrolled accounts</p>
+                    <p className="mt-2 text-4xl font-bold text-blue-700">{totalStudents}</p>
+                    <div className="mt-2 flex gap-3 text-xs text-blue-500">
+                      <span className="font-semibold text-emerald-600">{clearedStudents} cleared</span>
+                      <span className="text-amber-600">{outstandingStudents} outstanding</span>
+                    </div>
+                    <p className="mt-0.5 text-[10px] text-blue-400">enrolled student accounts</p>
                   </div>
+                  <div className="col-span-2 sm:col-span-2 rounded-xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Administrators</p>
+                      <Shield className="h-5 w-5 text-indigo-500" />
+                    </div>
+                    <p className="mt-2 text-4xl font-bold text-indigo-700">{1 + assistantAdmins.length}</p>
+                    <div className="mt-2 flex gap-3 text-xs">
+                      <span className="font-semibold text-indigo-600">1 super-admin</span>
+                      <span className="text-indigo-400">{assistantAdmins.length} sub-admin{assistantAdmins.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <p className="mt-0.5 text-[10px] text-indigo-400">active admin accounts</p>
+                  </div>
+                  {/* --- Permit stats --- */}
                   <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Cleared</p>
@@ -3315,7 +3333,7 @@ export default function AdminPanel() {
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                   <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
                     <h2 className="font-semibold text-gray-800">Recent Permit Activity</h2>
-                    <p className="text-xs text-gray-400">Showing {activityPageStart}-{activityPageEnd} of {activityTotalItems}</p>
+                    <p className="text-xs text-gray-400">{permitActivityLogs.length} event{permitActivityLogs.length !== 1 ? 's' : ''} on this page</p>
                     <button
                       type="button"
                       onClick={handleExportPermitActivity}
