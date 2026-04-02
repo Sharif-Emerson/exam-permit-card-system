@@ -4413,6 +4413,20 @@ export default function AdminPanel() {
                       <code className="block overflow-x-auto rounded-lg bg-slate-900 px-3 py-2 text-xs text-emerald-100">
                         POST {publicApiBaseUrl}/integrations/students/batch
                       </code>
+                      <div className="mt-2">
+                        <a
+                          href={`${publicApiBaseUrl}/integrations/students/batch`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block rounded bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        >
+                          Open REST API endpoint
+                        </a>
+                        <span className="ml-3 text-xs text-gray-500">(For direct testing or integration)</span>
+                      </div>
+                      <div className="mt-2 text-xs text-amber-700 bg-amber-50 rounded p-2">
+                        <strong>Note:</strong> If your university SIS does <span className="font-semibold">not</span> support REST API integration, you can still use the spreadsheet import tab or request a custom connector.
+                      </div>
                     </div>
                     <div>
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Example body</p>
