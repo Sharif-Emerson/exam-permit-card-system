@@ -607,6 +607,7 @@ export default function AdminPanel() {
   const [bulkPrintStudents, setBulkPrintStudents] = useState<StudentProfile[]>([])
   const [bulkPrintQrCodes, setBulkPrintQrCodes] = useState<Record<string, string>>({})
   const [bulkPrinting, setBulkPrinting] = useState(false)
+  const [bulkPrintConfirm, setBulkPrintConfirm] = useState<{ students: StudentProfile[]; title: string } | null>(null)
   const [selectedPermitStudentIds, setSelectedPermitStudentIds] = useState<string[]>([])
   const [lastSyncAt, setLastSyncAt] = useState('')
   const [lastReminderAt, setLastReminderAt] = useState('')
@@ -1695,6 +1696,13 @@ export default function AdminPanel() {
       setError(emptyMessage)
       return
     }
+
+    // Show count confirmation before printing
+    setBulkPrintConfirm({ students: printableStudents, title })
+  }
+
+  async function executeBulkPrint(printableStudents: StudentProfile[], title: string) {
+    setBulkPrintConfirm(null)
 
     if (typeof window === 'undefined') {
       return
@@ -5486,6 +5494,17 @@ export default function AdminPanel() {
         }
         onCancel={() => setPendingConfirmation(null)}
         onConfirm={() => void handleConfirmPendingAction()}
+      />
+
+      <ConfirmDialog
+        open={bulkPrintConfirm !== null}
+        title="Confirm Bulk Print"
+        message={`You are about to print ${bulkPrintConfirm?.students.length ?? 0} permit${(bulkPrintConfirm?.students.length ?? 0) === 1 ? '' : 's'}. Proceed?`}
+        confirmLabel={`Print ${bulkPrintConfirm?.students.length ?? 0} Permit${(bulkPrintConfirm?.students.length ?? 0) === 1 ? '' : 's'}`}
+        cancelLabel="Cancel"
+        tone="primary"
+        onCancel={() => setBulkPrintConfirm(null)}
+        onConfirm={() => { if (bulkPrintConfirm) void executeBulkPrint(bulkPrintConfirm.students, bulkPrintConfirm.title) }}
       />
 
       <SaveConfirmationDialog
