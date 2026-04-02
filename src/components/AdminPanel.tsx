@@ -120,9 +120,20 @@ type DashboardAlert = {
 type SupportReplyDrafts = Record<string, string>
 type SupportStatusDrafts = Record<string, SupportRequestStatus>
 type AssistantAdminRole = 'support_help' | 'department_prints'
+const ADMIN_EMAIL_DOMAIN = 'kiu.examcard.com'
+
+function nameToEmailPrefix(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, '.')
+    .replace(/[^a-z0-9.]/g, '')
+    .replace(/\.{2,}/g, '.')
+    .replace(/^\.|\.$/, '')
+}
+
 type AssistantAdminDraft = {
   name: string
-  email: string
+  emailPrefix: string
   phoneNumber: string
   password: string
   role: AssistantAdminRole
@@ -636,7 +647,7 @@ export default function AdminPanel() {
   const [assistantAdminUpdatingId, setAssistantAdminUpdatingId] = useState<string | null>(null)
   const [assistantAdminDraft, setAssistantAdminDraft] = useState<AssistantAdminDraft>({
     name: '',
-    email: '',
+    emailPrefix: '',
     phoneNumber: '',
     password: '',
     role: 'department_prints',
@@ -718,12 +729,13 @@ export default function AdminPanel() {
     }
 
     const normalizedName = assistantAdminDraft.name.trim()
-    const normalizedEmail = assistantAdminDraft.email.trim().toLowerCase()
+    const normalizedPrefix = assistantAdminDraft.emailPrefix.trim().toLowerCase().replace(/[^a-z0-9.]/g, '')
+    const normalizedEmail = normalizedPrefix ? `${normalizedPrefix}@${ADMIN_EMAIL_DOMAIN}` : ''
     const normalizedPhoneNumber = assistantAdminDraft.phoneNumber.trim()
     const normalizedPassword = assistantAdminDraft.password.trim()
     const normalizedDepartments = assistantAdminDraft.departments.map((value) => value.trim()).filter(Boolean)
 
-    if (!normalizedName || !normalizedEmail || !normalizedPassword) {
+    if (!normalizedName || !normalizedPrefix || !normalizedPassword) {
       setError('Name, email, and temporary password are required for assistant admin creation.')
       return
     }
@@ -746,7 +758,7 @@ export default function AdminPanel() {
       })
       setAssistantAdminDraft({
         name: '',
-        email: '',
+        emailPrefix: '',
         phoneNumber: '',
         password: '',
         role: 'department_prints',
@@ -3893,21 +3905,34 @@ export default function AdminPanel() {
                             maxLength={120}
                             disabled={!canManageAssistantAdmins}
                             value={assistantAdminDraft.name}
-                            onChange={(event) => setAssistantAdminDraft((current) => ({ ...current, name: event.target.value }))}
+                            onChange={(event) => {
+                              const name = event.target.value
+                              setAssistantAdminDraft((current) => ({
+                                ...current,
+                                name,
+                                emailPrefix: current.emailPrefix === nameToEmailPrefix(current.name)
+                                  ? nameToEmailPrefix(name)
+                                  : current.emailPrefix,
+                              }))
+                            }}
                             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                           />
                         </div>
                         <div>
                           <label htmlFor="assistant-admin-email" className="mb-2 block text-sm font-medium text-gray-700">Email address</label>
-                          <input
-                            id="assistant-admin-email"
-                            type="email"
-                            required
-                            disabled={!canManageAssistantAdmins}
-                            value={assistantAdminDraft.email}
-                            onChange={(event) => setAssistantAdminDraft((current) => ({ ...current, email: event.target.value }))}
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                          />
+                          <div className="flex items-center rounded-lg border border-gray-200 focus-within:ring-2 focus-within:ring-emerald-400 overflow-hidden">
+                            <input
+                              id="assistant-admin-email"
+                              type="text"
+                              required
+                              disabled={!canManageAssistantAdmins}
+                              value={assistantAdminDraft.emailPrefix}
+                              onChange={(event) => setAssistantAdminDraft((current) => ({ ...current, emailPrefix: event.target.value }))}
+                              placeholder="adminname"
+                              className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm focus:outline-none disabled:opacity-60"
+                            />
+                            <span className="shrink-0 select-none bg-gray-50 px-2 py-2 text-sm text-gray-500 border-l border-gray-200">@{ADMIN_EMAIL_DOMAIN}</span>
+                          </div>
                         </div>
                         <div>
                           <label htmlFor="assistant-admin-phone" className="mb-2 block text-sm font-medium text-gray-700">Phone number (optional)</label>
