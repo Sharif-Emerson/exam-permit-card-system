@@ -2677,7 +2677,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      <div className="admin-theme-shell flex h-dvh min-h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_10%_15%,_rgba(59,130,246,0.16),_transparent_34%),radial-gradient(circle_at_90%_18%,_rgba(239,68,68,0.13),_transparent_30%),radial-gradient(circle_at_50%_100%,_rgba(234,179,8,0.16),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#f1f5f9_100%)] text-gray-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(30,58,138,0.45),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(127,29,29,0.35),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#052e16_55%,_#1f2937_100%)] dark:text-slate-100">
+      <div className="admin-theme-shell flex h-dvh min-h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_10%_15%,_rgba(6,182,212,0.18),_transparent_34%),radial-gradient(circle_at_90%_18%,_rgba(20,184,166,0.16),_transparent_30%),radial-gradient(circle_at_50%_100%,_rgba(59,130,246,0.12),_transparent_28%),linear-gradient(180deg,_#ecfeff_0%,_#f0fdfa_100%)] text-gray-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(30,58,138,0.45),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(127,29,29,0.35),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#052e16_55%,_#1f2937_100%)] dark:text-slate-100">
 
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (

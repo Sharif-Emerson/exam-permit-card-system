@@ -37,6 +37,7 @@ import { createSemesterRegistration, createSupportRequest, fetchPermitActivityHi
 import type { PermitActivityRecord, StudentProfile, SupportContact, SupportRequest, UniversityDeadline } from '../types'
 import { FALLBACK_PROFILE_IMAGE } from './PermitCard'
 import SignOutDialog from './SignOutDialog'
+import Faq from './Faq'
 type PermitStatus = 'approved' | 'pending' | 'rejected'
 type PortalSection = 'overview' | 'permit_courses' | 'finance' | 'applications' | 'settings' | 'support'
 type HistoryStatusFilter = PermitStatus | 'all'
@@ -1303,7 +1304,8 @@ export default function Dashboard() {
   return (
     <div className={`${darkMode ? 'dark' : ''} student-dashboard-shell`}>
       {studentData?.firstLoginRequired && !skipFirstLoginSetup && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4">
+        <div className="fixed inset-0 z-[90] overflow-y-auto bg-black/60">
+          <div className="flex min-h-full items-center justify-center p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Security setup required</h3>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
@@ -1421,6 +1423,7 @@ export default function Dashboard() {
               </div>
             </form>
           </div>
+          </div>
         </div>
       )}
       {studentData && (
@@ -1436,7 +1439,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="student-dashboard-app min-h-screen bg-[radial-gradient(circle_at_8%_12%,_rgba(59,130,246,0.16),_transparent_30%),radial-gradient(circle_at_92%_16%,_rgba(239,68,68,0.14),_transparent_28%),radial-gradient(circle_at_50%_98%,_rgba(234,179,8,0.16),_transparent_26%),linear-gradient(180deg,_#f8fafc_0%,_#f0fdf4_45%,_#fefce8_100%)] text-slate-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(30,58,138,0.45),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(127,29,29,0.35),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#052e16_55%,_#1f2937_100%)] dark:text-slate-100">
+      <div className="student-dashboard-app min-h-screen bg-[radial-gradient(circle_at_8%_12%,_rgba(6,182,212,0.18),_transparent_32%),radial-gradient(circle_at_92%_16%,_rgba(20,184,166,0.16),_transparent_30%),radial-gradient(circle_at_50%_98%,_rgba(59,130,246,0.12),_transparent_28%),linear-gradient(180deg,_#ecfeff_0%,_#f0fdfa_45%,_#e0f2fe_100%)] text-slate-900 transition-colors duration-300 dark:bg-[radial-gradient(circle_at_top_left,_rgba(30,58,138,0.45),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(127,29,29,0.35),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#052e16_55%,_#1f2937_100%)] dark:text-slate-100">
         {sidebarOpen && (
           <button
             type="button"
@@ -1909,8 +1912,8 @@ export default function Dashboard() {
                         </div>
                       </section>
 
-                      <section className="rounded-[2rem] border border-amber-200/80 bg-[linear-gradient(140deg,_rgba(255,251,235,0.95),_rgba(239,246,255,0.92))] p-6 shadow-xl shadow-amber-200/45 backdrop-blur dark:border-amber-900/30 dark:bg-[linear-gradient(140deg,_rgba(69,26,3,0.7),_rgba(15,23,42,0.9))] dark:shadow-none">
-                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                      <section className="rounded-[2rem] border border-amber-200/80 bg-[linear-gradient(140deg,_rgba(255,251,235,0.95),_rgba(239,246,255,0.92))] p-6 shadow-xl shadow-amber-200/45 backdrop-blur dark:border-amber-900/30 dark:bg-[linear-gradient(140deg,_rgba(69,26,3,0.72),_rgba(15,23,42,0.9))] dark:shadow-none">
+                        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Semester Registration</p>
                             <h2 className="mt-2 text-2xl font-semibold">Register for a new semester</h2>
@@ -1956,7 +1959,7 @@ export default function Dashboard() {
                     </div>
 
                     <div className="space-y-6">
-                      <section className="rounded-[2rem] border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(224,242,254,0.92))] p-6 shadow-xl shadow-blue-200/45 backdrop-blur dark:border-blue-900/30 dark:bg-[linear-gradient(145deg,_rgba(10,25,47,0.92),_rgba(30,58,138,0.45))] dark:shadow-none">
+                      <section className="rounded-[2rem] border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(224,242,254,0.92))] p-6 shadow-xl shadow-blue-200/45 backdrop-blur dark:border-blue-900/30 dark:bg-[linear-gradient(145deg,_rgba(10,25,47,0.92),_rgba(30,58,138,0.42))] dark:shadow-none">
                         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Notifications Panel</p>
                         <h2 className="mt-2 text-2xl font-semibold">Latest updates</h2>
                         <div className="mt-5 max-h-72 space-y-3 overflow-y-auto pr-1">
@@ -2142,7 +2145,7 @@ export default function Dashboard() {
 
                 {activeSection === 'settings' && (
                   <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                    <section className="rounded-[2rem] border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(224,242,254,0.9))] p-6 shadow-xl shadow-blue-200/45 backdrop-blur dark:border-blue-900/30 dark:bg-[linear-gradient(145deg,_rgba(10,25,47,0.92),_rgba(30,58,138,0.42))] dark:shadow-none">
+                    <section className="rounded-[2rem] border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(224,242,254,0.92))] p-6 shadow-xl shadow-blue-200/45 backdrop-blur dark:border-blue-900/30 dark:bg-[linear-gradient(145deg,_rgba(10,25,47,0.92),_rgba(30,58,138,0.42))] dark:shadow-none">
                       <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Profile Settings</p>
                       <h2 className="mt-2 text-2xl font-semibold">Update your info</h2>
                       <div className="flex justify-end mb-2">
@@ -2283,7 +2286,7 @@ export default function Dashboard() {
                       </form>
                     </section>
 
-                    <section className="rounded-[2rem] border border-red-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(254,252,232,0.9))] p-6 shadow-xl shadow-red-200/45 backdrop-blur dark:border-red-900/30 dark:bg-[linear-gradient(145deg,_rgba(69,10,10,0.72),_rgba(66,32,6,0.68))] dark:shadow-none">
+                    <section className="rounded-[2rem] border border-red-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(254,252,232,0.9))] p-6 shadow-xl shadow-red-200/45 backdrop-blur dark:border-red-900/30 dark:bg-[linear-gradient(145deg,_rgba(69,10,10,0.72),_rgba(30,41,59,0.88))] dark:shadow-none">
                       <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Preview</p>
                       <h2 className="mt-2 text-2xl font-semibold">Current profile</h2>
                       <div className="mt-6 rounded-[2rem] border border-red-100 bg-[linear-gradient(145deg,_rgba(255,241,242,0.88),_rgba(255,247,237,0.8))] p-5 dark:border-slate-800 dark:bg-slate-900/70">
@@ -2321,14 +2324,7 @@ export default function Dashboard() {
                 {activeSection === 'support' && (
                   <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
                     <div className="space-y-6">
-                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                        <FileText className="h-9 w-9 text-blue-600 dark:text-blue-300" />
-                        <h2 className="mt-4 text-xl font-semibold">Help & support</h2>
-                        <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                          If your semester registration is pending or rejected, review admin remarks and contact support for guidance.
-                        </p>
-                      </section>
-
+                      <Faq />
                       <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
                         <UserCircle2 className="h-9 w-9 text-sky-600 dark:text-sky-300" />
                         <h2 className="mt-4 text-xl font-semibold">Contact desk</h2>
@@ -2586,14 +2582,14 @@ export default function Dashboard() {
                             <>
                               <div className="flex items-center justify-between border-l-2 border-orange-500 pl-3">
                                 <div>
-                                  <p className="text-sm font-medium text-slate-900 dark:text-white">Final Exam Clearance</p>
+                                  <p className="text-sm font-medium text-slate-900 dark:text-slate-300">Final Exam Clearance</p>
                                   <p className="text-xs text-slate-500 dark:text-slate-300">Clear all balances to generate permit</p>
                                 </div>
                                 <span className="text-xs font-semibold px-2 py-1 bg-orange-100 text-orange-700 rounded-full dark:bg-orange-900/40 dark:text-orange-300">In 14 Days</span>
                               </div>
                               <div className="flex items-center justify-between border-l-2 border-slate-300 dark:border-slate-600 pl-3">
                                 <div>
-                                  <p className="text-sm font-medium text-slate-900 dark:text-white">Next Semester Reg.</p>
+                                  <p className="text-sm font-medium text-slate-900 dark:text-slate-300">Next Semester Reg.</p>
                                   <p className="text-xs text-slate-500 dark:text-slate-300">Early bird registration fee</p>
                                 </div>
                                 <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded-full dark:bg-slate-800 dark:text-slate-300">August 1st</span>
