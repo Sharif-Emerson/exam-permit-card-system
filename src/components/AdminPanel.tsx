@@ -35,7 +35,7 @@ type ImportPreviewRow = {
   reason?: string
   studentName?: string
 }
-type NavSection = 'dashboard' | 'students' | 'support' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'settings'
+type NavSection = 'dashboard' | 'students' | 'support' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'assistants' | 'settings'
 type BulkImportSubSection = 'financial' | 'student_accounts' | 'api'
 
 type AdminPermitDesignFields = {
@@ -221,6 +221,10 @@ function getAdminCapabilityLabel(scope: AdminCapabilityProfile['scope']) {
 
 function getAdminSections(permissions: Set<AdminPermission>): NavSection[] {
   const sections = new Set<NavSection>(['dashboard', 'settings'])
+
+  if (permissions.size > 0) {
+    sections.add('assistants')
+  }
 
   if (permissions.has('view_students')) {
     sections.add('students')
@@ -2461,15 +2465,16 @@ export default function AdminPanel() {
     .every((student) => selectedPermitStudentIds.includes(student.id))
     && filteredStudents.some((student) => student.feesBalance === 0)
 
-  const navItems: { key: NavSection; label: string; icon: ReactNode; badge?: number }[] = [
-    { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { key: 'students', label: 'Students', icon: <Users className="w-5 h-5" />, badge: outstandingStudents > 0 ? outstandingStudents : undefined },
-    { key: 'support', label: 'Support Requests', icon: <Bell className="w-5 h-5" />, badge: openSupportRequestCount > 0 ? openSupportRequestCount : undefined },
-    { key: 'permits', label: 'Permit Activity', icon: <FileCheck className="w-5 h-5" />, badge: permitEventCount > 0 ? permitEventCount : undefined },
-    { key: 'permit-cards', label: 'Permit Cards', icon: <CreditCard className="w-5 h-5" />, badge: clearedStudents > 0 ? clearedStudents : undefined },
-    { key: 'import', label: 'Bulk Import', icon: <FileUp className="w-5 h-5" /> },
-    { key: 'reports', label: 'Reports', icon: <BarChart2 className="w-5 h-5" /> },
-    { key: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
+  const navItems: { id: string; key: NavSection; label: string; icon: ReactNode; badge?: number }[] = [
+    { id: 'dashboard', key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { id: 'students', key: 'students', label: 'Students', icon: <Users className="w-5 h-5" />, badge: outstandingStudents > 0 ? outstandingStudents : undefined },
+    { id: 'support-requests', key: 'support', label: 'Support Requests', icon: <Bell className="w-5 h-5" />, badge: openSupportRequestCount > 0 ? openSupportRequestCount : undefined },
+    { id: 'sub-admins', key: 'assistants', label: 'Sub-Admins', icon: <Shield className="w-5 h-5" /> },
+    { id: 'permit-activity', key: 'permits', label: 'Permit Activity', icon: <FileCheck className="w-5 h-5" />, badge: permitEventCount > 0 ? permitEventCount : undefined },
+    { id: 'permit-cards', key: 'permit-cards', label: 'Permit Cards', icon: <CreditCard className="w-5 h-5" />, badge: clearedStudents > 0 ? clearedStudents : undefined },
+    { id: 'bulk-import', key: 'import', label: 'Bulk Import', icon: <FileUp className="w-5 h-5" /> },
+    { id: 'reports', key: 'reports', label: 'Reports', icon: <BarChart2 className="w-5 h-5" /> },
+    { id: 'settings', key: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
   ]
   const visibleNavItems = navItems.filter((item) => adminCapability.sections.includes(item.key))
   const quickActions = [
@@ -2685,7 +2690,7 @@ export default function AdminPanel() {
           <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-slate-500">Menu</p>
           <ul className="space-y-1">
             {visibleNavItems.map((item) => (
-              <li key={item.key}>
+              <li key={item.id}>
                 <button
                   type="button"
                   onClick={() => setActiveSection(item.key)}
@@ -3400,7 +3405,7 @@ export default function AdminPanel() {
                     .filter((n) => n.key !== 'dashboard')
                     .map((item) => (
                       <button
-                        key={item.key}
+                        key={item.id}
                         type="button"
                         onClick={() => setActiveSection(item.key)}
                         className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-emerald-300 hover:bg-emerald-50"
@@ -3742,26 +3747,44 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {activeSection === 'support' && (
+            {(activeSection === 'support' || activeSection === 'assistants') && (
               <div className="space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h1 className="text-xl font-bold text-gray-900">Support Requests</h1>
-                    <p className="text-sm text-gray-500">Review student help tickets, update statuses, and send replies from the admin desk.</p>
+                    <h1 className="text-xl font-bold text-gray-900">{activeSection === 'assistants' ? 'Sub-Admin Management' : 'Support Requests'}</h1>
+                    <p className="text-sm text-gray-500">{activeSection === 'assistants' ? 'Create and manage delegated admin accounts for support/help and department permit printing.' : 'Review student help tickets, update statuses, and send replies from the admin desk.'}</p>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Open or in progress: {openSupportRequestCount}</span>
-                    <button
-                      type="button"
-                      onClick={() => void loadSupportRequestQueue()}
-                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                    >
-                      <RefreshCcw className="h-3.5 w-3.5" />
-                      Refresh Queue
-                    </button>
+                    {activeSection === 'support' ? (
+                      <>
+                        <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Open or in progress: {openSupportRequestCount}</span>
+                        <button
+                          type="button"
+                          onClick={() => void loadSupportRequestQueue()}
+                          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                        >
+                          <RefreshCcw className="h-3.5 w-3.5" />
+                          Refresh Queue
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5">Accounts: {canManageAssistantAdmins ? assistantAdmins.length : 0}</span>
+                        <button
+                          type="button"
+                          onClick={() => void loadAssistantAdmins()}
+                          disabled={assistantAdminsLoading || !canManageAssistantAdmins}
+                          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <RefreshCcw className={`h-3.5 w-3.5 ${assistantAdminsLoading ? 'animate-spin' : ''}`} />
+                          Refresh
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
+                {activeSection === 'support' && (
                 <div className="grid gap-4 lg:grid-cols-3">
                   <div className="rounded-xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
                     <p className="text-xs font-semibold uppercase tracking-wide text-amber-500">Open</p>
@@ -3779,8 +3802,9 @@ export default function AdminPanel() {
                     <p className="mt-1 text-xs text-emerald-500">Closed with an admin response</p>
                   </div>
                 </div>
+                )}
 
-                {showAssistantAdminPanel && (
+                {activeSection === 'assistants' && showAssistantAdminPanel && (
                   <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                     <div className="border-b border-gray-100 px-6 py-4">
                       <h2 className="font-semibold text-gray-800">Assistant Admin Delegation</h2>
@@ -4016,6 +4040,7 @@ export default function AdminPanel() {
                   </div>
                 )}
 
+                {activeSection === 'support' && (
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-100 px-5 py-4">
                     <h2 className="font-semibold text-gray-800">Support Queue</h2>
@@ -4106,6 +4131,7 @@ export default function AdminPanel() {
                     </div>
                   )}
                 </div>
+                )}
               </div>
             )}
 
