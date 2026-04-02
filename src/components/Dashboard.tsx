@@ -431,8 +431,8 @@ function getStatusPresentation(status: PermitStatus) {
     return {
       label: 'Approved',
       icon: ShieldCheck,
-      cardClass: 'border-green-200 bg-green-50 text-green-900',
-      badgeClass: 'bg-green-600 text-white',
+      cardClass: 'border-green-200 bg-green-50 text-green-900 dark:border-green-700 dark:bg-green-900 dark:text-green-100',
+      badgeClass: 'bg-green-600 text-white dark:bg-green-400 dark:text-green-900',
       message: 'Your permit is ready. Download or print it when needed.',
     }
   }
@@ -441,8 +441,8 @@ function getStatusPresentation(status: PermitStatus) {
     return {
       label: 'Rejected',
       icon: ShieldClose,
-      cardClass: 'border-red-200 bg-red-50 text-red-900',
-      badgeClass: 'bg-red-600 text-white',
+      cardClass: 'border-red-200 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-900 dark:text-red-100',
+      badgeClass: 'bg-red-600 text-white dark:bg-red-400 dark:text-red-900',
       message: 'Your last submission needs correction. Review the remarks and try again.',
     }
   }
@@ -450,8 +450,8 @@ function getStatusPresentation(status: PermitStatus) {
   return {
     label: 'Pending',
     icon: ShieldAlert,
-    cardClass: 'border-amber-200 bg-amber-50 text-amber-900',
-    badgeClass: 'bg-amber-500 text-white',
+    cardClass: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-100',
+    badgeClass: 'bg-amber-500 text-white dark:bg-amber-400 dark:text-amber-900',
     message: 'Your permit is pending review. Keep your profile and fee information up to date.',
   }
 }
