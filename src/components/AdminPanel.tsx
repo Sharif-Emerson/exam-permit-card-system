@@ -6,7 +6,7 @@ import {
   FileSpreadsheet, FileUp, LayoutDashboard, LogOut, Menu,
   Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Sun, Trash2, Upload, Users, X,
 } from 'lucide-react'
-import { KIU_COLLEGES, KIU_COURSES, KIU_CURRICULUM, KIU_DEPARTMENT_DEFAULT_PROGRAM, KIU_DEPARTMENTS, KIU_SEMESTERS, KiuCourseUnit } from '../config/universityData'
+import { KIU_BURSARY_RATE, KIU_COLLEGES, KIU_COURSES, KIU_CURRICULUM, KIU_DEPARTMENT_DEFAULT_PROGRAM, KIU_DEPARTMENTS, KIU_SEMESTERS, KiuCourseUnit, getProgramsForDepartment, getTuitionForProgram } from '../config/universityData'
 import BrandMark from './BrandMark'
 import PermitCard from './PermitCard'
 import ConfirmDialog from './ConfirmDialog'
@@ -61,9 +61,9 @@ const STUDENT_PAGE_SIZE = 24
 const ACTIVITY_PAGE_SIZE = 12
 const SYSTEM_STUDENT_EMAIL_DOMAIN = 'kiu.examcard.com'
 const DEFAULT_SYSTEM_FEE_SETTINGS: SystemFeeSettings = {
-  localStudentFee: 3000,
-  internationalStudentFee: 6000,
-  currencyCode: 'USD',
+  localStudentFee: 1600000,
+  internationalStudentFee: 2400000,
+  currencyCode: 'UGX',
 }
 
 type EditDraft = Omit<AdminProfileUpdateInput, 'totalFees' | 'courseUnits'> & {
@@ -1100,7 +1100,9 @@ export default function AdminPanel() {
       ? (resolvedYearOfStudy ? `${resolvedYearOfStudy} - ${resolvedSemester}` : resolvedSemester)
       : undefined
     const generatedEmail = buildSystemStudentEmail(createDraft.name)
-    const totalFeesNum = getFeeForStudentCategory(systemFeeSettings, createDraft.studentCategory)
+    const programFee = getTuitionForProgram(createDraft.program)
+    const draftFee = parseFloat(createDraft.totalFees)
+    const totalFeesNum = !isNaN(draftFee) && draftFee > 0 ? draftFee : (programFee ?? getFeeForStudentCategory(systemFeeSettings, createDraft.studentCategory))
     const amountPaidNum = 0
     const courseUnits: string[] = []
 
@@ -5810,17 +5812,34 @@ export default function AdminPanel() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="edit-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">Expected Total Fees ({activeCurrencyCode})</label>
-                  <input
-                    id="edit-student-total-fees"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    value={editDraft.totalFees}
-                    onChange={(e) => setEditDraft((d) => ({ ...d, totalFees: e.target.value }))}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
+                  <label htmlFor="edit-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">
+                    Expected Total Fees ({activeCurrencyCode}){editDraft.program && getTuitionForProgram(editDraft.program) != null ? ` — Official: UGX ${getTuitionForProgram(editDraft.program)!.toLocaleString()}` : ''}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="edit-student-total-fees"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                      value={editDraft.totalFees}
+                      onChange={(e) => setEditDraft((d) => ({ ...d, totalFees: e.target.value }))}
+                      className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    />
+                    {editDraft.program && getTuitionForProgram(editDraft.program) != null && (
+                      <button
+                        type="button"
+                        title="Apply KIU Bursary: set fee to 50% of official tuition"
+                        onClick={() => {
+                          const fee = getTuitionForProgram(editDraft.program)
+                          if (fee) setEditDraft((d) => ({ ...d, totalFees: String(Math.round(fee * KIU_BURSARY_RATE)) }))
+                        }}
+                        className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                      >
+                        Bursary (50%)
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label htmlFor="edit-student-program" className="mb-1 block text-xs font-medium text-gray-700">Program</label>
@@ -5830,6 +5849,7 @@ export default function AdminPanel() {
                     onChange={(event) => {
                       const nextProgram = event.target.value
                       const curriculum = KIU_CURRICULUM[nextProgram]
+                      const fee = getTuitionForProgram(nextProgram)
                       setEditDraft((d) => {
                         const units = (curriculum && d.semester) ? curriculum.semesters[d.semester] : null
                         return {
@@ -5837,7 +5857,8 @@ export default function AdminPanel() {
                           program: nextProgram,
                           course: curriculum ? curriculum.defaultCourse : d.course,
                           courseUnitsText: units ? units.map(u => u.unitName).join('\n') : (nextProgram ? '' : d.courseUnitsText),
-                          exams: units ? createExamsFromCurriculum(units) : (nextProgram ? [] : d.exams)
+                          exams: units ? createExamsFromCurriculum(units) : (nextProgram ? [] : d.exams),
+                          totalFees: fee ? String(fee) : d.totalFees,
                         }
                       })
                     }}
@@ -5874,8 +5895,9 @@ export default function AdminPanel() {
                       const nextDept = e.target.value
                       setEditDraft((d) => {
                         const inferredProg = programFromDepartment(nextDept)
+                        const fee = getTuitionForProgram(inferredProg)
                         if (!inferredProg || !KIU_CURRICULUM[inferredProg]) {
-                          return { ...d, department: nextDept }
+                          return { ...d, department: nextDept, ...(fee ? { totalFees: String(fee) } : {}) }
                         }
                         const curriculum = KIU_CURRICULUM[inferredProg]
                         const units = (curriculum && d.semester) ? curriculum.semesters[d.semester] : null
@@ -5886,6 +5908,7 @@ export default function AdminPanel() {
                           course: curriculum.defaultCourse,
                           courseUnitsText: units ? units.map((u) => u.unitName).join('\n') : (inferredProg ? '' : d.courseUnitsText),
                           exams: units ? createExamsFromCurriculum(units) : (inferredProg ? [] : d.exams),
+                          totalFees: fee ? String(fee) : d.totalFees,
                         }
                       })
                     }}
@@ -6152,11 +6175,22 @@ export default function AdminPanel() {
                     id="create-student-program-core"
                     required
                     value={createDraft.program ?? ''}
-                    onChange={(event) => setCreateDraft((current) => ({ ...current, program: event.target.value }))}
+                    onChange={(event) => {
+                      const prog = event.target.value
+                      const fee = getTuitionForProgram(prog)
+                      setCreateDraft((current) => ({
+                        ...current,
+                        program: prog,
+                        totalFees: fee ? String(fee) : current.totalFees,
+                      }))
+                    }}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
                     <option value="">Select Program</option>
-                    {KIU_COURSES.map((program) => <option key={program} value={program}>{program}</option>)}
+                    {(getProgramsForDepartment(createDraft.department ?? '').length > 0
+                      ? getProgramsForDepartment(createDraft.department ?? '')
+                      : KIU_COURSES
+                    ).map((program) => <option key={program} value={program}>{program}</option>)}
                   </select>
                 </div>
                 <div>
@@ -6202,12 +6236,57 @@ export default function AdminPanel() {
                     id="create-student-department-core"
                     required
                     value={createDraft.department ?? ''}
-                    onChange={(event) => setCreateDraft((current) => ({ ...current, department: event.target.value }))}
+                    onChange={(event) => {
+                      const nextDept = event.target.value
+                      const programs = getProgramsForDepartment(nextDept)
+                      const defaultProgram = programs[0] ?? ''
+                      const fee = getTuitionForProgram(defaultProgram)
+                      setCreateDraft((current) => ({
+                        ...current,
+                        department: nextDept,
+                        program: defaultProgram,
+                        totalFees: fee ? String(fee) : current.totalFees,
+                      }))
+                    }}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
                     <option value="">Select Department</option>
                     {KIU_DEPARTMENTS.map((department) => <option key={department} value={department}>{department}</option>)}
                   </select>
+                </div>
+                <div className="col-span-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
+                  <div className="flex-1">
+                    <label htmlFor="create-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">
+                      Tuition Fees (UGX){createDraft.program && getTuitionForProgram(createDraft.program) != null ? ` — Official: UGX ${getTuitionForProgram(createDraft.program)!.toLocaleString()}` : ''}
+                    </label>
+                    <input
+                      id="create-student-total-fees"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={createDraft.totalFees}
+                      onChange={(e) => setCreateDraft((c) => ({ ...c, totalFees: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 pb-2 text-xs font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          const base = getTuitionForProgram(createDraft.program) ?? parseFloat(createDraft.totalFees)
+                          if (base && !isNaN(base)) {
+                            setCreateDraft((c) => ({ ...c, totalFees: String(Math.round(base * KIU_BURSARY_RATE)) }))
+                          }
+                        } else {
+                          const fee = getTuitionForProgram(createDraft.program)
+                          setCreateDraft((c) => ({ ...c, totalFees: fee ? String(fee) : c.totalFees }))
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-emerald-600"
+                    />
+                    Apply KIU Bursary (50% discount)
+                  </label>
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-2">

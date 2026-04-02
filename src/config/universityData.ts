@@ -1,55 +1,167 @@
-export const KIU_COURSES = [
-  'BSc Computer Science',
-  'BSc Information Technology',
-  'BSc Software Engineering',
-  'Bachelor of Computer Science (BCS)',
-  'Bachelor of Information Technology (BIT)',
-  'BSc Electrical Engineering',
-  'BSc Civil Engineering',
-  'Bachelor of Laws (LLB)',
-  'MBChB (Medicine and Surgery)',
-  'BBA (Business Administration)',
-  'Bachelor of Pharmacy',
-  'BSc Nursing Science',
-  'Bachelor of Mass Communication',
-  'BSc Public Health',
-  'BSc Statistics',
-  'BSc Mathematics',
-]
+// ─── Official KIU Tuition Fees (UGX per semester) ───────────────────────────
+// Source: Kampala International University official fee structure
+export const KIU_PROGRAM_TUITION_UGX: Record<string, number> = {
+  // College of Health Sciences – Kampala
+  'MBChB (Medicine and Surgery)': 4200000,
+  'Bachelor of Dental Surgery (BDS)': 4200000,
+  'Bachelor of Pharmacy (BPharm)': 3800000,
+  'BSc Nursing Science': 2100000,
+  'BSc Medical Laboratory Science': 2100000,
+  'BSc Physiotherapy': 2100000,
+  'BSc Environmental Health Science': 1800000,
+  'BSc Public Health': 1700000,
+  'BSc Human Nutrition and Dietetics': 1800000,
+  // Faculty of Science and Technology
+  'BSc Computer Science': 1600000,
+  'BSc Information Technology': 1600000,
+  'BSc Software Engineering': 1600000,
+  'Bachelor of Computer Science (BCS)': 1600000,
+  'Bachelor of Information Technology (BIT)': 1600000,
+  'BSc Electrical Engineering': 2200000,
+  'BSc Civil Engineering': 2200000,
+  'BSc Mechanical Engineering': 2200000,
+  'BSc Architecture': 2200000,
+  'BSc Mathematics': 1400000,
+  'BSc Statistics': 1400000,
+  // School of Law
+  'Bachelor of Laws (LLB)': 2000000,
+  // Faculty of Business and Management Sciences
+  'BBA (Business Administration)': 1600000,
+  'Bachelor of Commerce (BCom)': 1600000,
+  'Bachelor of Human Resource Management': 1600000,
+  'Bachelor of Banking and Finance': 1700000,
+  'Bachelor of Procurement and Logistics': 1600000,
+  'Bachelor of Accounting and Finance': 1700000,
+  // Faculty of Arts and Social Sciences
+  'Bachelor of Mass Communication': 1400000,
+  'Bachelor of Development Studies': 1400000,
+  'Bachelor of Social Work and Social Administration': 1400000,
+  // Faculty of Education (Western Campus)
+  'Bachelor of Education (Arts)': 1400000,
+  'Bachelor of Education (Science)': 1400000,
+  'Bachelor of Education (Business Studies)': 1400000,
+  // Faculty of Clinical Medicine & Dentistry (Western Campus)
+  'Bachelor of Clinical Medicine and Community Health': 2500000,
+  'BSc Anaesthesia Science': 2300000,
+}
 
-export const KIU_DEPARTMENTS = [
-  'Department of Computer Science',
-  'Department of Information Technology',
-  'Department of Engineering',
-  'School of Law',
-  'School of Medicine',
-  'School of Business',
-  'School of Nursing',
-  'School of Pharmacy',
-  'Department of Public Health',
-]
+/** KIU Bursary Scheme: 50% discount on official tuition */
+export const KIU_BURSARY_RATE = 0.5
 
-export const KIU_COLLEGES = [
-  'College of Science and Technology',
-  'College of Education',
-  'College of Humanities and Social Sciences',
-  'College of Business and Management',
-  'School of Health Sciences',
-  'School of Law',
-]
+/** Returns official tuition fee (UGX) for a program, or null if not found */
+export function getTuitionForProgram(program: string | null | undefined): number | null {
+  if (!program) return null
+  return KIU_PROGRAM_TUITION_UGX[program] ?? null
+}
+
+/** Returns programs offered by a department */
+export function getProgramsForDepartment(department: string): string[] {
+  return KIU_DEPARTMENT_PROGRAMS[department] ?? []
+}
+
+// ─── Official KIU Department → Programs Mapping ──────────────────────────────
+export const KIU_DEPARTMENT_PROGRAMS: Record<string, string[]> = {
+  // College of Health Sciences
+  'School of Medicine and Surgery': ['MBChB (Medicine and Surgery)'],
+  'School of Dentistry': ['Bachelor of Dental Surgery (BDS)'],
+  'School of Pharmacy': ['Bachelor of Pharmacy (BPharm)'],
+  'Department of Nursing': ['BSc Nursing Science'],
+  'Department of Medical Laboratory Science': ['BSc Medical Laboratory Science'],
+  'Department of Physiotherapy': ['BSc Physiotherapy'],
+  'Department of Environmental Health Science': ['BSc Environmental Health Science'],
+  'Department of Public Health': ['BSc Public Health'],
+  'Department of Human Nutrition and Dietetics': ['BSc Human Nutrition and Dietetics'],
+  // Faculty of Science and Technology
+  'Department of Computer Science': ['BSc Computer Science', 'Bachelor of Computer Science (BCS)'],
+  'Department of Information Technology': ['BSc Information Technology', 'Bachelor of Information Technology (BIT)'],
+  'Department of Software Engineering': ['BSc Software Engineering'],
+  'Department of Electrical Engineering': ['BSc Electrical Engineering'],
+  'Department of Civil Engineering': ['BSc Civil Engineering'],
+  'Department of Mechanical Engineering': ['BSc Mechanical Engineering'],
+  'Department of Architecture': ['BSc Architecture'],
+  'Department of Mathematics and Statistics': ['BSc Mathematics', 'BSc Statistics'],
+  // School of Law
+  'Department of Law': ['Bachelor of Laws (LLB)'],
+  // Faculty of Business and Management Sciences
+  'Department of Business Administration': ['BBA (Business Administration)'],
+  'Department of Commerce': ['Bachelor of Commerce (BCom)'],
+  'Department of Human Resource Management': ['Bachelor of Human Resource Management'],
+  'Department of Banking and Finance': ['Bachelor of Banking and Finance'],
+  'Department of Procurement and Logistics': ['Bachelor of Procurement and Logistics'],
+  'Department of Accounting': ['Bachelor of Accounting and Finance'],
+  // Faculty of Arts and Social Sciences
+  'Department of Mass Communication': ['Bachelor of Mass Communication'],
+  'Department of Development Studies': ['Bachelor of Development Studies'],
+  'Department of Social Work': ['Bachelor of Social Work and Social Administration'],
+  // Faculty of Education (Western Campus)
+  'Department of Education (Arts)': ['Bachelor of Education (Arts)', 'Bachelor of Education (Business Studies)'],
+  'Department of Education (Science)': ['Bachelor of Education (Science)'],
+  // Faculty of Clinical Medicine & Dentistry (Western Campus)
+  'Department of Clinical Medicine': ['Bachelor of Clinical Medicine and Community Health'],
+  'Department of Anaesthesia Sciences': ['BSc Anaesthesia Science'],
+}
+
+// ─── Official KIU College → Departments Mapping ──────────────────────────────
+export const KIU_COLLEGE_DEPARTMENTS: Record<string, string[]> = {
+  'College of Health Sciences': [
+    'School of Medicine and Surgery',
+    'School of Dentistry',
+    'School of Pharmacy',
+    'Department of Nursing',
+    'Department of Medical Laboratory Science',
+    'Department of Physiotherapy',
+    'Department of Environmental Health Science',
+    'Department of Public Health',
+    'Department of Human Nutrition and Dietetics',
+  ],
+  'Faculty of Science and Technology': [
+    'Department of Computer Science',
+    'Department of Information Technology',
+    'Department of Software Engineering',
+    'Department of Electrical Engineering',
+    'Department of Civil Engineering',
+    'Department of Mechanical Engineering',
+    'Department of Architecture',
+    'Department of Mathematics and Statistics',
+  ],
+  'School of Law': [
+    'Department of Law',
+  ],
+  'Faculty of Business and Management Sciences': [
+    'Department of Business Administration',
+    'Department of Commerce',
+    'Department of Human Resource Management',
+    'Department of Banking and Finance',
+    'Department of Procurement and Logistics',
+    'Department of Accounting',
+  ],
+  'Faculty of Arts and Social Sciences': [
+    'Department of Mass Communication',
+    'Department of Development Studies',
+    'Department of Social Work',
+  ],
+  'Faculty of Education': [
+    'Department of Education (Arts)',
+    'Department of Education (Science)',
+  ],
+  'Faculty of Clinical Medicine and Dentistry': [
+    'Department of Clinical Medicine',
+    'Department of Anaesthesia Sciences',
+  ],
+}
+
+export const KIU_COLLEGES = Object.keys(KIU_COLLEGE_DEPARTMENTS)
+
+export const KIU_DEPARTMENTS = Object.keys(KIU_DEPARTMENT_PROGRAMS)
+
+export const KIU_COURSES: string[] = Array.from(
+  new Set(Object.values(KIU_DEPARTMENT_PROGRAMS).flat()),
+)
 
 /** Default degree program used for curriculum sync when a student has department set but program/course do not match KIU_CURRICULUM keys. */
-export const KIU_DEPARTMENT_DEFAULT_PROGRAM: Record<string, string> = {
-  'Department of Computer Science': 'BSc Computer Science',
-  'Department of Information Technology': 'BSc Information Technology',
-  'Department of Engineering': 'BSc Electrical Engineering',
-  'School of Law': 'Bachelor of Laws (LLB)',
-  'School of Medicine': 'MBChB (Medicine and Surgery)',
-  'School of Business': 'BBA (Business Administration)',
-  'School of Nursing': 'BSc Nursing Science',
-  'School of Pharmacy': 'Bachelor of Pharmacy',
-  'Department of Public Health': 'BSc Public Health',
-}
+export const KIU_DEPARTMENT_DEFAULT_PROGRAM: Record<string, string> = Object.fromEntries(
+  Object.entries(KIU_DEPARTMENT_PROGRAMS).map(([dept, programs]) => [dept, programs[0]]),
+)
 
 export const KIU_SEMESTERS = [
   'Year 1 Semester 1',
