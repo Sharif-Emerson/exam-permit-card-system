@@ -101,8 +101,8 @@ body {
 .permit-sheet {
 	position: relative;
 	overflow: hidden;
-	print-color-adjust: exact;
 	-webkit-print-color-adjust: exact;
+	print-color-adjust: exact;
 }
 
 .permit-sheet::before {
@@ -167,8 +167,8 @@ body {
 		border-radius: 12px;
 		padding: 10px;
 		overflow: visible;
-		print-color-adjust: exact;
 		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
 	}
 
 	.permit-sheet::before {

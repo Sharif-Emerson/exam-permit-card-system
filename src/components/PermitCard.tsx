@@ -46,33 +46,25 @@ type PermitCardProps = {
 type PermitCardFieldKey = 'photo' | 'department' | 'semester' | 'course'
 
 type DepartmentPrintTheme = {
-  /** Background hex for the whole permit card */
-  cardBg: string
-  /** Border hex for the whole permit card */
-  cardBorder: string
-  /** Background hex for the print-only header band */
-  headerBg: string
-  /** Border hex for the print-only header band */
-  headerBorder: string
-  /** Background hex for the department badge pill */
-  badgeBg: string
-  /** Text hex for the department badge pill */
-  badgeColor: string
+  cardClass: string
+  headerClass: string
+  badgeClass: string
+  genderClass: string
 }
 
 const DEPARTMENT_PRINT_THEMES: DepartmentPrintTheme[] = [
   // 0 Blue
-  { cardBg: '#bfdbfe', cardBorder: '#2563eb', headerBg: '#93c5fd', headerBorder: '#1d4ed8', badgeBg: '#1d4ed8', badgeColor: '#ffffff' },
+  { cardClass: 'bg-blue-200 border-blue-600', headerClass: 'bg-blue-300 border-blue-700', badgeClass: 'bg-blue-700 text-white', genderClass: 'text-blue-800' },
   // 1 Green
-  { cardBg: '#bbf7d0', cardBorder: '#16a34a', headerBg: '#86efac', headerBorder: '#15803d', badgeBg: '#15803d', badgeColor: '#ffffff' },
+  { cardClass: 'bg-green-200 border-green-600', headerClass: 'bg-green-300 border-green-700', badgeClass: 'bg-green-700 text-white', genderClass: 'text-green-800' },
   // 2 Orange
-  { cardBg: '#fed7aa', cardBorder: '#ea580c', headerBg: '#fdba74', headerBorder: '#c2410c', badgeBg: '#c2410c', badgeColor: '#ffffff' },
+  { cardClass: 'bg-orange-200 border-orange-600', headerClass: 'bg-orange-300 border-orange-700', badgeClass: 'bg-orange-700 text-white', genderClass: 'text-orange-800' },
   // 3 Purple
-  { cardBg: '#e9d5ff', cardBorder: '#9333ea', headerBg: '#d8b4fe', headerBorder: '#7e22ce', badgeBg: '#7e22ce', badgeColor: '#ffffff' },
+  { cardClass: 'bg-purple-200 border-purple-600', headerClass: 'bg-purple-300 border-purple-700', badgeClass: 'bg-purple-700 text-white', genderClass: 'text-purple-800' },
   // 4 Cyan
-  { cardBg: '#a5f3fc', cardBorder: '#0891b2', headerBg: '#67e8f9', headerBorder: '#0e7490', badgeBg: '#0e7490', badgeColor: '#ffffff' },
+  { cardClass: 'bg-cyan-200 border-cyan-600', headerClass: 'bg-cyan-300 border-cyan-700', badgeClass: 'bg-cyan-700 text-white', genderClass: 'text-cyan-800' },
   // 5 Yellow
-  { cardBg: '#fde68a', cardBorder: '#d97706', headerBg: '#fcd34d', headerBorder: '#b45309', badgeBg: '#b45309', badgeColor: '#ffffff' },
+  { cardClass: 'bg-yellow-200 border-yellow-600', headerClass: 'bg-yellow-300 border-yellow-700', badgeClass: 'bg-yellow-700 text-white', genderClass: 'text-yellow-800' },
 ]
 
 function getDepartmentPrintTheme(department: string | undefined) {
@@ -168,13 +160,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
           </div>
         </div>
 
-        <div
-          className="permit-sheet rounded-2xl border-2 shadow-lg p-4 sm:p-6 lg:p-8 relative"
-          style={{
-            backgroundColor: departmentTheme.cardBg,
-            borderColor: departmentTheme.cardBorder,
-          }}
-        >
+        <div className={`permit-sheet rounded-2xl border-2 shadow-lg p-4 sm:p-6 lg:p-8 relative ${departmentTheme.cardClass}`}>
           {/* Watermark for print/download view */}
           <div
             className="pointer-events-none hidden select-none print:absolute print:inset-0 print:z-0 print:flex print:h-full print:w-full print:items-center print:justify-center print:text-[5rem] print:font-black print:uppercase print:tracking-[0.2em] print:text-[#0f5132] print:opacity-[0.08]"
@@ -189,13 +175,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
           </div>
 
           {/* Print-only permit header with custom logo */}
-          <div
-            className="mb-5 hidden rounded-xl border-2 px-4 py-4 text-center print:mb-4 print:block"
-            style={{
-              backgroundColor: departmentTheme.headerBg,
-              borderColor: departmentTheme.headerBorder,
-            }}
-          >
+          <div className={`mb-5 hidden rounded-xl border-2 px-4 py-4 text-center print:mb-4 print:block ${departmentTheme.headerClass}`}>
             <div className="flex flex-col items-center gap-2">
               {logo && <img src={logo} alt="Permit Logo" className="h-14 w-14 rounded-full border border-white/80 object-cover" draggable={false} />}
               <div>
@@ -203,7 +183,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                 <p className="mt-0.5 text-sm font-bold text-slate-900">{name}</p>
               </div>
             </div>
-            <div className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white" style={{ backgroundColor: departmentTheme.badgeBg }}>
+            <div className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${departmentTheme.badgeClass}`}>
               <span>{studentData.department ?? 'General'}</span>
               {studentData.gender && (
                 <span className="opacity-90">• {studentData.gender === 'male' ? 'M' : studentData.gender === 'female' ? 'F' : 'O'}</span>
@@ -233,7 +213,7 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                 {showField('semester') && <p className="text-sm text-gray-600 print:hidden">{studentData.semester}</p>}
                 {showField('course') && <p className="text-sm text-gray-600 print:hidden">{studentData.course}</p>}
                 {studentData.gender && (
-                  <p className="hidden print:block text-[10px] font-semibold mt-0.5" style={{ color: departmentTheme.badgeBg }}>
+                  <p className={`hidden print:block text-[10px] font-semibold mt-0.5 ${departmentTheme.genderClass}`}>
                     {studentData.gender === 'male' ? 'MALE' : studentData.gender === 'female' ? 'FEMALE' : 'OTHER'}
                   </p>
                 )}
