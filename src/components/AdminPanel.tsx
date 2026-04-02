@@ -19,6 +19,8 @@ import { downloadFinancialImportTemplate } from '../services/adminImportTemplate
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
 import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail } from '../services/profileService'
+import { loadFaqs, saveFaqs } from './faqStorage'
+import type { FaqItem } from './faqStorage'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
 import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AssistantAdminAccount, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline } from '../types'
 import { DIALOG_Z } from '../constants/dialogLayers'
@@ -620,6 +622,8 @@ export default function AdminPanel() {
   const [emailTestRecipient, setEmailTestRecipient] = useState('')
   const [emailTestSending, setEmailTestSending] = useState(false)
   const [emailTestResult, setEmailTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [faqDraft, setFaqDraft] = useState<FaqItem[]>(() => loadFaqs())
+  const [faqSaved, setFaqSaved] = useState(false)
   const [assistantAdmins, setAssistantAdmins] = useState<AssistantAdminAccount[]>([])
   const [assistantAdminsLoading, setAssistantAdminsLoading] = useState(false)
   const [assistantAdminsSaving, setAssistantAdminsSaving] = useState(false)
@@ -2253,6 +2257,15 @@ export default function AdminPanel() {
       setSavingSettings(false)
     }
   }, [user, settingsDraft, refreshUser])
+
+  function handleSaveFaq(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const cleaned = faqDraft.filter((f) => f.question.trim() || f.answer.trim())
+    saveFaqs(cleaned)
+    setFaqDraft(cleaned.length > 0 ? cleaned : loadFaqs())
+    setFaqSaved(true)
+    setTimeout(() => setFaqSaved(false), 2500)
+  }
 
   async function handleSendTestEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -5348,6 +5361,83 @@ export default function AdminPanel() {
                       <Save className="h-4 w-4" />
                       {savingSettings ? 'Saving...' : 'Save account settings'}
                     </button>
+                  </form>
+                </div>
+
+                <div className="rounded-xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-800 dark:bg-slate-900">
+                  <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-800 px-6 py-4">
+                    <div>
+                      <h2 className="font-semibold text-gray-800 dark:text-white">FAQ Editor</h2>
+                      <p className="mt-1 text-xs text-gray-400 dark:text-slate-400">Manage the FAQ shown to students in the Help &amp; Support section.</p>
+                    </div>
+                  </div>
+                  <form className="space-y-4 px-6 py-5" onSubmit={handleSaveFaq}>
+                    <div className="space-y-3">
+                      {faqDraft.map((item, idx) => (
+                        <div key={idx} className="grid gap-2 rounded-xl border border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 p-4 sm:grid-cols-[1fr_1fr_auto]">
+                          <div>
+                            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-gray-400 dark:text-slate-400">Question</label>
+                            <input
+                              type="text"
+                              value={item.question}
+                              onChange={(e) => {
+                                const next = [...faqDraft]
+                                next[idx] = { ...item, question: e.target.value }
+                                setFaqDraft(next)
+                              }}
+                              className="w-full rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                              placeholder="e.g. How do I get my permit?"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-gray-400 dark:text-slate-400">Answer</label>
+                            <textarea
+                              rows={2}
+                              value={item.answer}
+                              onChange={(e) => {
+                                const next = [...faqDraft]
+                                next[idx] = { ...item, answer: e.target.value }
+                                setFaqDraft(next)
+                              }}
+                              className="w-full rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                              placeholder="Write the answer here…"
+                            />
+                          </div>
+                          <div className="flex items-start pt-5">
+                            <button
+                              type="button"
+                              onClick={() => setFaqDraft(faqDraft.filter((_, i) => i !== idx))}
+                              className="rounded p-1.5 text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
+                              aria-label="Remove FAQ item"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {faqDraft.length === 0 && (
+                        <p className="rounded-xl border-2 border-dashed border-gray-100 dark:border-slate-700 py-5 text-center text-xs text-gray-400 dark:text-slate-500 font-medium">
+                          No FAQ items. Add one below.
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFaqDraft([...faqDraft, { question: '', answer: '' }])}
+                      className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"
+                    >
+                      + Add FAQ item
+                    </button>
+                    <div className="flex items-center gap-3 pt-1">
+                      <button
+                        type="submit"
+                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                      >
+                        <Save className="h-4 w-4" />
+                        Save FAQ
+                      </button>
+                      {faqSaved && <span className="text-xs font-medium text-emerald-500 dark:text-emerald-400">✓ Saved — students will see these changes immediately.</span>}
+                    </div>
                   </form>
                 </div>
 
