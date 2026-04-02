@@ -76,6 +76,10 @@ body {
 	color: rgb(241 245 249);
 }
 
+.dark .admin-theme-shell .text-gray-800 {
+	color: rgb(226 232 240);
+}
+
 .dark .admin-theme-shell .text-gray-700 {
 	color: rgb(203 213 225);
 }
@@ -86,6 +90,138 @@ body {
 
 .dark .admin-theme-shell .text-gray-500 {
 	color: rgb(148 163 184);
+}
+
+.dark .admin-theme-shell .text-gray-400 {
+	color: rgb(148 163 184);
+}
+
+.dark .admin-theme-shell .text-slate-900 {
+	color: rgb(241 245 249);
+}
+
+.dark .admin-theme-shell .text-slate-800 {
+	color: rgb(226 232 240);
+}
+
+.dark .admin-theme-shell .text-slate-700 {
+	color: rgb(203 213 225);
+}
+
+.dark .admin-theme-shell .text-slate-600 {
+	color: rgb(148 163 184);
+}
+
+.dark .admin-theme-shell .text-slate-500 {
+	color: rgb(148 163 184);
+}
+
+.dark .admin-theme-shell .font-bold[class*='text-gray'],
+.dark .admin-theme-shell .font-semibold[class*='text-gray'],
+.dark .admin-theme-shell .font-bold[class*='text-slate'],
+.dark .admin-theme-shell .font-semibold[class*='text-slate'] {
+	color: rgb(241 245 249) !important;
+}
+
+.dark .admin-theme-shell h1,
+.dark .admin-theme-shell h2,
+.dark .admin-theme-shell h3,
+.dark .admin-theme-shell .font-bold,
+.dark .admin-theme-shell .font-semibold {
+	color: rgb(241 245 249) !important;
+}
+
+.dark .student-dashboard-app .text-gray-900 {
+	color: rgb(241 245 249);
+}
+
+.dark .student-dashboard-app .text-gray-800 {
+	color: rgb(226 232 240);
+}
+
+.dark .student-dashboard-app .text-gray-700 {
+	color: rgb(203 213 225);
+}
+
+.dark .student-dashboard-app .text-gray-600,
+.dark .student-dashboard-app .text-gray-500,
+.dark .student-dashboard-app .text-gray-400 {
+	color: rgb(148 163 184);
+}
+
+.dark .student-dashboard-app .text-slate-900 {
+	color: rgb(241 245 249);
+}
+
+.dark .student-dashboard-app .text-slate-800 {
+	color: rgb(226 232 240);
+}
+
+.dark .student-dashboard-app .text-slate-700 {
+	color: rgb(203 213 225);
+}
+
+.dark .student-dashboard-app .text-slate-600,
+.dark .student-dashboard-app .text-slate-500,
+.dark .student-dashboard-app .text-slate-400 {
+	color: rgb(148 163 184);
+}
+
+.dark .student-dashboard-app .placeholder-gray-400::placeholder,
+.dark .student-dashboard-app .placeholder-gray-500::placeholder,
+.dark .student-dashboard-app .dark\:placeholder-slate-500::placeholder {
+	color: rgb(148 163 184);
+}
+
+.dark .admin-theme-shell .placeholder-gray-400::placeholder,
+.dark .admin-theme-shell .placeholder-gray-500::placeholder,
+.dark .admin-theme-shell .dark\:placeholder-slate-500::placeholder {
+	color: rgb(148 163 184);
+}
+
+.dark .admin-theme-shell .bg-white,
+.dark .admin-theme-shell .bg-white\/90,
+.dark .admin-theme-shell .bg-white\/95,
+.dark .admin-theme-shell .bg-white\/80,
+.dark .admin-theme-shell .bg-gray-50,
+.dark .admin-theme-shell .bg-gray-100,
+.dark .admin-theme-shell .bg-gray-200,
+.dark .admin-theme-shell .hover\:bg-white:hover,
+
+.dark .admin-theme-shell .hover\:bg-white\/90:hover,
+.dark .admin-theme-shell .hover\:bg-gray-50:hover,
+.dark .admin-theme-shell .hover\:bg-gray-100:hover {
+	background-color: rgb(2 6 23) !important;
+}
+
+.dark .admin-theme-shell .border-gray-200,
+.dark .admin-theme-shell .border-gray-100,
+.dark .admin-theme-shell .border-gray-300,
+.dark .admin-theme-shell .border-white\/80,
+.dark .admin-theme-shell .border-white\/70 {
+	border-color: rgb(51 65 85) !important;
+}
+
+.dark .admin-theme-shell input,
+.dark .admin-theme-shell select,
+.dark .admin-theme-shell textarea {
+	background-color: rgb(15 23 42);
+	color: rgb(241 245 249);
+	border-color: rgb(51 65 85);
+}
+
+.dark .admin-theme-shell select option,
+.dark .admin-theme-shell select optgroup {
+	background-color: rgb(15 23 42);
+	color: rgb(241 245 249);
+}
+
+.dark .admin-theme-shell input:disabled,
+.dark .admin-theme-shell select:disabled,
+.dark .admin-theme-shell textarea:disabled {
+	background-color: rgb(30 41 59);
+	color: rgb(148 163 184);
+	border-color: rgb(71 85 105);
 }
 
 .payment-progress {
