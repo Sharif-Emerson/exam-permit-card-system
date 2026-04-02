@@ -186,7 +186,6 @@ export const restAuthAdapter: AuthAdapter = {
 
     setStoredAuthToken(token)
     const session = { userId, user: authUser ?? undefined }
-    notify(session)
     return session
   },
   async signInWithToken(token) {
@@ -212,7 +211,6 @@ export const restAuthAdapter: AuthAdapter = {
       }
 
       const session = { userId, user: authUser ?? undefined }
-      notify(session)
       return session
     } catch {
       clearStoredAuthToken()
