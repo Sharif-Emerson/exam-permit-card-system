@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
-import { Lock, Moon, Sun, User } from 'lucide-react'
+import { Eye, EyeOff, Lock, Moon, Sun, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { backendProvider, publicApiBaseUrl } from '../config/provider'
 import { useAuth } from '../context/AuthContext'
@@ -13,11 +13,14 @@ export default function Login() {
   const { darkMode, toggleTheme } = useTheme()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [showResetForm, setShowResetForm] = useState(false)
   const [resetIdentifier, setResetIdentifier] = useState('')
   const [verification, setVerification] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [resettingPassword, setResettingPassword] = useState(false)
   const [error, setError] = useState('')
@@ -294,13 +297,22 @@ export default function Login() {
                   <input
                     id="password"
                     name="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
-                    className="block w-full rounded-md border border-emerald-200 bg-emerald-50/40 py-2 pl-9 pr-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-emerald-500 dark:border-emerald-900/60 dark:bg-slate-900/80 dark:text-white sm:py-2 sm:pl-10 sm:text-base"
+                    className="block w-full rounded-md border border-emerald-200 bg-emerald-50/40 py-2 pl-9 pr-10 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-emerald-500 dark:border-emerald-900/60 dark:bg-slate-900/80 dark:text-white sm:py-2 sm:pl-10 sm:text-base"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
+                  <button
+                    type="button"
+                    title={showPassword ? 'Hide characters' : 'Show characters'}
+                    aria-label={showPassword ? 'Hide characters' : 'Show characters'}
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-emerald-500 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-100"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
             </div>
@@ -380,31 +392,53 @@ export default function Login() {
               <label htmlFor="reset-new-password" className="block text-sm font-medium text-emerald-900 dark:text-emerald-100">
                 New password
               </label>
-              <input
-                id="reset-new-password"
-                type="password"
-                required
-                minLength={8}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="At least 8 characters"
-                className="mt-1 block w-full rounded-md border border-emerald-200 bg-emerald-50/40 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-emerald-500 dark:border-emerald-900/60 dark:bg-slate-900/80 dark:text-white sm:text-base"
-              />
+              <div className="relative mt-1">
+                <input
+                  id="reset-new-password"
+                  type={showNewPassword ? 'text' : 'password'}
+                  required
+                  minLength={8}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  className="block w-full rounded-md border border-emerald-200 bg-emerald-50/40 px-3 py-2 pr-10 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-emerald-500 dark:border-emerald-900/60 dark:bg-slate-900/80 dark:text-white sm:text-base"
+                />
+                <button
+                  type="button"
+                  title={showNewPassword ? 'Hide characters' : 'Show characters'}
+                  aria-label={showNewPassword ? 'Hide characters' : 'Show characters'}
+                  onClick={() => setShowNewPassword((current) => !current)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-emerald-500 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-100"
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div>
               <label htmlFor="reset-confirm-password" className="block text-sm font-medium text-emerald-900 dark:text-emerald-100">
                 Confirm new password
               </label>
-              <input
-                id="reset-confirm-password"
-                type="password"
-                required
-                minLength={8}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repeat your new password"
-                className="mt-1 block w-full rounded-md border border-emerald-200 bg-emerald-50/40 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-emerald-500 dark:border-emerald-900/60 dark:bg-slate-900/80 dark:text-white sm:text-base"
-              />
+              <div className="relative mt-1">
+                <input
+                  id="reset-confirm-password"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  minLength={8}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat your new password"
+                  className="block w-full rounded-md border border-emerald-200 bg-emerald-50/40 px-3 py-2 pr-10 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-emerald-500 dark:border-emerald-900/60 dark:bg-slate-900/80 dark:text-white sm:text-base"
+                />
+                <button
+                  type="button"
+                  title={showConfirmPassword ? 'Hide characters' : 'Show characters'}
+                  aria-label={showConfirmPassword ? 'Hide characters' : 'Show characters'}
+                  onClick={() => setShowConfirmPassword((current) => !current)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-emerald-500 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-100"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div className="flex gap-3">
               <button
