@@ -1492,15 +1492,15 @@ export default function AdminPanel() {
     ...(permitStatusCounts.expired > 0 ? [{
       id: 'expired',
       title: 'Expired permits detected',
-      message: `${permitStatusCounts.expired} exam schedule record(s) are now past the exam date and should be archived or reviewed.`,
+      message: `${permitStatusCounts.expired} permit record(s) are now expired and should be archived or reviewed.`,
       tone: 'warning' as const,
       actionLabel: 'Open Reports',
       onAction: () => setActiveSection('reports'),
     }] : []),
     ...(studentsWithUpcomingUnpaidExams.length > 0 ? [{
       id: 'auto-unpaid-upcoming',
-      title: 'Automatic Alert: Outstanding Balances Before Exams',
-      message: `${studentsWithUpcomingUnpaidExams.length} student(s) have exams within 7 days and still owe fees.`,
+      title: 'Automatic Alert: Outstanding Balances',
+      message: `${studentsWithUpcomingUnpaidExams.length} student(s) still owe fees and need follow-up.`,
       tone: 'warning' as const,
       actionLabel: 'Send Reminders',
       onAction: () => {
@@ -3212,7 +3212,7 @@ export default function AdminPanel() {
                       <Shield className="h-5 w-5 text-rose-400" />
                     </div>
                     <p className="mt-2 text-3xl font-bold text-rose-700">{permitStatusCounts.expired}</p>
-                    <p className="mt-1 text-xs text-rose-400">past exam dates</p>
+                    <p className="mt-1 text-xs text-rose-400">expired records</p>
                   </div>
                 </div>
 
@@ -3252,8 +3252,8 @@ export default function AdminPanel() {
 
                   <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                     <div className="border-b border-gray-100 px-5 py-4">
-                      <h2 className="font-semibold text-gray-800">Upcoming Exam Schedule</h2>
-                      <p className="text-xs text-gray-400">Next scheduled exams pulled from current permit assignments</p>
+                      <h2 className="font-semibold text-gray-800">Permit Assignment Overview</h2>
+                      <p className="text-xs text-gray-400">Assigned permit items pulled from current student records</p>
                     </div>
                     <div className="divide-y divide-gray-100">
                       {upcomingExamEntries.slice(0, 5).map((item) => (
@@ -3263,15 +3263,13 @@ export default function AdminPanel() {
                               <p className="font-medium text-gray-900">{item.exam.title}</p>
                               <p className="text-xs text-gray-400">{item.student.name} • {item.student.studentId}</p>
                             </div>
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                              {new Date(item.exam.examDate).toLocaleDateString()}
-                            </span>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">Assigned</span>
                           </div>
-                          <p className="mt-2 text-xs text-gray-500">{item.exam.examTime} • {item.exam.venue} • Seat {item.exam.seatNumber}</p>
+                          <p className="mt-2 text-xs text-gray-500">{item.exam.venue} • Seat {item.exam.seatNumber}</p>
                         </div>
                       ))}
                       {upcomingExamEntries.length === 0 && (
-                        <div className="px-5 py-8 text-center text-sm text-gray-400">No scheduled exams are available yet.</div>
+                        <div className="px-5 py-8 text-center text-sm text-gray-400">No permit assignments are available yet.</div>
                       )}
                     </div>
                   </div>
@@ -6262,28 +6260,6 @@ export default function AdminPanel() {
                     onChange={(event) => setCreateDraft((current) => ({ ...current, profileImage: event.target.value }))}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 mt-2"
                     placeholder="https://example.com/student-photo.jpg"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="create-student-exam-date" className="mb-1 block text-xs font-medium text-gray-700">Exam Date</label>
-                  <input
-                    id="create-student-exam-date"
-                    type="text"
-                    value={createDraft.examDate ?? ''}
-                    onChange={(event) => setCreateDraft((current) => ({ ...current, examDate: event.target.value }))}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                    placeholder="e.g. 2026-11-04"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="create-student-exam-time" className="mb-1 block text-xs font-medium text-gray-700">Exam Time</label>
-                  <input
-                    id="create-student-exam-time"
-                    type="text"
-                    value={createDraft.examTime ?? ''}
-                    onChange={(event) => setCreateDraft((current) => ({ ...current, examTime: event.target.value }))}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                    placeholder="e.g. 9:00 AM"
                   />
                 </div>
                 <div>

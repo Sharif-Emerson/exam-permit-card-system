@@ -320,8 +320,8 @@ function buildNotifications(student: StudentProfile, history: PermitApplicationR
   if (student.exams.length > 0) {
     baseNotifications.push({
       id: 'exam-ready',
-      title: 'Exam details updated',
-      message: `You have ${student.exams.length} scheduled exam${student.exams.length === 1 ? '' : 's'} on your permit card.`,
+      title: 'Permit schedule updated',
+      message: `You have ${student.exams.length} scheduled item${student.exams.length === 1 ? '' : 's'} on your permit card.`,
       tone: 'blue',
       createdAt: new Date().toISOString(),
     })
@@ -430,7 +430,7 @@ function getStatusPresentation(status: PermitStatus) {
       icon: ShieldCheck,
       cardClass: 'border-green-200 bg-green-50 text-green-900',
       badgeClass: 'bg-green-600 text-white',
-      message: 'Your permit is ready. Download or print it before your exam date.',
+      message: 'Your permit is ready. Download or print it when needed.',
     }
   }
 
@@ -1211,7 +1211,7 @@ export default function Dashboard() {
     () => notifications.filter((n) => !readNotificationIds.has(n.id)).length,
     [notifications, readNotificationIds],
   )
-  const currentSession = applicationHistory[0]?.semester || `${deriveAcademicSession(studentData?.examDate)} ${deriveSemesterLabel(studentData?.examDate)}`
+  const currentSession = applicationHistory[0]?.semester || `${deriveAcademicSession()} ${deriveSemesterLabel()}`
 
   if (loading) {
     return (
@@ -1766,9 +1766,10 @@ export default function Dashboard() {
 
                           <div className="mt-6 grid gap-4 sm:grid-cols-2">
                             <div className="rounded-3xl bg-white/70 p-4 dark:bg-slate-950/70">
-                              <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Exam Details</p>
+                              <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">Academic Details</p>
                               <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                                <p>Date: {formatDate(studentData.examDate)}</p>
+                                <p>Semester: {studentData.semester || currentSession}</p>
+                                <p>Department: {studentData.department || 'Not assigned'}</p>
                               </div>
                             </div>
                             <div className="rounded-3xl bg-white/70 p-4 dark:bg-slate-950/70">
@@ -2597,7 +2598,6 @@ export default function Dashboard() {
                           <p><span className="font-semibold">Registration No:</span> {studentData.studentId}</p>
                           <p><span className="font-semibold">Program:</span> {studentData.program || studentData.course}</p>
                           <p><span className="font-semibold">Semester:</span> {studentData.semester || currentSession}</p>
-                          <p><span className="font-semibold">Exam Date:</span> {formatDate(studentData.examDate)}</p>
                           <p><span className="font-semibold">Status:</span> {statusView.label}</p>
                         </div>
                         <div className="w-32 shrink-0 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">

@@ -1,4 +1,4 @@
-import { Calendar, Clock, Download, LogOut, MapPin, Printer, RefreshCcw, User } from 'lucide-react'
+import { Download, LogOut, MapPin, Printer, RefreshCcw, User } from 'lucide-react'
 import { useCallback } from 'react'
 import { generalExamRules } from '../config/examRules'
 import { institutionLogo as defaultLogo, institutionName as defaultName, examPermitConfig } from '../config/branding'
@@ -140,13 +140,6 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
   const showField = (field: PermitCardFieldKey) => permitDesign.fields?.[field] !== false
   const profileImage = studentData.profileImage?.trim() ? studentData.profileImage : getFallbackImage(studentData.gender)
   const departmentTheme = getDepartmentPrintTheme(studentData.department)
-
-  // Permit validity: valid from today to exam date or a set period (e.g., 30 days from issue)
-  const issueDate = new Date()
-  // If student has exams, use the latest exam date as expiry; else, 30 days from now
-  const expiryDate = studentData.exams.length > 0
-    ? new Date(Math.max(...studentData.exams.map(e => new Date(e.examDate).getTime())))
-    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
 
   return (
     <div className="min-h-screen bg-slate-100 py-4 sm:py-8 print:bg-white">
@@ -311,10 +304,6 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
             </div>
           </div>
 
-          {/* Permit validity period (print only) */}
-          <div className="hidden print:block print:mb-1.5 text-center text-[9px] text-slate-700 font-semibold tracking-wide">
-            Permit Valid: {issueDate.toLocaleDateString()} — {expiryDate.toLocaleDateString()}
-          </div>
           {/* Print: two columns on A4; course units as table (no venue); exams compact table without venue */}
           <div className="print:grid print:grid-cols-[1.15fr_0.85fr] print:gap-x-4 print:items-start print:[page-break-inside:avoid]">
             {/* Column 1: Exams */}
@@ -362,18 +351,8 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                     {studentData.exams.map((exam) => (
                       <div key={exam.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <h4 className="text-sm sm:text-base font-semibold text-slate-900 mb-3">{exam.title}</h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-1 gap-3 sm:gap-4">
                           <div className="flex items-center space-x-2">
-                            <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0" />
-                            <span className="font-medium text-sm sm:text-base">Date:</span>
-                            <span className="text-sm sm:text-base">{exam.examDate}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0" />
-                            <span className="font-medium text-sm sm:text-base">Time:</span>
-                            <span className="text-sm sm:text-base">{exam.examTime}</span>
-                          </div>
-                          <div className="flex items-center space-x-2 sm:col-span-2">
                             <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 flex-shrink-0" />
                             <span className="font-medium text-sm sm:text-base">Venue:</span>
                             <span className="text-sm sm:text-base">{exam.venue}</span>
@@ -387,16 +366,14 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                     <thead>
                       <tr className="bg-slate-100">
                         <th className="border border-slate-400 px-1 py-0.5 font-semibold">Exam</th>
-                        <th className="border border-slate-400 px-1 py-0.5 font-semibold whitespace-nowrap">Date</th>
-                        <th className="border border-slate-400 px-1 py-0.5 font-semibold whitespace-nowrap">Time</th>
+                        <th className="border border-slate-400 px-1 py-0.5 font-semibold">Venue</th>
                       </tr>
                     </thead>
                     <tbody>
                       {studentData.exams.map((exam) => (
                         <tr key={exam.id}>
                           <td className="border border-slate-400 px-1 py-0.5 align-top">{exam.title}</td>
-                          <td className="border border-slate-400 px-1 py-0.5 align-top whitespace-nowrap">{exam.examDate}</td>
-                          <td className="border border-slate-400 px-1 py-0.5 align-top whitespace-nowrap">{exam.examTime}</td>
+                          <td className="border border-slate-400 px-1 py-0.5 align-top">{exam.venue}</td>
                         </tr>
                       ))}
                     </tbody>
