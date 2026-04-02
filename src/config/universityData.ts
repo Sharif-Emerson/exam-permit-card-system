@@ -486,5 +486,518 @@ export const KIU_CURRICULUM: Record<string, KiuProgramCurriculum> = {
         { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '02:00 PM' }
       ]
     }
+  },
+  'Bachelor of Dental Surgery (BDS)': {
+    defaultCourse: 'Bachelor of Dental Surgery (BDS)',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'DEN 1101: Oral Biology', venue: 'Science Block A', time: '08:00 AM' },
+        { unitName: 'DEN 1102: Human Anatomy for Dentistry', venue: 'Lab A', time: '11:00 AM' },
+        { unitName: 'DEN 1103: Dental Biochemistry', venue: 'Lab B', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'DEN 1201: Dental Histology', venue: 'Lab A', time: '08:00 AM' },
+        { unitName: 'DEN 1202: Dental Physiology', venue: 'Science Block A', time: '11:00 AM' },
+        { unitName: 'DEN 1203: Introduction to Clinical Dentistry', venue: 'Clinic Block', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'DEN 2101: Oral Pathology I', venue: 'Lab B', time: '08:00 AM' },
+        { unitName: 'DEN 2102: Dental Pharmacology', venue: 'Science Block A', time: '11:00 AM' },
+        { unitName: 'DEN 2103: Operative Dentistry I', venue: 'Clinic Block', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'DEN 2201: Oral Pathology II', venue: 'Lab B', time: '08:00 AM' },
+        { unitName: 'DEN 2202: Oral Radiology', venue: 'Radiology Unit', time: '11:00 AM' },
+        { unitName: 'DEN 2203: Operative Dentistry II', venue: 'Clinic Block', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Medical Laboratory Science': {
+    defaultCourse: 'BSc Medical Laboratory Science',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'MLS 1101: Introduction to Medical Laboratory Science', venue: 'Lab A', time: '08:00 AM' },
+        { unitName: 'MLS 1102: Human Anatomy and Physiology', venue: 'Science Block B', time: '11:00 AM' },
+        { unitName: 'MLS 1103: Basic Chemistry for Health Sciences', venue: 'Lab B', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'MLS 1201: Haematology I', venue: 'Lab A', time: '08:00 AM' },
+        { unitName: 'MLS 1202: Clinical Biochemistry I', venue: 'Lab B', time: '11:00 AM' },
+        { unitName: 'MLS 1203: Microbiology I', venue: 'Science Block B', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'MLS 2101: Haematology II', venue: 'Lab A', time: '08:00 AM' },
+        { unitName: 'MLS 2102: Clinical Biochemistry II', venue: 'Lab B', time: '11:00 AM' },
+        { unitName: 'MLS 2103: Parasitology', venue: 'Science Block B', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'MLS 2201: Blood Banking and Transfusion', venue: 'Lab A', time: '08:00 AM' },
+        { unitName: 'MLS 2202: Histopathology I', venue: 'Lab B', time: '11:00 AM' },
+        { unitName: 'MLS 2203: Research Methods', venue: 'Room 3', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Physiotherapy': {
+    defaultCourse: 'BSc Physiotherapy',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'PHY 1101: Anatomy for Physiotherapy', venue: 'Lab A', time: '08:00 AM' },
+        { unitName: 'PHY 1102: Physiology for Physiotherapy', venue: 'Science Block B', time: '11:00 AM' },
+        { unitName: 'PHY 1103: Introduction to Physiotherapy', venue: 'Clinic Block', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'PHY 1201: Biomechanics', venue: 'Lab A', time: '08:00 AM' },
+        { unitName: 'PHY 1202: Exercise Physiology', venue: 'Science Block B', time: '11:00 AM' },
+        { unitName: 'PHY 1203: Basic Physiotherapy Techniques', venue: 'Clinic Block', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'PHY 2101: Musculoskeletal Physiotherapy', venue: 'Clinic Block', time: '08:00 AM' },
+        { unitName: 'PHY 2102: Neurological Physiotherapy', venue: 'Clinic Block', time: '11:00 AM' },
+        { unitName: 'PHY 2103: Cardiorespiratory Physiotherapy', venue: 'Lab A', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'PHY 2201: Paediatric Physiotherapy', venue: 'Clinic Block', time: '08:00 AM' },
+        { unitName: 'PHY 2202: Sports Physiotherapy', venue: 'Gym Block', time: '11:00 AM' },
+        { unitName: 'PHY 2203: Research Methods in Physiotherapy', venue: 'Room 3', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Environmental Health Science': {
+    defaultCourse: 'BSc Environmental Health Science',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'EHS 1101: Introduction to Environmental Health', venue: 'Room 5', time: '08:00 AM' },
+        { unitName: 'EHS 1102: Environmental Chemistry', venue: 'Lab B', time: '11:00 AM' },
+        { unitName: 'EHS 1103: Epidemiology and Disease Control', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'EHS 1201: Water and Sanitation', venue: 'Lab B', time: '08:00 AM' },
+        { unitName: 'EHS 1202: Food Safety and Hygiene', venue: 'Room 5', time: '11:00 AM' },
+        { unitName: 'EHS 1203: Occupational Health and Safety', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'EHS 2101: Air Quality Management', venue: 'Room 5', time: '08:00 AM' },
+        { unitName: 'EHS 2102: Solid Waste Management', venue: 'Lab B', time: '11:00 AM' },
+        { unitName: 'EHS 2103: Environmental Toxicology', venue: 'Room 4', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'EHS 2201: Environmental Impact Assessment', venue: 'Room 5', time: '08:00 AM' },
+        { unitName: 'EHS 2202: Disease Vector Control', venue: 'Lab B', time: '11:00 AM' },
+        { unitName: 'EHS 2203: Research Methods', venue: 'Room 3', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Human Nutrition and Dietetics': {
+    defaultCourse: 'BSc Human Nutrition and Dietetics',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'NUT 1101: Introduction to Nutrition', venue: 'Room 6', time: '08:00 AM' },
+        { unitName: 'NUT 1102: Human Biochemistry', venue: 'Lab B', time: '11:00 AM' },
+        { unitName: 'NUT 1103: Food Science and Technology', venue: 'Lab C', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'NUT 1201: Macronutrients and Metabolism', venue: 'Lab B', time: '08:00 AM' },
+        { unitName: 'NUT 1202: Micronutrients', venue: 'Room 6', time: '11:00 AM' },
+        { unitName: 'NUT 1203: Community Nutrition', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'NUT 2101: Clinical Nutrition I', venue: 'Clinic Block', time: '08:00 AM' },
+        { unitName: 'NUT 2102: Dietetics Practice', venue: 'Lab C', time: '11:00 AM' },
+        { unitName: 'NUT 2103: Maternal and Child Nutrition', venue: 'Room 6', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'NUT 2201: Clinical Nutrition II', venue: 'Clinic Block', time: '08:00 AM' },
+        { unitName: 'NUT 2202: Public Health Nutrition', venue: 'Room 4', time: '11:00 AM' },
+        { unitName: 'NUT 2203: Research Methods in Nutrition', venue: 'Room 3', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Mechanical Engineering': {
+    defaultCourse: 'BSc Mechanical Engineering',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'MEN 1101: Engineering Mathematics I', venue: 'Room 1', time: '08:00 AM' },
+        { unitName: 'MEN 1102: Engineering Drawing', venue: 'Drawing Studio', time: '11:00 AM' },
+        { unitName: 'MEN 1103: Introduction to Mechanical Engineering', venue: 'Workshop A', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'MEN 1201: Engineering Mathematics II', venue: 'Room 1', time: '08:00 AM' },
+        { unitName: 'MEN 1202: Thermodynamics I', venue: 'Workshop A', time: '11:00 AM' },
+        { unitName: 'MEN 1203: Mechanics of Materials', venue: 'Lab E', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'MEN 2101: Thermodynamics II', venue: 'Workshop A', time: '08:00 AM' },
+        { unitName: 'MEN 2102: Fluid Mechanics', venue: 'Lab E', time: '11:00 AM' },
+        { unitName: 'MEN 2103: Manufacturing Technology', venue: 'Workshop B', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'MEN 2201: Machine Design', venue: 'Workshop A', time: '08:00 AM' },
+        { unitName: 'MEN 2202: Heat Transfer', venue: 'Lab E', time: '11:00 AM' },
+        { unitName: 'MEN 2203: Engineering Management', venue: 'Room 2', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Architecture': {
+    defaultCourse: 'BSc Architecture',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'ARC 1101: Architectural Design I', venue: 'Design Studio', time: '08:00 AM' },
+        { unitName: 'ARC 1102: History of Architecture', venue: 'Room 7', time: '11:00 AM' },
+        { unitName: 'ARC 1103: Building Technology I', venue: 'Workshop A', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'ARC 1201: Architectural Design II', venue: 'Design Studio', time: '08:00 AM' },
+        { unitName: 'ARC 1202: Structural Systems', venue: 'Lab E', time: '11:00 AM' },
+        { unitName: 'ARC 1203: Environmental Design', venue: 'Room 7', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'ARC 2101: Urban Design and Planning', venue: 'Design Studio', time: '08:00 AM' },
+        { unitName: 'ARC 2102: Building Services', venue: 'Workshop A', time: '11:00 AM' },
+        { unitName: 'ARC 2103: Construction Materials', venue: 'Lab E', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'ARC 2201: Architectural Design III', venue: 'Design Studio', time: '08:00 AM' },
+        { unitName: 'ARC 2202: Professional Practice', venue: 'Room 7', time: '11:00 AM' },
+        { unitName: 'ARC 2203: Research Studio', venue: 'Design Studio', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Commerce (BCom)': {
+    defaultCourse: 'Bachelor of Commerce (BCom)',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'COM 1101: Principles of Commerce', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'COM 1102: Business Mathematics', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'COM 1103: Introduction to Accounting', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'COM 1201: Business Economics', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'COM 1202: Commercial Law', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'COM 1203: Financial Accounting', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'COM 2101: Cost Accounting', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'COM 2102: Banking and Finance', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'COM 2103: Marketing Management', venue: 'Room 4', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'COM 2201: Auditing', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'COM 2202: Taxation', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'COM 2203: Business Research Methods', venue: 'Room 5', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Human Resource Management': {
+    defaultCourse: 'Bachelor of Human Resource Management',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'HRM 1101: Introduction to Human Resource Management', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'HRM 1102: Organisational Behaviour', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'HRM 1103: Business Communication', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'HRM 1201: Recruitment and Selection', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'HRM 1202: Labour Law', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'HRM 1203: Compensation and Benefits', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'HRM 2101: Training and Development', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'HRM 2102: Performance Management', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'HRM 2103: HR Information Systems', venue: 'Lab 1', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'HRM 2201: Strategic HR Management', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'HRM 2202: Industrial Relations', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'HRM 2203: HR Research Methods', venue: 'Room 5', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Banking and Finance': {
+    defaultCourse: 'Bachelor of Banking and Finance',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'BNF 1101: Introduction to Banking', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'BNF 1102: Financial Mathematics', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'BNF 1103: Principles of Finance', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'BNF 1201: Commercial Banking', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'BNF 1202: Financial Accounting', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'BNF 1203: Economics for Finance', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'BNF 2101: Investment Analysis', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'BNF 2102: Risk Management', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'BNF 2103: Financial Markets', venue: 'Room 4', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'BNF 2201: Corporate Finance', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'BNF 2202: Central Banking and Monetary Policy', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'BNF 2203: Banking Research Methods', venue: 'Room 5', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Procurement and Logistics': {
+    defaultCourse: 'Bachelor of Procurement and Logistics',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'PRL 1101: Introduction to Procurement', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'PRL 1102: Supply Chain Management', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'PRL 1103: Business Mathematics', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'PRL 1201: Logistics and Transport Management', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'PRL 1202: Procurement Law', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'PRL 1203: Warehouse Management', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'PRL 2101: Strategic Sourcing', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'PRL 2102: Inventory Management', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'PRL 2103: Quality Management', venue: 'Room 4', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'PRL 2201: Public Procurement', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'PRL 2202: International Trade and Logistics', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'PRL 2203: Research Methods', venue: 'Room 5', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Accounting and Finance': {
+    defaultCourse: 'Bachelor of Accounting and Finance',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'ACF 1101: Introduction to Accounting', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'ACF 1102: Business Mathematics', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'ACF 1103: Microeconomics', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'ACF 1201: Financial Accounting I', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'ACF 1202: Macroeconomics', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'ACF 1203: Business Law', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'ACF 2101: Financial Accounting II', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'ACF 2102: Management Accounting', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'ACF 2103: Taxation', venue: 'Room 4', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'ACF 2201: Auditing and Assurance', venue: 'Room 2', time: '09:00 AM' },
+        { unitName: 'ACF 2202: Corporate Finance', venue: 'Room 3', time: '11:00 AM' },
+        { unitName: 'ACF 2203: Research Methods in Accounting', venue: 'Room 5', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Development Studies': {
+    defaultCourse: 'Bachelor of Development Studies',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'DVS 1101: Introduction to Development Studies', venue: 'Room 6', time: '09:00 AM' },
+        { unitName: 'DVS 1102: Political Economy of Development', venue: 'Room 7', time: '11:00 AM' },
+        { unitName: 'DVS 1103: Development Communication', venue: 'Room 8', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'DVS 1201: Rural Development', venue: 'Room 6', time: '09:00 AM' },
+        { unitName: 'DVS 1202: Gender and Development', venue: 'Room 7', time: '11:00 AM' },
+        { unitName: 'DVS 1203: Development Planning', venue: 'Room 8', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'DVS 2101: Project Management', venue: 'Room 6', time: '09:00 AM' },
+        { unitName: 'DVS 2102: NGO Management', venue: 'Room 7', time: '11:00 AM' },
+        { unitName: 'DVS 2103: Poverty and Development', venue: 'Room 8', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'DVS 2201: International Development', venue: 'Room 6', time: '09:00 AM' },
+        { unitName: 'DVS 2202: Community Development', venue: 'Room 7', time: '11:00 AM' },
+        { unitName: 'DVS 2203: Research Methods in Development', venue: 'Room 5', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Social Work and Social Administration': {
+    defaultCourse: 'Bachelor of Social Work and Social Administration',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'SWA 1101: Introduction to Social Work', venue: 'Room 6', time: '09:00 AM' },
+        { unitName: 'SWA 1102: Sociology', venue: 'Room 7', time: '11:00 AM' },
+        { unitName: 'SWA 1103: Psychology for Social Workers', venue: 'Room 8', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'SWA 1201: Social Policy and Administration', venue: 'Room 6', time: '09:00 AM' },
+        { unitName: 'SWA 1202: Human Rights and Social Justice', venue: 'Room 7', time: '11:00 AM' },
+        { unitName: 'SWA 1203: Community Organisation', venue: 'Room 8', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'SWA 2101: Child and Family Welfare', venue: 'Room 6', time: '09:00 AM' },
+        { unitName: 'SWA 2102: Counselling Skills', venue: 'Room 7', time: '11:00 AM' },
+        { unitName: 'SWA 2103: Community Development Practice', venue: 'Room 8', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'SWA 2201: Social Work Research Methods', venue: 'Room 5', time: '09:00 AM' },
+        { unitName: 'SWA 2202: Disability Studies', venue: 'Room 6', time: '11:00 AM' },
+        { unitName: 'SWA 2203: Social Work Practice Placement', venue: 'Field', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Education (Arts)': {
+    defaultCourse: 'Bachelor of Education (Arts)',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'EDU 1101: Introduction to Education', venue: 'Room 8', time: '09:00 AM' },
+        { unitName: 'EDU 1102: Philosophy of Education', venue: 'Room 9', time: '11:00 AM' },
+        { unitName: 'EDU 1103: Teaching Methods in Arts I', venue: 'Room 10', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'EDU 1201: Curriculum Development', venue: 'Room 8', time: '09:00 AM' },
+        { unitName: 'EDU 1202: Psychology of Learning', venue: 'Room 9', time: '11:00 AM' },
+        { unitName: 'EDU 1203: Teaching Methods in Arts II', venue: 'Room 10', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'EDU 2101: Educational Assessment and Evaluation', venue: 'Room 8', time: '09:00 AM' },
+        { unitName: 'EDU 2102: Special Needs Education', venue: 'Room 9', time: '11:00 AM' },
+        { unitName: 'EDU 2103: Literature and Language Teaching', venue: 'Room 10', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'EDU 2201: Educational Administration', venue: 'Room 8', time: '09:00 AM' },
+        { unitName: 'EDU 2202: Teaching Practice Arts', venue: 'Field', time: '11:00 AM' },
+        { unitName: 'EDU 2203: Research Methods in Education', venue: 'Room 5', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Education (Science)': {
+    defaultCourse: 'Bachelor of Education (Science)',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'EDU 1101: Introduction to Education', venue: 'Room 8', time: '09:00 AM' },
+        { unitName: 'EDU 1102: Philosophy of Education', venue: 'Room 9', time: '11:00 AM' },
+        { unitName: 'EDU 1104: Teaching Methods in Science I', venue: 'Science Block B', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'EDU 1201: Curriculum Development', venue: 'Room 8', time: '09:00 AM' },
+        { unitName: 'EDU 1202: Psychology of Learning', venue: 'Room 9', time: '11:00 AM' },
+        { unitName: 'EDU 1204: Teaching Methods in Science II', venue: 'Science Block B', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'EDU 2101: Educational Assessment and Evaluation', venue: 'Room 8', time: '09:00 AM' },
+        { unitName: 'EDU 2102: Special Needs Education', venue: 'Room 9', time: '11:00 AM' },
+        { unitName: 'EDU 2104: Science Practicals in Schools', venue: 'Science Block B', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'EDU 2201: Educational Administration', venue: 'Room 8', time: '09:00 AM' },
+        { unitName: 'EDU 2202: Teaching Practice Science', venue: 'Field', time: '11:00 AM' },
+        { unitName: 'EDU 2203: Research Methods in Education', venue: 'Room 5', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Education (Business Studies)': {
+    defaultCourse: 'Bachelor of Education (Business Studies)',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'EDU 1101: Introduction to Education', venue: 'Room 8', time: '09:00 AM' },
+        { unitName: 'EDU 1102: Philosophy of Education', venue: 'Room 9', time: '11:00 AM' },
+        { unitName: 'EDU 1105: Teaching Methods in Business I', venue: 'Room 10', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'EDU 1201: Curriculum Development', venue: 'Room 8', time: '09:00 AM' },
+        { unitName: 'EDU 1202: Psychology of Learning', venue: 'Room 9', time: '11:00 AM' },
+        { unitName: 'EDU 1205: Teaching Methods in Business II', venue: 'Room 10', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'EDU 2101: Educational Assessment and Evaluation', venue: 'Room 8', time: '09:00 AM' },
+        { unitName: 'EDU 2105: Entrepreneurship Education', venue: 'Room 10', time: '11:00 AM' },
+        { unitName: 'EDU 2106: Accounting for School Business', venue: 'Room 2', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'EDU 2201: Educational Administration', venue: 'Room 8', time: '09:00 AM' },
+        { unitName: 'EDU 2202: Teaching Practice Business', venue: 'Field', time: '11:00 AM' },
+        { unitName: 'EDU 2203: Research Methods in Education', venue: 'Room 5', time: '02:00 PM' }
+      ]
+    }
+  },
+  'Bachelor of Clinical Medicine and Community Health': {
+    defaultCourse: 'Bachelor of Clinical Medicine and Community Health',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'CLM 1101: Anatomy for Clinical Officers', venue: 'Science Block A', time: '08:00 AM' },
+        { unitName: 'CLM 1102: Physiology for Clinical Officers', venue: 'Lab A', time: '11:00 AM' },
+        { unitName: 'CLM 1103: Biochemistry for Clinical Medicine', venue: 'Lab B', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'CLM 1201: General Medicine I', venue: 'Clinic Block', time: '08:00 AM' },
+        { unitName: 'CLM 1202: Surgery I', venue: 'Clinic Block', time: '11:00 AM' },
+        { unitName: 'CLM 1203: Community Health I', venue: 'Room 4', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'CLM 2101: General Medicine II', venue: 'Clinic Block', time: '08:00 AM' },
+        { unitName: 'CLM 2102: Paediatrics and Child Health', venue: 'Clinic Block', time: '11:00 AM' },
+        { unitName: 'CLM 2103: Obstetrics and Gynaecology', venue: 'Clinic Block', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'CLM 2201: Mental Health', venue: 'Clinic Block', time: '08:00 AM' },
+        { unitName: 'CLM 2202: Dermatology and Venereology', venue: 'Clinic Block', time: '11:00 AM' },
+        { unitName: 'CLM 2203: Community Health II', venue: 'Field', time: '02:00 PM' }
+      ]
+    }
+  },
+  'BSc Anaesthesia Science': {
+    defaultCourse: 'BSc Anaesthesia Science',
+    semesters: {
+      'Year 1 Semester 1': [
+        { unitName: 'ANS 1101: Anatomy for Anaesthesia', venue: 'Science Block A', time: '08:00 AM' },
+        { unitName: 'ANS 1102: Physiology for Anaesthesia', venue: 'Lab A', time: '11:00 AM' },
+        { unitName: 'ANS 1103: Introduction to Anaesthesia Science', venue: 'Clinic Block', time: '02:00 PM' },
+        { unitName: 'UCC 1101: English Language Skills', venue: 'Main Hall', time: '04:00 PM' }
+      ],
+      'Year 1 Semester 2': [
+        { unitName: 'ANS 1201: Pharmacology for Anaesthesia', venue: 'Lab B', time: '08:00 AM' },
+        { unitName: 'ANS 1202: Anaesthesia Equipment', venue: 'Clinic Block', time: '11:00 AM' },
+        { unitName: 'ANS 1203: Pain Management I', venue: 'Clinic Block', time: '02:00 PM' },
+        { unitName: 'UCC 1200: Communication Skills', venue: 'Auditorium', time: '04:00 PM' }
+      ],
+      'Year 2 Semester 1': [
+        { unitName: 'ANS 2101: General Anaesthesia I', venue: 'Clinic Block', time: '08:00 AM' },
+        { unitName: 'ANS 2102: Regional Anaesthesia', venue: 'Clinic Block', time: '11:00 AM' },
+        { unitName: 'ANS 2103: Critical Care Medicine', venue: 'ICU Block', time: '02:00 PM' }
+      ],
+      'Year 2 Semester 2': [
+        { unitName: 'ANS 2201: Paediatric Anaesthesia', venue: 'Clinic Block', time: '08:00 AM' },
+        { unitName: 'ANS 2202: Obstetric Anaesthesia', venue: 'Clinic Block', time: '11:00 AM' },
+        { unitName: 'ANS 2203: Research Methods in Anaesthesia', venue: 'Room 5', time: '02:00 PM' }
+      ]
+    }
   }
 }
