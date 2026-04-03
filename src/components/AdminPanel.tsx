@@ -246,6 +246,20 @@ function getAdminCapabilityLabel(scope: AdminCapabilityProfile['scope']) {
 }
 
 function getAdminSections(permissions: Set<AdminPermission>, scope: AdminCapabilityProfile['scope']): NavSection[] {
+  if (scope === 'assistant-admin') {
+    const assistantSections = new Set<NavSection>(['students', 'settings'])
+
+    if (permissions.has('manage_support_requests')) {
+      assistantSections.add('support')
+    }
+
+    if (permissions.has('manage_student_profiles')) {
+      assistantSections.add('permit-cards')
+    }
+
+    return Array.from(assistantSections)
+  }
+
   const sections = new Set<NavSection>(['dashboard', 'settings'])
 
   if (scope === 'super-admin') {
