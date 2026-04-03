@@ -1295,7 +1295,7 @@ export function clearAdminFirstLoginFlag(id) {
   return true
 }
 
-export function listProfilesPage({ role, search, status, department, program, course, college, page = 1, pageSize = 25 } = {}) {
+export function listProfilesPage({ role, search, status, department, departments, program, course, college, page = 1, pageSize = 25 } = {}) {
   pruneExpiredTrashedProfiles()
   const whereClauses = []
   const params = []
@@ -1325,6 +1325,16 @@ export function listProfilesPage({ role, search, status, department, program, co
   if (typeof department === 'string' && department.trim()) {
     whereClauses.push("LOWER(COALESCE(department, '')) = LOWER(?)")
     params.push(department.trim())
+  } else if (Array.isArray(departments) && departments.length > 0) {
+    const normalizedDepartments = departments
+      .map((value) => String(value ?? '').trim())
+      .filter(Boolean)
+
+    if (normalizedDepartments.length > 0) {
+      const placeholders = normalizedDepartments.map(() => '?').join(', ')
+      whereClauses.push(`LOWER(COALESCE(department, '')) IN (${placeholders})`)
+      params.push(...normalizedDepartments.map((value) => value.toLowerCase()))
+    }
   }
 
   if (typeof program === 'string' && program.trim()) {

@@ -1711,8 +1711,11 @@ app.get('/profiles', authenticate, requireAdminPermission('view_students', 'You 
       search: typeof search === 'string' ? search : undefined,
       status: status === 'paid' || status === 'outstanding' ? status : 'all',
       department: request.adminScope === 'assistant-admin'
-        ? (requestedDepartment || assistantDepartments[0] || '')
+        ? (requestedDepartment || undefined)
         : (typeof department === 'string' ? department : undefined),
+      departments: request.adminScope === 'assistant-admin' && !requestedDepartment
+        ? assistantDepartments
+        : undefined,
       program: typeof program === 'string' ? program : undefined,
       course: typeof course === 'string' ? course : undefined,
       college: typeof college === 'string' ? college : undefined,
@@ -1740,6 +1743,16 @@ app.get('/profiles', authenticate, requireAdminPermission('view_students', 'You 
   const result = typeof role === 'string'
     ? listProfiles(role)
     : listProfiles(undefined)
+
+  if (request.adminScope === 'assistant-admin') {
+    const scoped = result.filter((profile) => {
+      const profileDepartment = String(profile?.department ?? '').trim().toLowerCase()
+      return Boolean(profileDepartment) && assistantDepartments.includes(profileDepartment)
+    })
+    response.json({ data: scoped })
+    return
+  }
+
   response.json({ data: result })
 })
 
