@@ -853,6 +853,7 @@ function createAuthenticatedUser(user) {
     ...user,
     scope: resolveAdminScope(user),
     assistantRole: user.assistant_role === 'support_help' ? 'support_help' : (user.assistant_role === 'department_prints' ? 'department_prints' : undefined),
+    assistantDepartments: getAssistantAllowedDepartments(user),
     permissions: getAdminPermissions(user),
   }
 

@@ -220,6 +220,7 @@ export interface AuthUser {
   phoneNumber?: string
   scope?: AdminScope
   assistantRole?: 'support_help' | 'department_prints'
+  assistantDepartments?: string[]
   permissions?: AdminPermission[]
   firstLoginRequired?: boolean
 }

@@ -1847,20 +1847,40 @@ export default function AdminPanel() {
     )
   }
 
+  // Filter students to only those in sub-admin's assigned departments
+  function getFilteredPrintableStudents(studentsToFilter: StudentProfile[]): StudentProfile[] {
+    // If user is not a sub-admin or not department_prints role, return all students
+    if (user?.scope !== 'assistant-admin' || user.assistantRole !== 'department_prints') {
+      return studentsToFilter
+    }
+
+    // Filter to only students from assigned departments
+    const assignedDepts = user.assistantDepartments ?? []
+    if (assignedDepts.length === 0) {
+      return []
+    }
+
+    return studentsToFilter.filter((student) => {
+      const studentDept = (student.department ?? '').trim().toLowerCase()
+      return assignedDepts.some((dept) => dept.toLowerCase() === studentDept)
+    })
+  }
+
   async function handleBulkPrintStudents(printableStudents: StudentProfile[], title: string, emptyMessage: string) {
+    const filtered = getFilteredPrintableStudents(printableStudents)
 
     if (!canManageStudentProfiles) {
       setError('Your admin view does not allow permit card operations.')
       return
     }
 
-    if (printableStudents.length === 0) {
-      setError(emptyMessage)
+    if (filtered.length === 0) {
+      setError(emptyMessage || 'No students available in your assigned department(s) to print.')
       return
     }
 
     // Show count confirmation before printing
-    setBulkPrintConfirm({ students: printableStudents, title })
+    setBulkPrintConfirm({ students: filtered, title })
   }
 
   async function executeBulkPrint(printableStudents: StudentProfile[], title: string) {
@@ -5772,6 +5792,15 @@ export default function AdminPanel() {
                       <p className="mt-1 text-xs text-gray-400 dark:text-slate-400">Manage the FAQ shown to students in the Help &amp; Support section.</p>
                     </div>
                   </div>
+                  {user?.scope === 'assistant-admin' && user.assistantRole === 'support_help' ? (
+                    <div className="px-6 py-4 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-t border-blue-100 dark:border-blue-800">
+                      <p><strong>ℹ Your Role:</strong> As a Support agent, you can edit the FAQ to help students find answers to common questions.</p>
+                    </div>
+                  ) : user?.scope === 'assistant-admin' ? (
+                    <div className="px-6 py-4 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-t border-amber-100 dark:border-amber-800">
+                      <p><strong>⚠ Limited Access:</strong> Only support/help team members can edit the FAQ.</p>
+                    </div>
+                  ) : null}
                   <form className="space-y-4 px-6 py-5" onSubmit={handleSaveFaq}>
                     <div className="space-y-3">
                       {faqDraft.map((item, idx) => (
@@ -5832,7 +5861,8 @@ export default function AdminPanel() {
                     <div className="flex items-center gap-3 pt-1">
                       <button
                         type="submit"
-                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                        disabled={user?.scope === 'assistant-admin' && user.assistantRole !== 'support_help'}
+                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Save className="h-4 w-4" />
                         Save FAQ
