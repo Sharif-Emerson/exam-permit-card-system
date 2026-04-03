@@ -24,6 +24,8 @@ import type {
   SupportRequest,
   SupportRequestUpdateInput,
   SemesterRegistration,
+  PublicSupportContact,
+  StudentIdentityVerifyResult,
 } from '../types'
 
 export function getDataConfigError() {
@@ -217,6 +219,18 @@ export async function createSemesterRegistration(requestedSemester: string): Pro
 
 export async function updateSemesterRegistration(id: string, values: { status: 'approved' | 'rejected'; adminNote?: string }): Promise<SemesterRegistration> {
   return activeDataAdapter.updateSemesterRegistration(id, values)
+}
+
+export async function fetchPublicSupportContacts(): Promise<PublicSupportContact[]> {
+  return activeDataAdapter.fetchPublicSupportContacts()
+}
+
+export async function verifyStudentIdentity(identifier: string, verification: string): Promise<StudentIdentityVerifyResult> {
+  return activeDataAdapter.verifyStudentIdentity(identifier, verification)
+}
+
+export async function adminResetStudentPassword(studentId: string, newPassword: string): Promise<{ message: string }> {
+  return activeDataAdapter.adminResetStudentPassword(studentId, newPassword)
 }
 
 export type { EmailStatus, SisStatus, SisSyncResult }

@@ -18,6 +18,8 @@ import type {
   SemesterRegistration,
   SupportRequest,
   SupportRequestUpdateInput,
+  PublicSupportContact,
+  StudentIdentityVerifyResult,
 } from '../../types'
 
 export interface FinancialUpdateValues {
@@ -99,4 +101,7 @@ export interface DataAdapter {
   fetchSemesterRegistrations: () => Promise<SemesterRegistration[]>
   createSemesterRegistration: (requestedSemester: string) => Promise<SemesterRegistration>
   updateSemesterRegistration: (id: string, values: { status: 'approved' | 'rejected'; adminNote?: string }) => Promise<SemesterRegistration>
+  fetchPublicSupportContacts: () => Promise<PublicSupportContact[]>
+  verifyStudentIdentity: (identifier: string, verification: string) => Promise<StudentIdentityVerifyResult>
+  adminResetStudentPassword: (studentId: string, newPassword: string) => Promise<{ message: string }>
 }

@@ -5,6 +5,8 @@ import { backendProvider, publicApiBaseUrl } from '../config/provider'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { resetPassword } from '../services/authService'
+import { fetchPublicSupportContacts } from '../services/profileService'
+import type { PublicSupportContact } from '../types'
 import { institutionContact, institutionLogo, institutionName } from '../config/branding'
 
 export default function Login() {
@@ -27,6 +29,9 @@ export default function Login() {
   const [resetMessage, setResetMessage] = useState('')
   const [oidcAvailable, setOidcAvailable] = useState<boolean | null>(null)
   const [oidcCompleting, setOidcCompleting] = useState(false)
+  const [showSupportContacts, setShowSupportContacts] = useState(false)
+  const [supportContacts, setSupportContacts] = useState<PublicSupportContact[]>([])
+  const [loadingSupportContacts, setLoadingSupportContacts] = useState(false)
   const signInWithTokenRef = useRef(signInWithToken)
   signInWithTokenRef.current = signInWithToken
   function normalizeLoginErrorMessage(message: string) {
@@ -124,6 +129,25 @@ export default function Login() {
       cancelled = true
     }
   }, [navigate])
+
+  const handleToggleSupportContacts = async () => {
+    if (showSupportContacts) {
+      setShowSupportContacts(false)
+      return
+    }
+    setShowSupportContacts(true)
+    if (supportContacts.length === 0) {
+      setLoadingSupportContacts(true)
+      try {
+        const contacts = await fetchPublicSupportContacts()
+        setSupportContacts(contacts)
+      } catch {
+        // silently fall through — the static contact block below is still shown
+      } finally {
+        setLoadingSupportContacts(false)
+      }
+    }
+  }
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -481,6 +505,37 @@ export default function Login() {
                 {institutionContact.phone}
               </a>
             </p>
+            <button
+              type="button"
+              onClick={handleToggleSupportContacts}
+              className="mt-3 flex w-full items-center justify-between rounded border border-emerald-300 bg-white/60 px-2 py-1 text-left text-xs font-medium text-emerald-800 transition hover:bg-white/80 dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 dark:hover:bg-emerald-900/60"
+            >
+              <span>Contact support staff</span>
+              <span className="text-emerald-600 dark:text-emerald-400">{showSupportContacts ? '▲' : '▼'}</span>
+            </button>
+            {showSupportContacts && (
+              <div className="mt-2 space-y-2">
+                {loadingSupportContacts ? (
+                  <p className="text-emerald-600 dark:text-emerald-400">Loading contacts…</p>
+                ) : supportContacts.length === 0 ? (
+                  <p className="text-emerald-600 dark:text-emerald-400">No additional support contacts available.</p>
+                ) : (
+                  supportContacts.map((c) => (
+                    <div key={c.id} className="rounded border border-emerald-200 bg-white/70 p-2 dark:border-emerald-800 dark:bg-emerald-900/30">
+                      <p className="font-semibold">{c.name}</p>
+                      <p>
+                        <a href={`mailto:${c.email}`} className="underline">{c.email}</a>
+                      </p>
+                      {c.phoneNumber && c.phoneNumber !== 'Not assigned' && (
+                        <p>
+                          <a href={`tel:${c.phoneNumber}`} className="underline">{c.phoneNumber}</a>
+                        </p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

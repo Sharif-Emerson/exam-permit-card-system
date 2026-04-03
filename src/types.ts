@@ -184,6 +184,25 @@ export interface SupportContact {
   scope: AdminScope
 }
 
+export interface PublicSupportContact {
+  id: string
+  name: string
+  email: string
+  phoneNumber: string
+  scope: string
+}
+
+export interface StudentIdentityVerifyResult {
+  verified: boolean
+  studentId: string
+  name: string
+  email: string
+  registrationNumber: string
+  course: string
+  department: string
+  phoneNumber: string
+}
+
 export interface SemesterRegistration {
   id: string
   studentId: string

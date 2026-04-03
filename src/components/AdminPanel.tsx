@@ -2,7 +2,7 @@ import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, u
 
   // Ref to preserve search input focus
 import {
-  BarChart2, Bell, CheckCircle2, CreditCard, Download, FileCheck,
+  BarChart2, Bell, CheckCircle2, CreditCard, Download, Eye, EyeOff, FileCheck,
   FileSpreadsheet, FileUp, KeyRound, LayoutDashboard, LogOut, Menu,
   Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Sun, Trash2, Upload, Users, X,
 } from 'lucide-react'
@@ -18,14 +18,14 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync } from '../services/profileService'
+import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync, verifyStudentIdentity, adminResetStudentPassword } from '../services/profileService'
 import { completeAdminFirstLogin } from '../services/authService'
 import type { SisStatus, SisSyncResult } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
 import type { FaqItem } from './faqStorage'
 import { buildPermitQrPayload } from '../utils/permitQr'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
-import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AssistantAdminAccount, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline } from '../types'
+import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AssistantAdminAccount, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline, StudentIdentityVerifyResult } from '../types'
 import { DIALOG_Z } from '../constants/dialogLayers'
 import SignOutDialog from './SignOutDialog'
 
@@ -596,6 +596,19 @@ export default function AdminPanel() {
   const [supportStatusDrafts, setSupportStatusDrafts] = useState<SupportStatusDrafts>({})
   const [loadingSupportRequests, setLoadingSupportRequests] = useState(false)
   const [savingSupportRequestId, setSavingSupportRequestId] = useState<string | null>(null)
+  // Support-desk identity verification tool
+  const [idVerifyIdentifier, setIdVerifyIdentifier] = useState('')
+  const [idVerifySecond, setIdVerifySecond] = useState('')
+  const [idVerifyLoading, setIdVerifyLoading] = useState(false)
+  const [idVerifyResult, setIdVerifyResult] = useState<StudentIdentityVerifyResult | null>(null)
+  const [idVerifyError, setIdVerifyError] = useState('')
+  // Support-desk password reset tool
+  const [resetTargetStudentId, setResetTargetStudentId] = useState<string | null>(null)
+  const [resetNewPassword, setResetNewPassword] = useState('')
+  const [resetShowPassword, setResetShowPassword] = useState(false)
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false)
+  const [resetPasswordError, setResetPasswordError] = useState('')
+  const [resetPasswordSuccess, setResetPasswordSuccess] = useState('')
   const [activityPage, setActivityPage] = useState(1)
   const [activityTotalItems, setActivityTotalItems] = useState(0)
   const [activityTotalPages, setActivityTotalPages] = useState(1)
@@ -2708,6 +2721,67 @@ export default function AdminPanel() {
     }
   }
 
+  async function handleVerifyStudentIdentity() {
+    const identifier = idVerifyIdentifier.trim()
+    const second = idVerifySecond.trim()
+    if (!identifier || !second) {
+      setIdVerifyError('Enter the student identifier and the second verification detail.')
+      return
+    }
+    setIdVerifyLoading(true)
+    setIdVerifyError('')
+    setIdVerifyResult(null)
+    setResetTargetStudentId(null)
+    setResetPasswordError('')
+    setResetPasswordSuccess('')
+    try {
+      const result = await verifyStudentIdentity(identifier, second)
+      setIdVerifyResult(result)
+    } catch (e) {
+      setIdVerifyError(e instanceof Error ? e.message : 'Identity verification failed.')
+    } finally {
+      setIdVerifyLoading(false)
+    }
+  }
+
+  async function handleAdminResetStudentPassword() {
+    if (!resetTargetStudentId) return
+    const pwd = resetNewPassword.trim()
+    if (!pwd) {
+      setResetPasswordError('Please enter a new password.')
+      return
+    }
+    setResetPasswordLoading(true)
+    setResetPasswordError('')
+    setResetPasswordSuccess('')
+    try {
+      const result = await adminResetStudentPassword(resetTargetStudentId, pwd)
+      setResetPasswordSuccess(result.message)
+      setResetNewPassword('')
+      setResetTargetStudentId(null)
+    } catch (e) {
+      setResetPasswordError(e instanceof Error ? e.message : 'Password reset failed.')
+    } finally {
+      setResetPasswordLoading(false)
+    }
+  }
+
+  function handleFaqAutoReply(requestId: string, subject: string, message: string) {
+    if (!faqDraft || faqDraft.length === 0) return
+    const needle = `${subject} ${message}`.toLowerCase()
+    const match = faqDraft.find((item) => {
+      const question = item.question.toLowerCase()
+      const keywords = question.split(/\s+/).filter((w) => w.length > 3)
+      return keywords.some((kw) => needle.includes(kw))
+    })
+    if (match) {
+      setSupportReplyDrafts((current) => ({
+        ...current,
+        [requestId]: match.answer,
+      }))
+    }
+  }
+
   function handleDragEnter(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault()
     setDragActive(true)
@@ -4094,6 +4168,123 @@ export default function AdminPanel() {
                 </div>
                 )}
 
+                {activeSection === 'support' && (
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50 shadow-sm">
+                  <div className="border-b border-indigo-100 px-5 py-4">
+                    <h2 className="font-semibold text-indigo-900">Student Identity Verification &amp; Password Reset</h2>
+                    <p className="text-xs text-indigo-600">Verify a student's identity before taking any account actions on their behalf.</p>
+                  </div>
+                  <div className="px-5 py-5 space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="id-verify-identifier" className="mb-2 block text-sm font-medium text-gray-700">Student identifier</label>
+                        <input
+                          id="id-verify-identifier"
+                          type="text"
+                          value={idVerifyIdentifier}
+                          onChange={(e) => setIdVerifyIdentifier(e.target.value)}
+                          placeholder="Email, phone, or registration number"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="id-verify-second" className="mb-2 block text-sm font-medium text-gray-700">Second verification detail</label>
+                        <input
+                          id="id-verify-second"
+                          type="text"
+                          value={idVerifySecond}
+                          onChange={(e) => setIdVerifySecond(e.target.value)}
+                          placeholder="e.g. their phone number, email, or reg. no."
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => void handleVerifyStudentIdentity()}
+                        disabled={idVerifyLoading}
+                        className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        {idVerifyLoading ? 'Verifying…' : 'Verify Identity'}
+                      </button>
+                      {idVerifyResult && (
+                        <button
+                          type="button"
+                          onClick={() => { setIdVerifyResult(null); setIdVerifyIdentifier(''); setIdVerifySecond(''); setResetTargetStudentId(null); setResetPasswordError(''); setResetPasswordSuccess(''); }}
+                          className="text-xs text-indigo-600 underline hover:text-indigo-800"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    {idVerifyError && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{idVerifyError}</p>}
+                    {idVerifyResult && (
+                      <div className="rounded-xl border border-indigo-200 bg-white p-4 space-y-3">
+                        <p className="text-sm font-semibold text-indigo-800">Identity verified ✓</p>
+                        <div className="grid gap-1 text-sm text-gray-700 sm:grid-cols-2">
+                          <p><span className="font-medium">Name:</span> {idVerifyResult.name}</p>
+                          <p><span className="font-medium">Email:</span> {idVerifyResult.email}</p>
+                          {idVerifyResult.registrationNumber && <p><span className="font-medium">Reg. No.:</span> {idVerifyResult.registrationNumber}</p>}
+                          {idVerifyResult.course && <p><span className="font-medium">Course:</span> {idVerifyResult.course}</p>}
+                          {idVerifyResult.department && <p><span className="font-medium">Department:</span> {idVerifyResult.department}</p>}
+                          {idVerifyResult.phoneNumber && <p><span className="font-medium">Phone:</span> {idVerifyResult.phoneNumber}</p>}
+                        </div>
+                        {resetTargetStudentId === idVerifyResult.studentId ? (
+                          <div className="space-y-3 border-t border-indigo-100 pt-3">
+                            <p className="text-xs font-semibold text-gray-700">Set new password for {idVerifyResult.name}</p>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type={resetShowPassword ? 'text' : 'password'}
+                                value={resetNewPassword}
+                                onChange={(e) => setResetNewPassword(e.target.value)}
+                                placeholder="New password (min 8 chars, mixed case, number, symbol)"
+                                className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setResetShowPassword((v) => !v)}
+                                className="rounded-lg border border-gray-200 p-2 text-gray-500 hover:border-indigo-300 hover:text-indigo-600"
+                                aria-label="Toggle password visibility"
+                              >
+                                {resetShowPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
+                            {resetPasswordError && <p className="text-xs text-red-600">{resetPasswordError}</p>}
+                            {resetPasswordSuccess && <p className="text-xs text-emerald-700 font-medium">{resetPasswordSuccess}</p>}
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleAdminResetStudentPassword()}
+                                disabled={resetPasswordLoading}
+                                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                              >
+                                {resetPasswordLoading ? 'Resetting…' : 'Confirm Reset'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setResetTargetStudentId(null); setResetNewPassword(''); setResetPasswordError(''); setResetPasswordSuccess(''); }}
+                                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => { setResetTargetStudentId(idVerifyResult.studentId); setResetPasswordError(''); setResetPasswordSuccess(''); }}
+                            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+                          >
+                            Reset password for {idVerifyResult.name}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                )}
+
                 {activeSection === 'assistants' && showAssistantAdminPanel && (
                   <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                     <div className="border-b border-gray-100 px-6 py-4">
@@ -4495,6 +4686,15 @@ export default function AdminPanel() {
                                   placeholder="Explain the resolution or next action for the student."
                                   className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                 />
+                                {faqDraft.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleFaqAutoReply(request.id, request.subject, request.message)}
+                                    className="mt-1 text-xs text-indigo-600 underline hover:text-indigo-800"
+                                  >
+                                    Suggest FAQ reply
+                                  </button>
+                                )}
                               </div>
                               <button
                                 type="button"

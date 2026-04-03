@@ -22,6 +22,8 @@ import type {
   SupportRequestUpdateInput,
   SemesterRegistration,
   UniversityDeadline,
+  PublicSupportContact,
+  StudentIdentityVerifyResult,
 } from '../../types'
 import { requestWithApiFallback } from '../rest/request'
 import { getStoredAuthToken } from '../rest/tokenStorage'
@@ -50,6 +52,14 @@ async function request(path: string, init?: RequestInit) {
     headers.set('Content-Type', 'application/json')
   }
 
+  return requestWithApiFallback(path, { ...init, headers })
+}
+
+async function requestPublic(path: string, init?: RequestInit) {
+  const headers = new Headers(init?.headers)
+  if (init?.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
   return requestWithApiFallback(path, { ...init, headers })
 }
 
@@ -853,6 +863,37 @@ export const restDataAdapter: DataAdapter = {
       body: JSON.stringify(values),
     })
     return toSemesterRegistration(payload)
+  },
+
+  async fetchPublicSupportContacts(): Promise<PublicSupportContact[]> {
+    const payload = await requestPublic('/public/support-contacts')
+    const items: unknown[] = Array.isArray(payload?.data) ? (payload.data as unknown[]) : []
+    return items.map((item) => {
+      const c = item as Record<string, unknown>
+      return {
+        id: String(c.id ?? ''),
+        name: String(c.name ?? ''),
+        email: String(c.email ?? ''),
+        phoneNumber: String(c.phoneNumber ?? ''),
+        scope: String(c.scope ?? ''),
+      }
+    })
+  },
+
+  async verifyStudentIdentity(identifier: string, verification: string): Promise<StudentIdentityVerifyResult> {
+    const payload = await request('/admin/support/verify-student', {
+      method: 'POST',
+      body: JSON.stringify({ identifier, verification }),
+    })
+    return payload as StudentIdentityVerifyResult
+  },
+
+  async adminResetStudentPassword(studentId: string, newPassword: string): Promise<{ message: string }> {
+    const payload = await request('/admin/support/reset-student-password', {
+      method: 'POST',
+      body: JSON.stringify({ studentId, newPassword }),
+    })
+    return payload as { message: string }
   },
 }
 

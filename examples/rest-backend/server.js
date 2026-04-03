@@ -3198,6 +3198,108 @@ async function findAvailablePort(startPort, maxAttempts = 10) {
   throw new Error(`No available port found starting from ${startPort}`)
 }
 
+// ── Support-desk helpers (no auth required) ──────────────────────────────────
+
+app.get('/public/support-contacts', (_request, response) => {
+  // Return support_help sub-admins + main admin contacts for the login page
+  const subAdmins = listAssistantAdmins()
+    .filter((a) => a.role === 'support_help')
+    .map((a) => ({
+      id: a.id,
+      name: a.name,
+      email: a.email,
+      phoneNumber: a.phoneNumber || 'Not assigned',
+      scope: 'support',
+    }))
+
+  const admins = listProfiles('admin')
+    .filter((p) => p.role === 'admin')
+    .slice(0, 2)
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      email: p.email,
+      phoneNumber: p.phoneNumber ?? 'Not assigned',
+      scope: 'super-admin',
+    }))
+
+  response.json({ data: [...subAdmins, ...admins] })
+})
+
+// ── Support-desk: student identity verification ───────────────────────────────
+
+app.post('/admin/support/verify-student', authenticate, requireAdminPermission('manage_support_requests', 'You do not have permission to verify student identities.'), (request, response) => {
+  const identifier = typeof request.body?.identifier === 'string' ? request.body.identifier.trim() : ''
+  const verification = typeof request.body?.verification === 'string' ? request.body.verification.trim() : ''
+
+  if (!identifier || !verification) {
+    response.status(400).json({ message: 'Provide the student identifier and the second verification detail.' })
+    return
+  }
+
+  const user = resolveUserByIdentifier(identifier)
+  const profile = user ? getProfileById(user.id) : null
+
+  if (!user || !profile || profile.role !== 'student') {
+    response.status(404).json({ verified: false, message: 'No matching student account found for the provided identifier.' })
+    return
+  }
+
+  const matches = doesVerificationMatchProfile(profile, user, identifier, verification)
+  if (!matches) {
+    response.status(400).json({ verified: false, message: 'The second detail did not match this student\'s registered information.' })
+    return
+  }
+
+  response.json({
+    verified: true,
+    studentId: profile.id,
+    name: profile.name,
+    email: profile.email,
+    registrationNumber: profile.studentId ?? '',
+    course: profile.course ?? '',
+    department: profile.department ?? '',
+    phoneNumber: profile.phoneNumber ?? '',
+  })
+})
+
+// ── Support-desk: admin-initiated password reset ──────────────────────────────
+
+app.post('/admin/support/reset-student-password', authenticate, requireAdminPermission('manage_support_requests', 'You do not have permission to reset student passwords.'), (request, response) => {
+  const studentId = typeof request.body?.studentId === 'string' ? request.body.studentId.trim() : ''
+  const newPassword = typeof request.body?.newPassword === 'string' ? request.body.newPassword.trim() : ''
+
+  if (!studentId) {
+    response.status(400).json({ message: 'Student ID is required.' })
+    return
+  }
+
+  if (!isStrongPassword(newPassword)) {
+    response.status(400).json({ message: 'New password must be at least 8 characters with uppercase, lowercase, number, and special character.' })
+    return
+  }
+
+  const user = getProfileById(studentId)
+  if (!user || user.role !== 'student') {
+    response.status(404).json({ message: 'Student not found.' })
+    return
+  }
+
+  resetUserPassword(studentId, newPassword)
+
+  insertActivityLog({
+    adminId: request.userId,
+    targetProfileId: studentId,
+    action: 'admin_reset_student_password',
+    details: {
+      resetBy: request.userId,
+      studentName: user.name,
+    },
+  })
+
+  response.json({ message: `Password for ${user.name} has been reset successfully.` })
+})
+
 let shuttingDown = false
 
 app.use((error, _request, response, next) => {
