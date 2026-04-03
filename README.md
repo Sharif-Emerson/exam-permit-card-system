@@ -8,7 +8,6 @@ Exam Permit System is a React application backed by a REST API for managing stud
 - Role-based routing for students and administrators
 - Student permit dashboard with QR code, print, and PDF download flow
 - Student dashboard sections for overview, applications, profile settings, and support
-- Student self-service profile updates for name, email, avatar URL, and password
 - Student self-service profile updates for name, email, phone number, avatar URL, and password
 - Student-side permit application history and local request tracking
 - Fee breakdown showing total fees, amount paid, remaining balance, and payment progress
@@ -50,18 +49,19 @@ Exam Permit System is a React application backed by a REST API for managing stud
    npm install
    ```
 
-  This now installs both the frontend dependencies and the bundled REST backend dependencies, so a fresh machine can start the project directly from `cmd` after the root install completes.
+   This installs both frontend dependencies and the bundled REST backend dependencies.
+
 2. Create your local environment file:
 
    ```bash
    copy .env.example .env
    ```
 
-1. For an explicit backend URL, use:
+3. For an explicit backend URL, use:
    - `VITE_BACKEND_PROVIDER=rest`
    - `VITE_API_BASE_URL=http://localhost:4000`
    - Optional for QR scanning on phones: `VITE_PERMIT_PUBLIC_BASE_URL=http://<your-lan-ip>:4000`
-2. Start the full local stack:
+4. Start the full local stack:
 
    ```bash
    npm run dev:rest
@@ -157,8 +157,8 @@ Expected login request fields:
 
 The repository includes:
 
-- [examples/rest-backend/README.md](c:/Users/kabuy/OneDrive/Desktop/project/examples/rest-backend/README.md)
-- [examples/rest-backend/server.js](c:/Users/kabuy/OneDrive/Desktop/project/examples/rest-backend/server.js)
+- [examples/rest-backend/README.md](examples/rest-backend/README.md)
+- [examples/rest-backend/server.js](examples/rest-backend/server.js)
 
 The backend starter includes:
 
@@ -201,7 +201,7 @@ The admin panel includes:
 - a preview table before applying changes
 - an `Apply Import` action so admins can review rows first
 
-Use [examples/real-student-import-template.csv](c:/Users/kabuy/OneDrive/Desktop/project/examples/real-student-import-template.csv) as the first real-data import file, and follow [examples/REAL_STUDENT_IMPORT.md](c:/Users/kabuy/OneDrive/Desktop/project/examples/REAL_STUDENT_IMPORT.md) for a safe staged rollout.
+Use [examples/real-student-import-template.csv](examples/real-student-import-template.csv) as the first real-data import file, and follow [examples/REAL_STUDENT_IMPORT.md](examples/REAL_STUDENT_IMPORT.md) for a safe staged rollout.
 
 Accepted spreadsheet columns:
 
@@ -212,7 +212,7 @@ Accepted spreadsheet columns:
 
 The bundled backend now starts without seeded student records. Use the admin panel to add/import real students after first login with an admin account.
 
-For a real deployment, configure the backend with a persistent SQLite path and your own bootstrap admin credentials instead of using the default example admin accounts. See [examples/rest-backend/README.md](c:/Users/kabuy/OneDrive/Desktop/project/examples/rest-backend/README.md) for the `APP_DB_PATH` and `BOOTSTRAP_ADMIN_*` settings.
+For a real deployment, configure the backend with a persistent SQLite path and your own bootstrap admin credentials instead of using the default example admin accounts. See [examples/rest-backend/README.md](examples/rest-backend/README.md) for the `APP_DB_PATH` and `BOOTSTRAP_ADMIN_*` settings.
 
 ## Project Structure
 
@@ -271,8 +271,8 @@ npm run test:all
 
 This project is configured as a single-page application for both:
 
-- [vercel.json](c:/Users/kabuy/OneDrive/Desktop/project/vercel.json)
-- [netlify.toml](c:/Users/kabuy/OneDrive/Desktop/project/netlify.toml)
+- [vercel.json](vercel.json)
+- [netlify.toml](netlify.toml)
 
 Both configs rewrite frontend routes to `index.html` so client-side routing works in production.
 
@@ -286,25 +286,23 @@ For the app to work on any device anywhere, the backend must also be reachable f
 To deploy:
 
 1. Deploy the frontend to Vercel or Netlify.
-2. Choose one API strategy:
+2. Choose one API strategy.
+  - Use a public backend URL with:
+    - `VITE_BACKEND_PROVIDER=rest`
+    - `VITE_API_BASE_URL=https://your-backend.example.com`
+  - Or expose your backend behind the same origin at `/api`.
 
-- Set frontend environment variables:
-- `VITE_BACKEND_PROVIDER=rest`
-- `VITE_API_BASE_URL=https://your-backend.example.com`
-- or expose your backend behind the same origin at `/api`
-
-1. Deploy [examples/rest-backend](c:/Users/kabuy/OneDrive/Desktop/project/examples/rest-backend) as a separate Node service using its Dockerfile.
-2. Set backend environment variables:
-   - `PORT`
-   - `APP_DB_PATH`
-
-- `APP_UPLOADS_DIR`
-- `SESSION_TTL_HOURS`
-- `CORS_ALLOWED_ORIGINS`
+3. Deploy [examples/rest-backend](examples/rest-backend) as a separate Node service using its Dockerfile.
+4. Set backend environment variables:
+  - `PORT`
+  - `APP_DB_PATH`
+  - `APP_UPLOADS_DIR`
+  - `SESSION_TTL_HOURS`
+  - `CORS_ALLOWED_ORIGINS`
 
 For Vercel Preview deployments, this repository now includes a same-origin `/api` proxy function. Set `API_BASE_URL=https://your-backend.example.com` in the Vercel project settings for `Preview` and `Production` so the proxy knows where to forward requests. If `API_BASE_URL` is missing, `/api/*` returns a deployment error instead of silently falling through to the SPA.
 
-If you want a faster backend deployment path, this repository now includes a Render Blueprint at [render.yaml](c:/Users/kabuy/OneDrive/Desktop/project/render.yaml). It deploys [examples/rest-backend](c:/Users/kabuy/OneDrive/Desktop/project/examples/rest-backend) with a persistent disk and gives you the backend URL you can paste into Vercel `API_BASE_URL`.
+If you want a faster backend deployment path, this repository now includes a Render Blueprint at [render.yaml](render.yaml). It deploys [examples/rest-backend](examples/rest-backend) with a persistent disk and gives you the backend URL you can paste into Vercel `API_BASE_URL`.
 
 If the frontend is public but the backend is still only running on your laptop, users in other locations will never be able to fetch data from it.
 
@@ -312,9 +310,9 @@ If the frontend is public but the backend is still only running on your laptop, 
 
 This repository now includes a same-origin deployment option for a VPS or container host:
 
-- [docker-compose.deploy.yml](c:/Users/kabuy/OneDrive/Desktop/project/docker-compose.deploy.yml)
-- [deploy/frontend.Dockerfile](c:/Users/kabuy/OneDrive/Desktop/project/deploy/frontend.Dockerfile)
-- [deploy/nginx.conf](c:/Users/kabuy/OneDrive/Desktop/project/deploy/nginx.conf)
+- [docker-compose.deploy.yml](docker-compose.deploy.yml)
+- [deploy/frontend.Dockerfile](deploy/frontend.Dockerfile)
+- [deploy/nginx.conf](deploy/nginx.conf)
 
 This setup:
 
@@ -333,8 +331,8 @@ To run it on a public server:
   docker compose -f docker-compose.deploy.yml up -d --build
   ```
 
-1. Point your domain at that server.
-2. Put TLS in front of it with your platform load balancer, Caddy, Nginx Proxy Manager, or another reverse proxy.
+4. Point your domain at that server.
+5. Put TLS in front of it with your platform load balancer, Caddy, Nginx Proxy Manager, or another reverse proxy.
 
 With this setup, the frontend can use the default `/api` production path and does not need `VITE_API_BASE_URL` at build time.
 
