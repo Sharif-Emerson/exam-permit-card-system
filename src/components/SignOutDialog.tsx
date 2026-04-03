@@ -14,9 +14,11 @@ export default function SignOutDialog({ onConfirm, onCancel, signingOut }: SignO
       role="dialog"
       aria-modal="true"
       aria-labelledby="signout-title"
+      onClick={onCancel}
     >
       <div
         className={`kiu-dialog-up relative ${DIALOG_Z.confirmContent} w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900`}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Green header */}
         <div className="relative bg-gradient-to-br from-emerald-600 to-green-500 px-6 py-6 text-center text-white">
