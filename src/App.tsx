@@ -72,8 +72,15 @@ function BackNavigationHandler() {
       if (!currentUser) return
 
       const targetPath = currentUser.role === 'admin' ? '/admin' : '/student'
-      navigateRef.current(targetPath, { replace: true })
 
+      // Only intercept if the user is actually navigating AWAY from the app path.
+      // Hash-only navigation (e.g. /admin#students -> /admin#reports or /admin)
+      // must not trigger the sign-out dialog.
+      if (window.location.pathname === targetPath) {
+        return
+      }
+
+      navigateRef.current(targetPath, { replace: true })
       setShowDialog(true)
     }
 

@@ -1391,7 +1391,8 @@ export default function Dashboard() {
                   disabled={savingFirstLoginSetup}
                   onClick={() => {
                     setError('')
-                    setShowSignOut(true)
+                    setSuccessMessage('You skipped security setup for now. Please update your password from Profile Settings soon.')
+                    setSkipFirstLoginSetup(true)
                   }}
                   className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
                 >

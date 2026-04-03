@@ -1397,7 +1397,10 @@ export default function AdminPanel() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.location.hash = activeSection
+      // Use replaceState so section changes don't push new browser history entries.
+      // Pushing entries causes popstate to fire on back-navigation, which the
+      // BackNavigationHandler interprets as "leaving the app" and shows a sign-out dialog.
+      window.history.replaceState(window.history.state ?? null, '', `#${activeSection}`)
     }
   }, [activeSection])
 
