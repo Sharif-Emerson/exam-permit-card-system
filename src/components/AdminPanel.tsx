@@ -2910,7 +2910,11 @@ export default function AdminPanel() {
           </div>
           <button
             type="button"
-            onClick={() => setShowSignOut(true)} // 3. Replace signOut with setShowSignOut(true)
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setShowSignOut(true)
+            }}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
           >
             <LogOut className="h-4 w-4" />
@@ -5951,7 +5955,11 @@ export default function AdminPanel() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setShowSignOut(true)}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setShowSignOut(true)
+                      }}
                       className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
                     >
                       <LogOut className="h-4 w-4" />
