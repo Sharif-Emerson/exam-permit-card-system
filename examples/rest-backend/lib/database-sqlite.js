@@ -2131,6 +2131,16 @@ export function updateSemesterRegistrationStatus(registrationId, { status, admin
   return listSemesterRegistrations().find((item) => item.id === registrationId) ?? null
 }
 
+export function deleteSupportRequestById(id) {
+  const existing = db.prepare('SELECT id FROM support_requests WHERE id = ?').get(id)
+  if (!existing) {
+    return false
+  }
+  db.prepare('DELETE FROM support_request_messages WHERE request_id = ?').run(id)
+  db.prepare('DELETE FROM support_requests WHERE id = ?').run(id)
+  return true
+}
+
 export function deleteStudentProfile(profileId, deletedByAdminId = null) {
   const profileRow = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profileId)
 

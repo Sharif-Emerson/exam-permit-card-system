@@ -866,6 +866,15 @@ export const restDataAdapter: DataAdapter = {
     return toSemesterRegistration(payload)
   },
 
+  async deleteSupportRequest(id: string): Promise<void> {
+    await request(`/support-requests/${id}`, { method: 'DELETE' })
+  },
+
+  async advanceAllStudentSemesters(): Promise<{ advanced: number; carryDebt: number; skipped: number }> {
+    const payload = await request('/admin/advance-semester', { method: 'POST' }) as { advanced: number; carryDebt: number; skipped: number }
+    return payload
+  },
+
   async fetchPublicSupportContacts(): Promise<PublicSupportContact[]> {
     const payload = await requestPublic('/public/support-contacts')
     const items: unknown[] = Array.isArray(payload?.data) ? (payload.data as unknown[]) : []

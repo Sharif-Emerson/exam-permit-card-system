@@ -46,6 +46,7 @@ import {
   listSemesterRegistrations,
   createSemesterRegistration,
   updateSemesterRegistrationStatus,
+  deleteSupportRequestById,
   resetUserPassword,
   restoreStudentProfile,
   revokeSession,
@@ -2705,6 +2706,15 @@ app.patch('/support-requests/:id', authenticate, requireAdminPermission('manage_
   response.json(updated)
 })
 
+app.delete('/support-requests/:id', authenticate, requireAdminPermission('manage_support_requests', 'You do not have permission to delete support requests.'), (request, response) => {
+  const deleted = deleteSupportRequestById(request.params.id)
+  if (!deleted) {
+    response.status(404).json({ message: 'Support request not found.' })
+    return
+  }
+  response.status(204).end()
+})
+
 app.post('/support-requests/:id/messages', authenticate, upload.single('attachment'), async (request, response) => {
   const message = typeof request.body?.message === 'string' ? request.body.message.trim() : ''
   const attachment = request.file ?? null
@@ -2864,6 +2874,55 @@ app.patch('/semester-registrations/:id', authenticate, requireAdminPermission('m
   })
 
   response.json(updated)
+})
+
+app.post('/admin/advance-semester', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to advance student semesters.'), (request, response) => {
+  const allStudents = listProfiles('student')
+  const settings = getSystemSettings()
+  let advanced = 0
+  let carryDebt = 0
+  let skipped = 0
+
+  for (const profile of allStudents) {
+    const currentSemester = profile.semester
+    if (!currentSemester) {
+      skipped++
+      continue
+    }
+    const currentIdx = KIU_SEMESTERS.indexOf(currentSemester)
+    if (currentIdx === -1 || currentIdx >= KIU_SEMESTERS.length - 1) {
+      skipped++
+      continue
+    }
+    const nextSemester = KIU_SEMESTERS[currentIdx + 1]
+    const newSemesterFee = profile.student_category === 'international'
+      ? settings.international_student_fee
+      : settings.local_student_fee
+    const totalFees = Number(profile.total_fees ?? 0)
+    const amountPaid = Number(profile.amount_paid ?? 0)
+    const debt = totalFees - amountPaid
+
+    if (debt > 0.001) {
+      // Carry outstanding debt forward: new total = debt + next semester fee, paid resets to 0
+      updateProfileFinancials(profile.id, 0, Number((debt + newSemesterFee).toFixed(2)))
+      adminUpdateStudentProfile(profile.id, { semester: nextSemester })
+      carryDebt++
+    } else {
+      // Fully cleared: fresh start for next semester
+      updateProfileFinancials(profile.id, 0, Number(newSemesterFee.toFixed(2)))
+      adminUpdateStudentProfile(profile.id, { semester: nextSemester })
+    }
+    advanced++
+  }
+
+  insertActivityLog({
+    adminId: request.userId,
+    targetProfileId: request.userId,
+    action: 'admin_advance_all_semesters',
+    details: { advanced, carryDebt, skipped },
+  })
+
+  response.json({ advanced, carryDebt, skipped })
 })
 
 app.post('/imports/financials/preview', authenticate, requireAdminPermission('manage_financials', 'You do not have permission to preview financial imports.'), upload.single('file'), async (request, response) => {

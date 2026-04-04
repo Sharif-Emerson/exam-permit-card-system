@@ -1,8 +1,8 @@
-import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useState, useRef } from 'react'
+﻿import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useState, useRef } from 'react'
 
   // Ref to preserve search input focus
 import {
-  BarChart2, Bell, CheckCircle2, CreditCard, Download, Eye, EyeOff, FileCheck,
+  BarChart2, Bell, CalendarDays, CheckCircle2, CreditCard, Download, Eye, EyeOff, FileCheck,
   FileSpreadsheet, FileUp, KeyRound, LayoutDashboard, LogOut, Menu,
   Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, ShieldAlert, Sun, Trash2, Upload, Users, X,
 } from 'lucide-react'
@@ -18,14 +18,14 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync } from '../services/profileService'
+import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchSemesterRegistrations, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateSemesterRegistration, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync } from '../services/profileService'
 import { completeAdminFirstLogin } from '../services/authService'
 import type { SisStatus, SisSyncResult } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
 import type { FaqItem } from './faqStorage'
 import { buildPermitQrPayload } from '../utils/permitQr'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
-import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AssistantAdminAccount, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline } from '../types'
+import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AssistantAdminAccount, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SemesterRegistration, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline } from '../types'
 import { DIALOG_Z } from '../constants/dialogLayers'
 import SignOutDialog from './SignOutDialog'
 
@@ -39,8 +39,8 @@ type ImportPreviewRow = {
   reason?: string
   studentName?: string
 }
-type NavSection = 'dashboard' | 'students' | 'dustbin' | 'support' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'assistants' | 'settings'
-const ADMIN_VALID_SECTIONS = new Set<NavSection>(['dashboard', 'students', 'dustbin', 'support', 'permits', 'import', 'reports', 'permit-cards', 'assistants', 'settings'])
+type NavSection = 'dashboard' | 'students' | 'dustbin' | 'support' | 'semester-requests' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'assistants' | 'settings'
+const ADMIN_VALID_SECTIONS = new Set<NavSection>(['dashboard', 'students', 'dustbin', 'support', 'semester-requests', 'permits', 'import', 'reports', 'permit-cards', 'assistants', 'settings'])
 
 function readAdminSectionFromHash(): NavSection | null {
   if (typeof window === 'undefined') return null
@@ -284,6 +284,7 @@ function getAdminSections(permissions: Set<AdminPermission>, scope: AdminCapabil
   }
 
   if (permissions.has('manage_student_profiles')) {
+    sections.add('semester-requests')
     sections.add('permit-cards')
   }
 
@@ -564,6 +565,7 @@ export default function AdminPanel() {
   const canViewPermitActivity = adminCapability.sections.includes('permits')
   const canManageSupportRequests = adminCapability.sections.includes('support')
   const canManageStudentProfiles = adminCapability.sections.includes('permit-cards')
+  const canManageSemesterRequests = adminCapability.sections.includes('semester-requests')
   const canManageFinancials = adminCapability.canImportFinancials
   const bulkImportTabs = useMemo((): BulkImportSubSection[] => {
     const tabs: BulkImportSubSection[] = []
@@ -597,6 +599,10 @@ export default function AdminPanel() {
   const [supportStatusDrafts, setSupportStatusDrafts] = useState<SupportStatusDrafts>({})
   const [loadingSupportRequests, setLoadingSupportRequests] = useState(false)
   const [savingSupportRequestId, setSavingSupportRequestId] = useState<string | null>(null)
+  const [semesterRequests, setSemesterRequests] = useState<SemesterRegistration[]>([])
+  const [loadingSemesterRequests, setLoadingSemesterRequests] = useState(false)
+  const [savingSemesterRequestId, setSavingSemesterRequestId] = useState<string | null>(null)
+  const [semesterAdminNotes, setSemesterAdminNotes] = useState<Record<string, string>>({})
   const [activityPage, setActivityPage] = useState(1)
   const [activityTotalItems, setActivityTotalItems] = useState(0)
   const [activityTotalPages, setActivityTotalPages] = useState(1)
@@ -980,7 +986,7 @@ export default function AdminPanel() {
       setPaymentDrafts((currentDrafts) => {
         const nextDrafts: PaymentDrafts = {}
         for (const student of nextStudents) {
-          // Field is "payment to add this time", not running total — default empty, keep in-progress typing on refresh
+          // Field is "payment to add this time", not running total â€” default empty, keep in-progress typing on refresh
           nextDrafts[student.id] = currentDrafts[student.id] ?? ''
         }
         return nextDrafts
@@ -1071,6 +1077,35 @@ export default function AdminPanel() {
       }
     }
   }, [canManageSupportRequests])
+
+  const loadSemesterRequests = useCallback(async (options?: { silent?: boolean }) => {
+    if (!canManageSemesterRequests) {
+      setSemesterRequests([])
+      return
+    }
+
+    try {
+      if (!options?.silent) {
+        setLoadingSemesterRequests(true)
+      }
+      const nextRequests = await fetchSemesterRegistrations()
+      setSemesterRequests(nextRequests)
+      setSemesterAdminNotes((current) => {
+        const nextNotes: Record<string, string> = {}
+        for (const req of nextRequests) {
+          nextNotes[req.id] = current[req.id] ?? req.adminNote ?? ''
+        }
+        return nextNotes
+      })
+    } catch (loadError) {
+      const nextError = loadError instanceof Error ? loadError.message : 'Unable to load semester requests.'
+      setError(nextError)
+    } finally {
+      if (!options?.silent) {
+        setLoadingSemesterRequests(false)
+      }
+    }
+  }, [canManageSemesterRequests])
 
   const loadFeeSettings = useCallback(async () => {
     if (!user || user.role !== 'admin') {
@@ -1381,6 +1416,17 @@ export default function AdminPanel() {
   }, [activeSection, canManageSupportRequests, loadSupportRequestQueue])
 
   useEffect(() => {
+    if (!canManageSemesterRequests) {
+      setSemesterRequests([])
+      return
+    }
+
+    if (activeSection === 'semester-requests') {
+      void loadSemesterRequests()
+    }
+  }, [activeSection, canManageSemesterRequests, loadSemesterRequests])
+
+  useEffect(() => {
     void loadFeeSettings()
   }, [loadFeeSettings])
 
@@ -1440,12 +1486,15 @@ export default function AdminPanel() {
       if (canManageSupportRequests && activeSection === 'support') {
         void loadSupportRequestQueue({ silent: true })
       }
+      if (canManageSemesterRequests && activeSection === 'semester-requests') {
+        void loadSemesterRequests({ silent: true })
+      }
     }, 30000)
 
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [activeSection, canManageStudentProfiles, canManageSupportRequests, canViewPermitActivity, loadActivityLogs, loadStudents, loadSupportRequestQueue, loadTrashedStudents])
+  }, [activeSection, canManageStudentProfiles, canManageSemesterRequests, canManageSupportRequests, canViewPermitActivity, loadActivityLogs, loadSemesterRequests, loadStudents, loadSupportRequestQueue, loadTrashedStudents])
 
   useEffect(() => {
     if (activeSection !== 'settings') {
@@ -2593,6 +2642,7 @@ export default function AdminPanel() {
     { id: 'students', key: 'students', label: 'Students', icon: <Users className="w-5 h-5" />, badge: outstandingStudents > 0 ? outstandingStudents : undefined },
     { id: 'dustbin', key: 'dustbin', label: 'General Dustbin', icon: <Trash2 className="w-5 h-5" />, badge: trashedStudents.length > 0 ? trashedStudents.length : undefined },
     { id: 'support-requests', key: 'support', label: 'Support Requests', icon: <Bell className="w-5 h-5" />, badge: openSupportRequestCount > 0 ? openSupportRequestCount : undefined },
+    { id: 'semester-requests', key: 'semester-requests', label: 'Semester Requests', icon: <CalendarDays className="w-5 h-5" />, badge: semesterRequests.filter((r) => r.status === 'pending').length > 0 ? semesterRequests.filter((r) => r.status === 'pending').length : undefined },
     { id: 'sub-admins', key: 'assistants', label: 'Sub-Admins', icon: <Shield className="w-5 h-5" /> },
     { id: 'permit-activity', key: 'permits', label: 'Permit Activity', icon: <FileCheck className="w-5 h-5" />, badge: permitUnreadCount > 0 ? permitUnreadCount : undefined },
     { id: 'permit-cards', key: 'permit-cards', label: 'Permit Cards', icon: <CreditCard className="w-5 h-5" />, badge: clearedStudents > 0 ? clearedStudents : undefined },
@@ -2723,6 +2773,67 @@ export default function AdminPanel() {
   function handleDragEnter(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault()
     setDragActive(true)
+  }
+
+  async function handleSaveSemesterRequest(requestId: string, decision: 'approved' | 'rejected') {
+    if (!canManageSemesterRequests) {
+      setError('Your admin view does not allow semester request updates.')
+      return
+    }
+
+    try {
+      setSavingSemesterRequestId(requestId)
+      setError('')
+      setSuccessMessage('')
+
+      const adminNote = (semesterAdminNotes[requestId] ?? '').trim()
+      const updated = await updateSemesterRegistration(requestId, { status: decision, adminNote })
+
+      setSemesterRequests((current) => current.map((r) => (r.id === requestId ? updated : r)))
+      setSemesterAdminNotes((current) => ({ ...current, [requestId]: updated.adminNote ?? '' }))
+      setSuccessMessage(`Semester request for ${updated.studentName} has been ${decision}.`)
+    } catch (saveError) {
+      const nextError = saveError instanceof Error ? saveError.message : 'Unable to update semester request.'
+      setError(nextError)
+    } finally {
+      setSavingSemesterRequestId(null)
+    }
+  }
+
+  async function handleDeleteSupportRequest(requestId: string) {
+    if (!canManageSupportRequests) {
+      setError('Your admin view does not allow deleting support requests.')
+      return
+    }
+
+    try {
+      setError('')
+      setSuccessMessage('')
+      await deleteSupportRequest(requestId)
+      setSupportRequests((current) => current.filter((r) => r.id !== requestId))
+      setSuccessMessage('Support request deleted.')
+    } catch (saveError) {
+      const nextError = saveError instanceof Error ? saveError.message : 'Unable to delete support request.'
+      setError(nextError)
+    }
+  }
+
+  async function handleAdvanceAllSemesters() {
+    if (!canManageStudentProfiles) {
+      setError('You do not have permission to advance student semesters.')
+      return
+    }
+
+    try {
+      setError('')
+      setSuccessMessage('')
+      const result = await advanceAllStudentSemesters()
+      setSuccessMessage(`Semester advance complete: ${result.advanced} student(s) advanced, ${result.carryDebt} with carried debt, ${result.skipped} skipped.`)
+      void loadStudents({ silent: true })
+    } catch (saveError) {
+      const nextError = saveError instanceof Error ? saveError.message : 'Unable to advance student semesters.'
+      setError(nextError)
+    }
   }
 
   function handleDragOver(event: DragEvent<HTMLLabelElement>) {
@@ -2866,7 +2977,7 @@ export default function AdminPanel() {
                   disabled={adminFirstLoginSaving}
                   className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
-                  {adminFirstLoginSaving ? 'Saving…' : 'Complete setup &amp; continue'}
+                  {adminFirstLoginSaving ? 'Savingâ€¦' : 'Complete setup &amp; continue'}
                 </button>
               </form>
             </div>
@@ -2882,7 +2993,7 @@ export default function AdminPanel() {
         />
       )}
 
-      {/* â”€â”€ Sidebar â”€â”€ */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ Sidebar Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <aside
         className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-sky-200/70 bg-[linear-gradient(180deg,_rgba(239,246,255,0.95),_rgba(240,253,250,0.94)_52%,_rgba(254,252,232,0.92))] px-4 py-5 shadow-2xl shadow-sky-200/55 backdrop-blur-xl transition-transform duration-300 dark:border-slate-800 dark:bg-[linear-gradient(180deg,_#0f172a_0%,_#0c1a2e_52%,_#111827_100%)] dark:shadow-none lg:static lg:translate-x-0 lg:pt-0 lg:shadow-none lg:border-r lg:border-gray-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
@@ -2963,7 +3074,7 @@ export default function AdminPanel() {
         </div>
       </aside>
 
-      {/* â”€â”€ Main area â”€â”€ */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ Main area Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 
         {/* Top header */}
@@ -3240,7 +3351,7 @@ export default function AdminPanel() {
             onChange={(e) => void handleImportFile(e)}
           />
           <div key={activeSection} className="kiu-page-in-animate"> {/* 4. Wrap activeSection renders */}
-            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ DASHBOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ DASHBOARD Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
             {activeSection === 'dashboard' && (
               <div className="space-y-6">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -3427,7 +3538,7 @@ export default function AdminPanel() {
                         <div key={student.id} className="flex items-center justify-between gap-4 px-5 py-4">
                           <div>
                             <p className="font-medium text-gray-900">{student.name}</p>
-                            <p className="text-xs text-gray-400">{student.studentId} • {student.department ?? student.course}</p>
+                            <p className="text-xs text-gray-400">{student.studentId} â€¢ {student.department ?? student.course}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-semibold text-red-600">{formatMoney(student.feesBalance, activeCurrencyCode)}</p>
@@ -3452,11 +3563,11 @@ export default function AdminPanel() {
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="font-medium text-gray-900">{item.exam.title}</p>
-                              <p className="text-xs text-gray-400">{item.student.name} • {item.student.studentId}</p>
+                              <p className="text-xs text-gray-400">{item.student.name} â€¢ {item.student.studentId}</p>
                             </div>
                             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">Assigned</span>
                           </div>
-                          <p className="mt-2 text-xs text-gray-500">{item.exam.venue} • Seat {item.exam.seatNumber}</p>
+                          <p className="mt-2 text-xs text-gray-500">{item.exam.venue} â€¢ Seat {item.exam.seatNumber}</p>
                         </div>
                       ))}
                       {upcomingExamEntries.length === 0 && (
@@ -3599,7 +3710,7 @@ export default function AdminPanel() {
                         <div key={log.id} className="flex items-start justify-between gap-3 px-5 py-4">
                           <div>
                             <p className="font-medium text-gray-900">{formatAdminActionLabel(log.action)}</p>
-                            <p className="text-xs text-gray-400">Actor: {log.adminId} • Target: {log.targetProfileId}</p>
+                            <p className="text-xs text-gray-400">Actor: {log.adminId} â€¢ Target: {log.targetProfileId}</p>
                           </div>
                           <span className="text-xs text-gray-400">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</span>
                         </div>
@@ -3635,7 +3746,7 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ STUDENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ STUDENTS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
             {activeSection === 'students' && (
               <div className="space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -3713,7 +3824,7 @@ export default function AdminPanel() {
                     <div>
                       <p className="font-medium">Student filters are active</p>
                       <p className="text-xs text-amber-800">
-                        {activeStudentFilterLabels.join(' • ')}
+                        {activeStudentFilterLabels.join(' â€¢ ')}
                       </p>
                     </div>
                     <button
@@ -3749,9 +3860,9 @@ export default function AdminPanel() {
                             <tr key={student.id} className="hover:bg-gray-50">
                               <td className="px-5 py-3">
                                 <div className="font-medium text-gray-900">{student.name}</div>
-                                <div className="text-xs text-gray-400">{student.studentId} Â· {student.email}</div>
+                                <div className="text-xs text-gray-400">{student.studentId} Ã‚Â· {student.email}</div>
                                 <div className="mt-1 text-xs text-gray-400">
-                                  {student.program ?? student.course} Â· {student.department ?? 'No department'}
+                                  {student.program ?? student.course} Ã‚Â· {student.department ?? 'No department'}
                                 </div>
                               </td>
                               <td className="px-5 py-3 text-gray-600">
@@ -3795,14 +3906,14 @@ export default function AdminPanel() {
                                       setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
                                     }
                                     aria-label={`Bank slip or payment amount to add for ${student.name}`}
-                                    title={`Amount on this slip only — adds to cumulative total (already recorded: ${formatMoney(student.amountPaid, activeCurrencyCode)})`}
+                                    title={`Amount on this slip only â€” adds to cumulative total (already recorded: ${formatMoney(student.amountPaid, activeCurrencyCode)})`}
                                     placeholder="Slip amount"
                                     className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
                                   />
                                   <button
                                     type="submit"
                                     disabled={!canManageFinancials || savingId === student.id}
-                                    title="Post this slip — adds to cumulative amount received"
+                                    title="Post this slip â€” adds to cumulative amount received"
                                     aria-label={`Post bank slip payment for ${student.name}`}
                                     className="rounded bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
                                   >
@@ -3922,14 +4033,14 @@ export default function AdminPanel() {
                         <div key={student.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="font-medium text-gray-900">{student.name}</p>
-                            <p className="text-xs text-gray-400">{student.studentId ?? 'No registration number'} · {student.email}</p>
+                            <p className="text-xs text-gray-400">{student.studentId ?? 'No registration number'} Â· {student.email}</p>
                             {(() => {
                               const daysUntilPurge = getDaysUntilDate(student.purgeAfterAt)
 
                               return (
                             <p className="mt-1 text-xs text-gray-500">
-                              Deleted {new Date(student.deletedAt).toLocaleString()} · auto-purge {new Date(student.purgeAfterAt).toLocaleDateString()}
-                              {daysUntilPurge !== null ? ` • ${daysUntilPurge} day${daysUntilPurge === 1 ? '' : 's'} left` : ''}
+                              Deleted {new Date(student.deletedAt).toLocaleString()} Â· auto-purge {new Date(student.purgeAfterAt).toLocaleDateString()}
+                              {daysUntilPurge !== null ? ` â€¢ ${daysUntilPurge} day${daysUntilPurge === 1 ? '' : 's'} left` : ''}
                             </p>
                               )
                             })()}
@@ -3942,7 +4053,7 @@ export default function AdminPanel() {
                               className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
                             >
                               <RefreshCcw className="h-4 w-4" />
-                              {restoringStudentId === student.id ? 'Restoring…' : 'Restore'}
+                              {restoringStudentId === student.id ? 'Restoringâ€¦' : 'Restore'}
                             </button>
                             <button
                               type="button"
@@ -4001,14 +4112,14 @@ export default function AdminPanel() {
                         <div key={student.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="font-medium text-gray-900">{student.name}</p>
-                            <p className="text-xs text-gray-400">{student.studentId ?? 'No registration number'} · {student.email}</p>
+                            <p className="text-xs text-gray-400">{student.studentId ?? 'No registration number'} Â· {student.email}</p>
                             {(() => {
                               const daysUntilPurge = getDaysUntilDate(student.purgeAfterAt)
 
                               return (
                                 <p className="mt-1 text-xs text-gray-500">
-                                  Deleted {new Date(student.deletedAt).toLocaleString()} · auto-purge {new Date(student.purgeAfterAt).toLocaleDateString()}
-                                  {daysUntilPurge !== null ? ` • ${daysUntilPurge} day${daysUntilPurge === 1 ? '' : 's'} left` : ''}
+                                  Deleted {new Date(student.deletedAt).toLocaleString()} Â· auto-purge {new Date(student.purgeAfterAt).toLocaleDateString()}
+                                  {daysUntilPurge !== null ? ` â€¢ ${daysUntilPurge} day${daysUntilPurge === 1 ? '' : 's'} left` : ''}
                                 </p>
                               )
                             })()}
@@ -4021,7 +4132,7 @@ export default function AdminPanel() {
                               className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
                             >
                               <RefreshCcw className="h-4 w-4" />
-                              {restoringStudentId === student.id ? 'Restoring…' : 'Restore'}
+                              {restoringStudentId === student.id ? 'Restoringâ€¦' : 'Restore'}
                             </button>
                             <button
                               type="button"
@@ -4307,7 +4418,7 @@ export default function AdminPanel() {
                                   </button>
                                 </div>
                               </div>
-                              <p className="mt-1 text-xs text-gray-500">{assistant.email}{assistant.phoneNumber ? ` • ${assistant.phoneNumber}` : ''}</p>
+                              <p className="mt-1 text-xs text-gray-500">{assistant.email}{assistant.phoneNumber ? ` â€¢ ${assistant.phoneNumber}` : ''}</p>
                               {assistant.role === 'department_prints' && (
                                 <p className="mt-1 text-xs text-gray-500">Departments: {assistant.departments.length > 0 ? assistant.departments.join(', ') : 'None assigned'}</p>
                               )}
@@ -4485,8 +4596,8 @@ export default function AdminPanel() {
                                     {request.status.replace('_', ' ')}
                                   </span>
                                 </div>
-                                <p className="mt-1 text-sm text-gray-500">{request.studentName} • {request.registrationNumber || request.studentEmail}</p>
-                                <p className="mt-1 text-xs text-gray-400">Submitted {new Date(request.createdAt).toLocaleString()} • Updated {new Date(request.updatedAt).toLocaleString()}</p>
+                                <p className="mt-1 text-sm text-gray-500">{request.studentName} â€¢ {request.registrationNumber || request.studentEmail}</p>
+                                <p className="mt-1 text-xs text-gray-400">Submitted {new Date(request.createdAt).toLocaleString()} â€¢ Updated {new Date(request.updatedAt).toLocaleString()}</p>
                               </div>
                               <div className="text-xs text-gray-500">
                                 <p>Email: {request.studentEmail}</p>
@@ -4539,6 +4650,18 @@ export default function AdminPanel() {
                                 {isSaving ? 'Saving...' : 'Save Update'}
                               </button>
                             </div>
+                            {request.status === 'resolved' && (
+                              <div className="mt-3 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteSupportRequest(request.id)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  Delete resolved request
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -4548,8 +4671,99 @@ export default function AdminPanel() {
                 )}
               </div>
             )}
+            {/* ────────────── SEMESTER REQUESTS ────────────── */}
+            {activeSection === 'semester-requests' && (
+              <div className="space-y-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h1 className="text-xl font-bold text-gray-900">Semester Requests</h1>
+                    <p className="text-sm text-gray-500">Student-submitted semester registration requests pending review.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void loadSemesterRequests()}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                  >
+                    <RefreshCcw className="h-4 w-4" />
+                    Refresh
+                  </button>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  {loadingSemesterRequests ? (
+                    <div className="px-5 py-10 text-center text-sm text-gray-400">Loading semester requests...</div>
+                  ) : semesterRequests.length === 0 ? (
+                    <div className="px-5 py-10 text-center text-sm text-gray-400">No semester registration requests have been submitted yet.</div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {semesterRequests.map((req) => {
+                        const isSavingThis = savingSemesterRequestId === req.id
+                        return (
+                          <div key={req.id} className="px-5 py-5">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="text-base font-semibold text-gray-900">{req.studentName}</h3>
+                                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                    req.status === 'approved'
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : req.status === 'rejected'
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-amber-100 text-amber-700'
+                                  }`}>
+                                    {req.status}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-sm text-gray-500">{req.registrationNumber || req.studentEmail}</p>
+                                <p className="mt-1 text-sm text-gray-700">Requested semester: <span className="font-medium">{req.requestedSemester}</span></p>
+                                <p className="mt-1 text-xs text-gray-400">Submitted {new Date(req.createdAt).toLocaleString()}</p>
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                <p>Email: {req.studentEmail}</p>
+                                <p>Request ID: {req.id}</p>
+                              </div>
+                            </div>
+                            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                              <div>
+                                <label htmlFor={`sem-note-${req.id}`} className="mb-1 block text-sm font-medium text-gray-700">Admin note (optional)</label>
+                                <input
+                                  id={`sem-note-${req.id}`}
+                                  type="text"
+                                  value={semesterAdminNotes[req.id] ?? ''}
+                                  onChange={(event) => setSemesterAdminNotes((current) => ({ ...current, [req.id]: event.target.value }))}
+                                  placeholder="Add a note for the student..."
+                                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => void handleSaveSemesterRequest(req.id, 'approved')}
+                                disabled={isSavingThis || req.status === 'approved'}
+                                className="inline-flex items-center justify-center gap-2 self-end rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                                {isSavingThis ? 'Saving...' : 'Approve'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleSaveSemesterRequest(req.id, 'rejected')}
+                                disabled={isSavingThis || req.status === 'rejected'}
+                                className="inline-flex items-center justify-center gap-2 self-end rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                              >
+                                <X className="h-4 w-4" />
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
-            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ PERMIT ACTIVITY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+
+            {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ PERMIT ACTIVITY Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
             {activeSection === 'permits' && (
               <div className="space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -4764,7 +4978,7 @@ export default function AdminPanel() {
                           <div>
                             <h3 className="font-semibold text-gray-800">Import preview</h3>
                             <p className="text-xs text-gray-500">
-                              {importPreviewRows.length} row(s) from {importFileName} — {pendingImportUpdates.length} row(s) are ready to apply.
+                              {importPreviewRows.length} row(s) from {importFileName} â€” {pendingImportUpdates.length} row(s) are ready to apply.
                             </p>
                           </div>
                           <div className="flex gap-2">
@@ -4882,7 +5096,7 @@ export default function AdminPanel() {
 }`}
                       </pre>
                       <p className="mt-2 text-xs text-gray-500">
-                        Use <code className="rounded bg-gray-100 px-1 text-xs">password</code> (8–128 characters) or, instead of <code className="rounded bg-gray-100 px-1 text-xs">password</code>, a <code className="rounded bg-gray-100 px-1 text-xs">password_hash</code> string beginning with <code className="rounded bg-gray-100 px-1 text-xs">scrypt:</code>.
+                        Use <code className="rounded bg-gray-100 px-1 text-xs">password</code> (8â€“128 characters) or, instead of <code className="rounded bg-gray-100 px-1 text-xs">password</code>, a <code className="rounded bg-gray-100 px-1 text-xs">password_hash</code> string beginning with <code className="rounded bg-gray-100 px-1 text-xs">scrypt:</code>.
                       </p>
                     </div>
                     <div className="rounded-lg border border-blue-100 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/30 p-4 space-y-3">
@@ -4899,7 +5113,7 @@ export default function AdminPanel() {
                               {sisStatus.enabled ? 'Connected' : 'Not configured'}
                             </span>
                           ) : (
-                            <span className="mt-1 inline-block text-xs text-blue-500 dark:text-blue-400">Checking status…</span>
+                            <span className="mt-1 inline-block text-xs text-blue-500 dark:text-blue-400">Checking statusâ€¦</span>
                           )}
                         </div>
                         <button
@@ -4928,7 +5142,7 @@ export default function AdminPanel() {
                           {sisSyncing ? (
                             <>
                               <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                              Syncing…
+                              Syncingâ€¦
                             </>
                           ) : (
                             'Sync from SIS'
@@ -4970,7 +5184,7 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ REPORTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ REPORTS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
             {activeSection === 'reports' && (
               <div className="space-y-6">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -5164,7 +5378,7 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {/* ── PERMIT CARDS ── */}
+            {/* â”€â”€ PERMIT CARDS â”€â”€ */}
             {activeSection === 'permit-cards' && (
               <div className="space-y-5">
                 <div>
@@ -5309,11 +5523,11 @@ export default function AdminPanel() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center dark:border-emerald-900 dark:bg-emerald-950/50">
                     <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{clearedStudents}</p>
-                    <p className="mt-1 text-xs text-emerald-500 dark:text-emerald-400">Cleared — Can Print</p>
+                    <p className="mt-1 text-xs text-emerald-500 dark:text-emerald-400">Cleared â€” Can Print</p>
                   </div>
                   <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-center dark:border-amber-900 dark:bg-amber-950/50">
                     <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{outstandingStudents}</p>
-                    <p className="mt-1 text-xs text-amber-500 dark:text-amber-400">Outstanding — Blocked</p>
+                    <p className="mt-1 text-xs text-amber-500 dark:text-amber-400">Outstanding â€” Blocked</p>
                   </div>
                   <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-center dark:border-blue-900 dark:bg-blue-950/50">
                     <p className="text-2xl font-bold text-blue-700">
@@ -5401,14 +5615,14 @@ export default function AdminPanel() {
                                 setPaymentDrafts((cur) => ({ ...cur, [student.id]: e.target.value }))
                               }
                               aria-label={`Bank slip or payment amount to add for ${student.name}`}
-                              title={`Amount on this slip only — adds to cumulative total (already recorded: ${formatMoney(student.amountPaid, activeCurrencyCode)})`}
+                              title={`Amount on this slip only â€” adds to cumulative total (already recorded: ${formatMoney(student.amountPaid, activeCurrencyCode)})`}
                               placeholder="Slip amount"
                               className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300"
                             />
                             <button
                               type="submit"
                               disabled={!canManageFinancials || savingId === student.id}
-                              title="Post this slip — adds to cumulative amount received"
+                              title="Post this slip â€” adds to cumulative amount received"
                               aria-label={`Post bank slip payment for ${student.name}`}
                               className="rounded bg-emerald-600 p-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
                             >
@@ -5533,13 +5747,39 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {/* ── SETTINGS ── */}
+            {/* â”€â”€ SETTINGS â”€â”€ */}
             {activeSection === 'settings' && (
               <div className="space-y-6">
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Settings</h1>
                   <p className="text-sm text-gray-500">System configuration and account information.</p>
                 </div>
+
+                {canManageStudentProfiles && (
+                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <div className="border-b border-gray-100 px-6 py-4">
+                      <h2 className="font-semibold text-gray-800">Semester Advancement</h2>
+                      <p className="mt-1 text-xs text-gray-400">Advance all students to their next semester. Students with outstanding balances will carry their debt forward combined with the new semester fee.</p>
+                    </div>
+                    <div className="px-6 py-5">
+                      <p className="mb-4 text-sm text-gray-600">This action will move every student currently assigned to a semester to the next semester in the KIU sequence, resetting fees for cleared students and combining debt for those with outstanding balances. Students on Year 5 Semester 2 or with no semester assigned will be skipped.</p>
+                      <button
+                        type="button"
+                        onClick={() => setPendingConfirmation({
+                          title: 'Advance all students to next semester?',
+                          message: 'Students with cleared balances will have their fees reset for the new semester. Students with outstanding debt will carry it forward added to the next semester fee. This cannot be undone. Continue?',
+                          confirmLabel: 'Advance semesters',
+                          tone: 'danger',
+                          action: () => handleAdvanceAllSemesters(),
+                        })}
+                        className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+                      >
+                        <CalendarDays className="h-4 w-4" />
+                        Advance all students to next semester
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {canManageFinancials && (
                   <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -5686,7 +5926,7 @@ export default function AdminPanel() {
                                   setFeeSettingsDraft(prev => ({ ...prev, deadlines: next }))
                                 }}
                                 className="w-full border-b border-gray-200 bg-transparent py-1 text-xs focus:border-emerald-400 focus:outline-none"
-                                title="Optional — drives the live countdown on student dashboards"
+                                title="Optional â€” drives the live countdown on student dashboards"
                               />
                             </div>
                             <div>
@@ -5849,11 +6089,11 @@ export default function AdminPanel() {
                   </div>
                   {user?.scope === 'assistant-admin' && user.assistantRole === 'support_help' ? (
                     <div className="px-6 py-4 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-t border-blue-100 dark:border-blue-800">
-                      <p><strong>ℹ Your Role:</strong> As a Support agent, you can edit the FAQ to help students find answers to common questions.</p>
+                      <p><strong>â„¹ Your Role:</strong> As a Support agent, you can edit the FAQ to help students find answers to common questions.</p>
                     </div>
                   ) : user?.scope === 'assistant-admin' ? (
                     <div className="px-6 py-4 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-t border-amber-100 dark:border-amber-800">
-                      <p><strong>⚠ Limited Access:</strong> Only support/help team members can edit the FAQ.</p>
+                      <p><strong>âš  Limited Access:</strong> Only support/help team members can edit the FAQ.</p>
                     </div>
                   ) : null}
                   <form className="space-y-4 px-6 py-5" onSubmit={handleSaveFaq}>
@@ -5885,7 +6125,7 @@ export default function AdminPanel() {
                                 setFaqDraft(next)
                               }}
                               className="w-full rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                              placeholder="Write the answer here…"
+                              placeholder="Write the answer hereâ€¦"
                             />
                           </div>
                           <div className="flex items-start pt-5">
@@ -5922,7 +6162,7 @@ export default function AdminPanel() {
                         <Save className="h-4 w-4" />
                         Save FAQ
                       </button>
-                      {faqSaved && <span className="text-xs font-medium text-emerald-500 dark:text-emerald-400">✓ Saved — students will see these changes immediately.</span>}
+                      {faqSaved && <span className="text-xs font-medium text-emerald-500 dark:text-emerald-400">âœ“ Saved â€” students will see these changes immediately.</span>}
                     </div>
                   </form>
                 </div>
@@ -5939,7 +6179,7 @@ export default function AdminPanel() {
                   </div>
 
                   {emailStatus === null ? (
-                    <p className="text-xs text-sky-400 dark:text-sky-500">Loading email status…</p>
+                    <p className="text-xs text-sky-400 dark:text-sky-500">Loading email statusâ€¦</p>
                   ) : (
                     <div className="mb-4 flex flex-wrap items-center gap-3">
                       <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${emailStatus.configured ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'}`}>
@@ -5983,12 +6223,12 @@ export default function AdminPanel() {
                       disabled={emailTestSending}
                       className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
                     >
-                      {emailTestSending ? 'Sending…' : 'Send test email'}
+                      {emailTestSending ? 'Sendingâ€¦' : 'Send test email'}
                     </button>
                   </form>
                   {emailTestResult && (
                     <p className={`mt-3 text-xs font-medium ${emailTestResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {emailTestResult.ok ? '✓' : '✗'} {emailTestResult.message}
+                      {emailTestResult.ok ? 'âœ“' : 'âœ—'} {emailTestResult.message}
                     </p>
                   )}
                 </div>
@@ -6243,7 +6483,7 @@ export default function AdminPanel() {
                 </div>
                 <div>
                   <label htmlFor="edit-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">
-                    Expected Total Fees ({activeCurrencyCode}){editDraft.program && getTuitionForProgram(editDraft.program) != null ? ` — Official: UGX ${getTuitionForProgram(editDraft.program)!.toLocaleString()}` : ''}
+                    Expected Total Fees ({activeCurrencyCode}){editDraft.program && getTuitionForProgram(editDraft.program) != null ? ` â€” Official: UGX ${getTuitionForProgram(editDraft.program)!.toLocaleString()}` : ''}
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -6704,7 +6944,7 @@ export default function AdminPanel() {
                 <div className="col-span-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
                   <div className="flex-1">
                     <label htmlFor="create-student-total-fees" className="mb-1 block text-xs font-medium text-gray-700">
-                      Tuition Fees (UGX){createDraft.program && getTuitionForProgram(createDraft.program) != null ? ` — Official: UGX ${getTuitionForProgram(createDraft.program)!.toLocaleString()}` : ''}
+                      Tuition Fees (UGX){createDraft.program && getTuitionForProgram(createDraft.program) != null ? ` â€” Official: UGX ${getTuitionForProgram(createDraft.program)!.toLocaleString()}` : ''}
                     </label>
                     <input
                       id="create-student-total-fees"
@@ -6772,4 +7012,3 @@ export default function AdminPanel() {
     </>
   )
 }
-

@@ -221,6 +221,14 @@ export async function updateSemesterRegistration(id: string, values: { status: '
   return activeDataAdapter.updateSemesterRegistration(id, values)
 }
 
+export async function deleteSupportRequest(id: string): Promise<void> {
+  return activeDataAdapter.deleteSupportRequest(id)
+}
+
+export async function advanceAllStudentSemesters(): Promise<{ advanced: number; carryDebt: number; skipped: number }> {
+  return activeDataAdapter.advanceAllStudentSemesters()
+}
+
 export async function fetchPublicSupportContacts(): Promise<PublicSupportContact[]> {
   return activeDataAdapter.fetchPublicSupportContacts()
 }
