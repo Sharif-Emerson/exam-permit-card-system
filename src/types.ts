@@ -257,6 +257,7 @@ export interface AssistantAdminAccount {
 export interface StudentAccountUpdateInput {
   name?: string
   email?: string
+  gender?: StudentGender
   phoneNumber?: string
   currentPassword?: string
   password?: string

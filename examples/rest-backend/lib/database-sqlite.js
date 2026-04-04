@@ -1608,6 +1608,7 @@ export function updateStudentAccount(profileId, updates) {
 
   const nextName = typeof updates.name === 'string' ? updates.name.trim() : userRow.name
   const nextEmail = typeof updates.email === 'string' ? updates.email.trim().toLowerCase() : userRow.email
+  const nextGender = updates.gender === 'male' || updates.gender === 'female' || updates.gender === 'other' ? updates.gender : profileRow.gender
   const nextPhoneNumber = typeof updates.phoneNumber === 'string' ? (normalizePhoneNumber(updates.phoneNumber) || null) : userRow.phone_number
   const nextProfileImage = typeof updates.profileImage === 'string'
     ? updates.profileImage.trim() || null
@@ -1650,9 +1651,9 @@ export function updateStudentAccount(profileId, updates) {
 
     db.prepare(`
       UPDATE profiles
-      SET email = ?, phone_number = ?, name = ?, profile_image = ?, first_login_required = ?, updated_at = ?
+      SET email = ?, phone_number = ?, name = ?, gender = ?, profile_image = ?, first_login_required = ?, updated_at = ?
       WHERE id = ?
-    `).run(nextEmail, nextPhoneNumber, nextName, effectiveProfileImage, nextFirstLoginRequired, updatedAt, profileId)
+    `).run(nextEmail, nextPhoneNumber, nextName, nextGender, effectiveProfileImage, nextFirstLoginRequired, updatedAt, profileId)
 
     db.exec('COMMIT')
   } catch (error) {

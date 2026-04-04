@@ -74,6 +74,7 @@ type NotificationItem = {
 type SettingsDraft = {
   name: string
   email: string
+  gender: string
   phoneNumber: string
   profileImage: string
   currentPassword: string
@@ -506,6 +507,7 @@ export default function Dashboard() {
   const [settingsDraft, setSettingsDraft] = useState<SettingsDraft>({
     name: '',
     email: '',
+    gender: '',
     phoneNumber: '',
     profileImage: '',
     currentPassword: '',
@@ -659,6 +661,7 @@ export default function Dashboard() {
           ...current,
           name: p.name,
           email: p.email,
+          gender: p.gender ?? '',
           phoneNumber: p.phoneNumber || '',
           profileImage: p.profileImage || '',
         }))
@@ -1095,6 +1098,7 @@ export default function Dashboard() {
       setError('')
       setSuccessMessage('')
       const updatedProfile = await updateStudentAccount(studentData.id, {
+        gender: (settingsDraft.gender === 'male' || settingsDraft.gender === 'female' || settingsDraft.gender === 'other') ? settingsDraft.gender : undefined,
         phoneNumber: settingsDraft.phoneNumber.trim() || undefined,
         profileImage: settingsDraft.profileImage || null,
         currentPassword: settingsDraft.currentPassword || undefined,
@@ -1108,6 +1112,7 @@ export default function Dashboard() {
       setSettingsDraft({
         name: updatedProfile.name,
         email: updatedProfile.email,
+        gender: updatedProfile.role === 'student' ? (updatedProfile.gender ?? '') : '',
         phoneNumber: updatedProfile.phoneNumber ?? '',
         profileImage: updatedProfile.profileImage,
         currentPassword: '',
@@ -2211,6 +2216,20 @@ export default function Dashboard() {
                               placeholder="e.g. +256700123456"
                               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
                             />
+                          </div>
+                          <div>
+                            <label htmlFor="settings-gender" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Gender</label>
+                            <select
+                              id="settings-gender"
+                              value={settingsDraft.gender}
+                              onChange={(event) => setSettingsDraft((current) => ({ ...current, gender: event.target.value }))}
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                            >
+                              <option value="">Not specified</option>
+                              <option value="male">Male</option>
+                              <option value="female">Female</option>
+                              <option value="other">Other</option>
+                            </select>
                           </div>
                         </div>
                         <div>

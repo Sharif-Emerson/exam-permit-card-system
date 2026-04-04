@@ -1772,6 +1772,9 @@ app.patch('/profiles/:id/account', authenticate, (request, response) => {
 
   const name = typeof request.body.name === 'string' ? request.body.name.trim() : undefined
   const email = typeof request.body.email === 'string' ? request.body.email.trim().toLowerCase() : undefined
+  const gender = request.body.gender === 'male' || request.body.gender === 'female' || request.body.gender === 'other'
+    ? request.body.gender
+    : undefined
   const phoneNumber = typeof request.body.phoneNumber === 'string' ? normalizePhoneNumber(request.body.phoneNumber) : undefined
   const currentPassword = typeof request.body.currentPassword === 'string' ? request.body.currentPassword : undefined
   const password = typeof request.body.password === 'string' ? request.body.password : undefined
@@ -1845,6 +1848,7 @@ app.patch('/profiles/:id/account', authenticate, (request, response) => {
   try {
     const updates = {
       ...(profile.role === 'admin' ? { name, email } : {}),
+      ...(typeof gender !== 'undefined' ? { gender } : {}),
       ...(typeof phoneNumber === 'string' ? { phoneNumber } : {}),
       currentPassword,
       password,

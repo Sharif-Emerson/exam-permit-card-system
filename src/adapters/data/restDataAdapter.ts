@@ -594,6 +594,7 @@ export const restDataAdapter: DataAdapter = {
     const payload: Record<string, unknown> = {}
     if (typeof values.name === 'string') payload.name = values.name
     if (typeof values.email === 'string') payload.email = values.email
+    if (values.gender === 'male' || values.gender === 'female' || values.gender === 'other') payload.gender = values.gender
     if (typeof values.phoneNumber === 'string') payload.phoneNumber = values.phoneNumber || null
     if (typeof values.currentPassword === 'string') payload.currentPassword = values.currentPassword
     if (typeof values.password === 'string') payload.password = values.password

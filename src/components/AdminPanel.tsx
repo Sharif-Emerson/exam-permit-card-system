@@ -1192,6 +1192,7 @@ export default function AdminPanel() {
           email: editDraft.email,
           studentId: editDraft.studentId,
           studentCategory: editDraft.studentCategory,
+          gender: editDraft.gender,
           phoneNumber: editDraft.phoneNumber,
           profileImage: editDraft.profileImage || null,
           course: editDraft.course,
@@ -1257,6 +1258,7 @@ export default function AdminPanel() {
         password: assignedPassword,
         studentId: createDraft.studentId,
         studentCategory: createDraft.studentCategory,
+        gender: createDraft.gender,
         phoneNumber: createDraft.phoneNumber,
         course: resolvedCourse,
         program: resolvedProgram,
@@ -1984,6 +1986,7 @@ export default function AdminPanel() {
       email: student.email,
       studentId: student.studentId ?? '',
       studentCategory: student.studentCategory ?? 'local',
+      gender: student.gender ?? undefined,
       phoneNumber: student.phoneNumber === 'Not assigned' ? '' : student.phoneNumber ?? '',
       profileImage: student.profileImage ?? '',
       course: inferredCourse,
@@ -6164,6 +6167,23 @@ export default function AdminPanel() {
                   </select>
                 </div>
                 <div>
+                  <label htmlFor="edit-student-gender" className="mb-1 block text-xs font-medium text-gray-700">Gender</label>
+                  <select
+                    id="edit-student-gender"
+                    value={editDraft.gender ?? ''}
+                    onChange={(event) => {
+                      const val = event.target.value
+                      setEditDraft((d) => ({ ...d, gender: (val === 'male' || val === 'female' || val === 'other') ? val : undefined }))
+                    }}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="">Not specified</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
                   <label htmlFor="edit-student-course" className="mb-1 block text-xs font-medium text-gray-700">Course</label>
                   <select
                     id="edit-student-course"
@@ -6613,6 +6633,23 @@ export default function AdminPanel() {
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                     placeholder="e.g. +256700123456"
                   />
+                </div>
+                <div>
+                  <label htmlFor="create-student-gender" className="mb-1 block text-xs font-medium text-gray-700">Gender</label>
+                  <select
+                    id="create-student-gender"
+                    value={createDraft.gender ?? ''}
+                    onChange={(event) => {
+                      const val = event.target.value
+                      setCreateDraft((c) => ({ ...c, gender: (val === 'male' || val === 'female' || val === 'other') ? val : undefined }))
+                    }}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="">Not specified</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="create-student-year" className="mb-1 block text-xs font-medium text-gray-700">Current Year of Study</label>
