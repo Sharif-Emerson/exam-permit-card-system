@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
-import { Eye, EyeOff, Lock, Moon, Sun, User } from 'lucide-react'
+import { Eye, EyeOff, Lock, Moon, ShieldAlert, Sun, User, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { backendProvider, publicApiBaseUrl } from '../config/provider'
 import { useAuth } from '../context/AuthContext'
@@ -191,6 +191,24 @@ export default function Login() {
   }
 
   return (
+    <>
+    {error && (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-none">
+        <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-red-200 bg-white shadow-2xl dark:border-red-900 dark:bg-slate-900">
+          <div className="flex items-center gap-3 border-b border-red-100 px-5 py-4 dark:border-red-900/60">
+            <ShieldAlert className="h-5 w-5 shrink-0 text-red-500 dark:text-red-400" />
+            <span className="flex-1 text-sm font-semibold text-red-700 dark:text-red-300">Error</span>
+            <button type="button" aria-label="Dismiss error" onClick={() => setError('')} className="rounded-full p-1 text-red-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/40">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="px-5 py-4 text-sm text-red-700 dark:text-red-300">{error}</p>
+          <div className="flex justify-end px-5 pb-4">
+            <button type="button" onClick={() => setError('')} className="rounded-full bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600">OK</button>
+          </div>
+        </div>
+      </div>
+    )}
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(187,247,208,0.75),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(254,249,195,0.75),_transparent_24%),linear-gradient(180deg,_#f0fdf4_0%,_#ecfdf5_40%,_#f7fee7_100%)] px-4 py-8 text-emerald-950 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.2),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(250,204,21,0.12),_transparent_18%),linear-gradient(180deg,_#020617_0%,_#052e16_52%,_#111827_100%)] dark:text-emerald-50 sm:px-6 lg:px-8">
       <style>{`
         @keyframes login-ribbon-spin {
@@ -252,15 +270,7 @@ export default function Login() {
               {configError}
             </div>
           )}
-          {error && (
-            <div
-              role="alert"
-              aria-live="polite"
-              className="rounded-lg border border-red-200 bg-red-100 p-3 text-sm text-red-700 dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-200 sm:p-4"
-            >
-              {error}
-            </div>
-          )}
+
           {resetMessage && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-100 p-3 text-sm text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-200 sm:p-4">
               {resetMessage}
@@ -468,6 +478,7 @@ export default function Login() {
         </div>
       </div>
     </div>
+    </>
   )
 }
   

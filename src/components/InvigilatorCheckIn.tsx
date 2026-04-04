@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { ShieldAlert, X } from 'lucide-react'
 // You may need to install 'react-qr-reader' or similar package for QR scanning
 // import QrReader from 'react-qr-reader'
 
@@ -86,6 +87,23 @@ export default function InvigilatorCheckIn() {
 
   return (
     <div className="max-w-lg mx-auto mt-10 p-6 bg-white rounded-xl shadow">
+      {error && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-red-200 bg-white shadow-2xl">
+            <div className="flex items-center gap-3 border-b border-red-100 px-5 py-4">
+              <ShieldAlert className="h-5 w-5 shrink-0 text-red-500" />
+              <span className="flex-1 text-sm font-semibold text-red-700">Error</span>
+              <button type="button" aria-label="Dismiss error" onClick={() => setError('')} className="rounded-full p-1 text-red-400 hover:bg-red-100 hover:text-red-600">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="px-5 py-4 text-sm text-red-700">{error}</p>
+            <div className="flex justify-end px-5 pb-4">
+              <button type="button" onClick={() => setError('')} className="rounded-full bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700">OK</button>
+            </div>
+          </div>
+        </div>
+      )}
       <h1 className="text-2xl font-bold mb-4">Invigilator Permit Check-In</h1>
       {/* <QrReader delay={300} onError={handleError} onScan={handleScan} style={{ width: '100%' }} /> */}
       <form onSubmit={handleSubmit} className="mb-4 flex gap-2">
@@ -99,7 +117,6 @@ export default function InvigilatorCheckIn() {
         <button type="submit" className="bg-emerald-600 text-white px-4 py-2 rounded">Verify</button>
       </form>
       {loading && <div className="text-blue-600">Checking permit...</div>}
-      {error && <div className="text-red-600">{error}</div>}
       {permit && (
         <div className="mt-4 border rounded p-4 bg-slate-50">
           <h2 className="text-lg font-semibold mb-2">Permit Details</h2>
