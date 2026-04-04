@@ -252,17 +252,15 @@ export default function Login() {
               {configError}
             </div>
           )}
-          <div
-            role="alert"
-            aria-live="polite"
-            className={`rounded-lg border p-3 text-sm sm:p-4 transition-all duration-150 ${
-              error
-                ? 'border-red-200 bg-red-100 text-red-700 dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-200'
-                : 'invisible h-0 overflow-hidden border-transparent p-0'
-            }`}
-          >
-            {error}
-          </div>
+          {error && (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="rounded-lg border border-red-200 bg-red-100 p-3 text-sm text-red-700 dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-200 sm:p-4"
+            >
+              {error}
+            </div>
+          )}
           {resetMessage && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-100 p-3 text-sm text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-200 sm:p-4">
               {resetMessage}

@@ -1247,28 +1247,17 @@ export default function Dashboard() {
 
   if (error || !studentData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
-        <div className="w-full max-w-md rounded-3xl border border-red-100 bg-white p-6 text-center shadow-xl shadow-red-100/30">
-          <h2 className="mb-2 text-xl font-semibold text-slate-900 dark:text-white">Unable to load your dashboard</h2>
-          <p className="mb-5 text-sm text-slate-600 dark:text-slate-300">{error || 'No student record was found for this account.'}</p>
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <button
-              type="button"
-              onClick={handleRefresh}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
-            >
-              <RefreshCcw className="h-4 w-4" />
-              Retry
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowSignOut(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-200 px-4 py-2 text-slate-900 transition-colors hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign Out
-            </button>
-          </div>
+      <div className="min-h-screen bg-slate-50 px-4 py-12">
+        <div className="mx-auto max-w-sm rounded-2xl border border-amber-200 bg-white p-5 text-center shadow-sm">
+          <p className="mb-4 text-sm text-slate-700">{error || 'No student record was found for this account.'}</p>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+          >
+            <RefreshCcw className="h-4 w-4" />
+            Retry
+          </button>
         </div>
         {showSignOut && (
           <SignOutDialog
