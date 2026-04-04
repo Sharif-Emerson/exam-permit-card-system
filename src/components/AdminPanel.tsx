@@ -39,6 +39,7 @@ type ImportPreviewRow = {
   reason?: string
   studentName?: string
 }
+type NavSection = 'dashboard' | 'students' | 'dustbin' | 'support' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'assistants' | 'settings'
 const ADMIN_VALID_SECTIONS = new Set<NavSection>(['dashboard', 'students', 'dustbin', 'support', 'permits', 'import', 'reports', 'permit-cards', 'assistants', 'settings'])
 
 function readAdminSectionFromHash(): NavSection | null {
@@ -1090,6 +1091,10 @@ export default function AdminPanel() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchQuery(searchInputValue)
+      // Navigate to students section automatically when the user searches
+      if (searchInputValue.trim()) {
+        setActiveSection('students')
+      }
     }, 300)
     return () => clearTimeout(timer)
   }, [searchInputValue])
@@ -2991,7 +2996,7 @@ export default function AdminPanel() {
                 type="button"
                 title="Clear search"
                 aria-label="Clear search"
-                onClick={() => setSearchQuery('')}
+                onClick={() => { setSearchQuery(''); setSearchInputValue('') }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200"
               >
                 <X className="h-3.5 w-3.5" />
