@@ -1276,6 +1276,22 @@ export default function Dashboard() {
 
   return (
     <div className={`${darkMode ? 'dark' : ''} student-dashboard-shell`}>
+      {error && (
+        <div className="fixed inset-x-0 top-0 z-[200] flex justify-center p-4 pointer-events-none">
+          <div className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-2xl dark:border-red-900 dark:bg-slate-900">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-500 dark:text-red-400" />
+            <span className="flex-1 text-sm font-medium text-red-700 dark:text-red-300">{error}</span>
+            <button
+              type="button"
+              aria-label="Dismiss error"
+              onClick={() => setError('')}
+              className="rounded-full p-1 text-red-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/40"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
       {studentData?.firstLoginRequired && !skipFirstLoginSetup && (
         <div className="fixed inset-0 z-[90] overflow-y-auto bg-black/60">
           <div className="flex min-h-full items-center justify-center p-4">
@@ -1284,11 +1300,6 @@ export default function Dashboard() {
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               Welcome. Before continuing, set a strong password and add your phone number.
             </p>
-            {error && (
-              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
-                {error}
-              </div>
-            )}
             <form onSubmit={(event) => void handleCompleteFirstLoginSetup(event)} className="mt-4 space-y-3">
               <div>
                 <label htmlFor="first-login-profile-upload" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Passport Photo (recommended 3:4 portrait)</label>
@@ -1652,36 +1663,20 @@ export default function Dashboard() {
             </header>
 
             <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-              {(error || successMessage) && (
-                <div className="mb-5 space-y-3">
-                  {error && (
-                    <div className="flex items-start justify-between rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
-                      <span>{error}</span>
-                      <button
-                        type="button"
-                        title="Dismiss error"
-                        aria-label="Dismiss error"
-                        onClick={() => setError('')}
-                        className="rounded-full p-1 hover:bg-red-100 dark:hover:bg-red-900/40"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                  {successMessage && (
-                    <div className="flex items-start justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
-                      <span>{successMessage}</span>
-                      <button
-                        type="button"
-                        title="Dismiss message"
-                        aria-label="Dismiss message"
-                        onClick={() => setSuccessMessage('')}
-                        className="rounded-full p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
+              {successMessage && (
+                <div className="mb-5">
+                  <div className="flex items-start justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+                    <span>{successMessage}</span>
+                    <button
+                      type="button"
+                      title="Dismiss message"
+                      aria-label="Dismiss message"
+                      onClick={() => setSuccessMessage('')}
+                      className="rounded-full p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               )}
 
