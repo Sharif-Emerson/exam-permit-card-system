@@ -1277,18 +1277,30 @@ export default function Dashboard() {
   return (
     <div className={`${darkMode ? 'dark' : ''} student-dashboard-shell`}>
       {error && (
-        <div className="fixed inset-x-0 top-0 z-[200] flex justify-center p-4 pointer-events-none">
-          <div className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-2xl border border-red-200 bg-white px-5 py-4 shadow-2xl dark:border-red-900 dark:bg-slate-900">
-            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-500 dark:text-red-400" />
-            <span className="flex-1 text-sm font-medium text-red-700 dark:text-red-300">{error}</span>
-            <button
-              type="button"
-              aria-label="Dismiss error"
-              onClick={() => setError('')}
-              className="rounded-full p-1 text-red-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/40"
-            >
-              <X className="h-4 w-4" />
-            </button>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-red-200 bg-white shadow-2xl dark:border-red-900 dark:bg-slate-900">
+            <div className="flex items-center gap-3 border-b border-red-100 px-5 py-4 dark:border-red-900/60">
+              <ShieldAlert className="h-5 w-5 shrink-0 text-red-500 dark:text-red-400" />
+              <span className="flex-1 text-sm font-semibold text-red-700 dark:text-red-300">Error</span>
+              <button
+                type="button"
+                aria-label="Dismiss error"
+                onClick={() => setError('')}
+                className="rounded-full p-1 text-red-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/40"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="px-5 py-4 text-sm text-red-700 dark:text-red-300">{error}</p>
+            <div className="flex justify-end px-5 pb-4">
+              <button
+                type="button"
+                onClick={() => setError('')}
+                className="rounded-full bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600"
+              >
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}
