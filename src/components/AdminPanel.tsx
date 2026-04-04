@@ -1146,7 +1146,7 @@ export default function AdminPanel() {
       setSuccessMessage('')
       await updateStudentFinancials(student.id, { amountPaid: nextAmountPaid }, user.id)
       setPaymentDrafts((cur) => ({ ...cur, [student.id]: '' }))
-      await loadStudents()
+      await loadStudents({ silent: true })
       // Fetch and update the individual student profile to ensure permit status is up-to-date
       const updatedProfile = await fetchStudentProfileById(student.id)
       setStudents((prev) => prev.map((s) => (s.id === student.id ? updatedProfile : s)))
@@ -1205,7 +1205,7 @@ export default function AdminPanel() {
         },
         user.id,
       )
-      await loadStudents()
+      await loadStudents({ silent: true })
       setSuccessMessage(`Student profile updated for ${editDraft.name}.`)
       setEditingStudent(null)
       return true
@@ -1958,7 +1958,7 @@ export default function AdminPanel() {
       setError('')
       setSuccessMessage('')
       await clearStudentBalance(student.id, user.id)
-      await loadStudents()
+      await loadStudents({ silent: true })
       // Fetch and update the individual student profile to ensure permit status is up-to-date
       const updatedProfile = await fetchStudentProfileById(student.id)
       setStudents((prev) => prev.map((s) => (s.id === student.id ? updatedProfile : s)))
@@ -2029,7 +2029,7 @@ export default function AdminPanel() {
       setSuccessMessage('')
       await deleteStudentProfile(student.id, user.id)
       setEditingStudent(null)
-      await loadStudents({ page: 1, status: 'all' })
+      await loadStudents({ page: 1, status: 'all', silent: true })
       await loadTrashedStudents()
       setSuccessMessage(`Student profile moved to trash for ${student.name}. It can be restored during the trash retention window.`)
     } catch (deleteError) {
@@ -2082,7 +2082,7 @@ export default function AdminPanel() {
       setError('')
       setSuccessMessage('')
       const restoredStudent = await restoreStudentProfile(student.id, user.id)
-      await loadStudents({ page: 1, status: 'all' })
+      await loadStudents({ page: 1, status: 'all', silent: true })
       await loadTrashedStudents()
       setSuccessMessage(`Restored student profile for ${restoredStudent.name}.`)
     } catch (restoreError) {
@@ -2224,7 +2224,7 @@ export default function AdminPanel() {
       setError('')
       setSuccessMessage('')
       const updatedStudent = await grantStudentPermitPrintAccess(student.id, 1, user.id)
-      await loadStudents({ page, search: searchQuery, status: filterStatus })
+      await loadStudents({ page, search: searchQuery, status: filterStatus, silent: true })
       setSuccessMessage(`Granted one extra permit print copy for ${updatedStudent.name}. ${updatedStudent.grantedPrintsRemaining ?? 0} extra print copy remains for this month.`)
     } catch (grantError) {
       const nextError = grantError instanceof Error ? grantError.message : 'Unable to grant permit print access.'
@@ -2362,7 +2362,7 @@ export default function AdminPanel() {
       setImporting(true)
       setError('')
       const importResult = await importStudentFinancials(pendingImportUpdates, user.id)
-      await loadStudents({ page: 1, status: 'all' })
+      await loadStudents({ page: 1, status: 'all', silent: true })
   
       const failedRows = new Map(importResult.skippedRows.map((item) => [item.rowNumber, item.reason]))
       setImportPreviewRows((current) =>
@@ -2510,7 +2510,7 @@ export default function AdminPanel() {
         ...current,
         totalFees: formatFeeDraftValue(getFeeForStudentCategory(nextFeeSettings, current.studentCategory)),
       }))
-      await loadStudents({ page: 1, status: 'all' })
+      await loadStudents({ page: 1, status: 'all', silent: true })
       setSuccessMessage('Fee structure settings updated successfully and applied to existing students.')
     } catch (saveError) {
       const nextError = saveError instanceof Error ? saveError.message : 'Unable to update fee structure settings.'
@@ -2673,7 +2673,7 @@ export default function AdminPanel() {
           setSuccessMessage(
             `Bulk curriculum sync complete. Students in system: ${data.totalStudents}. Updated: ${data.updated}. No match or error: ${data.failed.length}.`,
           )
-          await loadStudents()
+          await loadStudents({ silent: true })
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Bulk curriculum sync failed')
         }
@@ -3295,7 +3295,7 @@ export default function AdminPanel() {
                         className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200"
                         onClick={async () => {
                           setRefreshing(true)
-                          await loadStudents()
+                          await loadStudents({ silent: true })
                           setRefreshing(false)
                         }}
                         aria-label="Refresh student list"
