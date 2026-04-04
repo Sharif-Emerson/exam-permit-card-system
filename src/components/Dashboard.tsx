@@ -6,6 +6,8 @@ import {
   CalendarDays,
   CreditCard,
   Download,
+  Eye,
+  EyeOff,
   FileBadge2,
   FileText,
   GraduationCap,
@@ -469,6 +471,8 @@ export default function Dashboard() {
   const [studentData, setStudentData] = useState<StudentProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showFirstLoginPassword, setShowFirstLoginPassword] = useState(false)
+  const [showSettingsPassword, setShowSettingsPassword] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [showSignOut, setShowSignOut] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -1366,29 +1370,39 @@ export default function Dashboard() {
               </div>
               <div>
                 <label htmlFor="first-login-password" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">New Strong Password</label>
-                <input
-                  id="first-login-password"
-                  type="password"
-                  value={firstLoginDraft.password}
-                  onChange={(event) => setFirstLoginDraft((current) => ({ ...current, password: event.target.value }))}
-                  required
-                  minLength={8}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950"
-                  placeholder="e.g. Permit@2027"
-                />
+                <div className="relative">
+                  <input
+                    id="first-login-password"
+                    type={showFirstLoginPassword ? 'text' : 'password'}
+                    value={firstLoginDraft.password}
+                    onChange={(event) => setFirstLoginDraft((current) => ({ ...current, password: event.target.value }))}
+                    required
+                    minLength={8}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950"
+                    placeholder="e.g. Permit@2027"
+                  />
+                  <button type="button" onClick={() => setShowFirstLoginPassword(v => !v)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600" aria-label={showFirstLoginPassword ? 'Hide password' : 'Show password'}>
+                    {showFirstLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
                 <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-300">Use uppercase, lowercase, number, and special character. Example: Permit@2027</p>
               </div>
               <div>
                 <label htmlFor="first-login-confirm-password" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Confirm Password</label>
-                <input
-                  id="first-login-confirm-password"
-                  type="password"
-                  value={firstLoginDraft.confirmPassword}
-                  onChange={(event) => setFirstLoginDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
-                  required
-                  minLength={8}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950"
-                />
+                <div className="relative">
+                  <input
+                    id="first-login-confirm-password"
+                    type={showFirstLoginPassword ? 'text' : 'password'}
+                    value={firstLoginDraft.confirmPassword}
+                    onChange={(event) => setFirstLoginDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
+                    required
+                    minLength={8}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950"
+                  />
+                  <button type="button" onClick={() => setShowFirstLoginPassword(v => !v)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600" aria-label={showFirstLoginPassword ? 'Hide password' : 'Show password'}>
+                    {showFirstLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button
@@ -2228,37 +2242,52 @@ export default function Dashboard() {
                         <div className="grid gap-4 sm:grid-cols-3">
                           <div>
                             <label htmlFor="settings-current-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Current password</label>
-                            <input
-                              id="settings-current-password"
-                              type="password"
-                              value={settingsDraft.currentPassword}
-                              onChange={(event) => setSettingsDraft((current) => ({ ...current, currentPassword: event.target.value }))}
-                              placeholder="Required to change password"
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                            />
+                            <div className="relative">
+                              <input
+                                id="settings-current-password"
+                                type={showSettingsPassword ? 'text' : 'password'}
+                                value={settingsDraft.currentPassword}
+                                onChange={(event) => setSettingsDraft((current) => ({ ...current, currentPassword: event.target.value }))}
+                                placeholder="Required to change password"
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-11 text-sm dark:border-slate-700 dark:bg-slate-900"
+                              />
+                              <button type="button" onClick={() => setShowSettingsPassword(v => !v)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600" aria-label={showSettingsPassword ? 'Hide password' : 'Show password'}>
+                                {showSettingsPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
                           </div>
                           <div>
                             <label htmlFor="settings-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">New password</label>
-                            <input
-                              id="settings-password"
-                              type="password"
-                              value={settingsDraft.password}
-                              onChange={(event) => setSettingsDraft((current) => ({ ...current, password: event.target.value }))}
-                              placeholder="e.g. Permit@2027 (leave blank to keep current password)"
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                            />
+                            <div className="relative">
+                              <input
+                                id="settings-password"
+                                type={showSettingsPassword ? 'text' : 'password'}
+                                value={settingsDraft.password}
+                                onChange={(event) => setSettingsDraft((current) => ({ ...current, password: event.target.value }))}
+                                placeholder="e.g. Permit@2027 (leave blank to keep current password)"
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-11 text-sm dark:border-slate-700 dark:bg-slate-900"
+                              />
+                              <button type="button" onClick={() => setShowSettingsPassword(v => !v)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600" aria-label={showSettingsPassword ? 'Hide password' : 'Show password'}>
+                                {showSettingsPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
                             <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-300">Use uppercase, lowercase, number, and special character. Example: Permit@2027</p>
                           </div>
                           <div>
                             <label htmlFor="settings-confirm-password" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Confirm password</label>
-                            <input
-                              id="settings-confirm-password"
-                              type="password"
-                              value={settingsDraft.confirmPassword}
-                              onChange={(event) => setSettingsDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
-                              placeholder="Repeat new password"
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                            />
+                            <div className="relative">
+                              <input
+                                id="settings-confirm-password"
+                                type={showSettingsPassword ? 'text' : 'password'}
+                                value={settingsDraft.confirmPassword}
+                                onChange={(event) => setSettingsDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
+                                placeholder="Repeat new password"
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-11 text-sm dark:border-slate-700 dark:bg-slate-900"
+                              />
+                              <button type="button" onClick={() => setShowSettingsPassword(v => !v)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600" aria-label={showSettingsPassword ? 'Hide password' : 'Show password'}>
+                                {showSettingsPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
                           </div>
                         </div>
                         <button

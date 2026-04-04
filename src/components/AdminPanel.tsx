@@ -2,9 +2,9 @@ import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, u
 
   // Ref to preserve search input focus
 import {
-  BarChart2, Bell, CheckCircle2, CreditCard, Download, FileCheck,
+  BarChart2, Bell, CheckCircle2, CreditCard, Download, Eye, EyeOff, FileCheck,
   FileSpreadsheet, FileUp, KeyRound, LayoutDashboard, LogOut, Menu,
-  Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, Sun, Trash2, Upload, Users, X,
+  Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, ShieldAlert, Sun, Trash2, Upload, Users, X,
 } from 'lucide-react'
 import { KIU_BURSARY_RATE, KIU_COLLEGES, KIU_COURSES, KIU_CURRICULUM, KIU_DEPARTMENT_DEFAULT_PROGRAM, KIU_DEPARTMENTS, KIU_SEMESTERS, KiuCourseUnit, getProgramsForDepartment, getTuitionForProgram } from '../config/universityData'
 import BrandMark from './BrandMark'
@@ -601,6 +601,10 @@ export default function AdminPanel() {
   const [activityTotalPages, setActivityTotalPages] = useState(1)
   const [showPrintedOnly, setShowPrintedOnly] = useState(false)
   const [error, setError] = useState('')
+  const [showAdminFirstLoginPassword, setShowAdminFirstLoginPassword] = useState(false)
+  const [showAssistantPassword, setShowAssistantPassword] = useState(false)
+  const [showAssistantCredPassword, setShowAssistantCredPassword] = useState(false)
+  const [showAdminSettingsPassword, setShowAdminSettingsPassword] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [activeSection, setActiveSection] = useState<NavSection>(() => readAdminSectionFromHash() ?? 'students')
   const [searchInputValue, setSearchInputValue] = useState('')
@@ -2815,29 +2819,39 @@ export default function AdminPanel() {
                 </div>
                 <div>
                   <label htmlFor="admin-firstlogin-password" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">New strong password <span className="text-red-500">*</span></label>
-                  <input
-                    id="admin-firstlogin-password"
-                    type="password"
-                    required
-                    minLength={8}
-                    value={adminFirstLoginDraft.password}
-                    onChange={(event) => setAdminFirstLoginDraft((current) => ({ ...current, password: event.target.value }))}
-                    placeholder="Min 8 chars, uppercase, number &amp; symbol"
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                  />
+                  <div className="relative">
+                    <input
+                      id="admin-firstlogin-password"
+                      type={showAdminFirstLoginPassword ? 'text' : 'password'}
+                      required
+                      minLength={8}
+                      value={adminFirstLoginDraft.password}
+                      onChange={(event) => setAdminFirstLoginDraft((current) => ({ ...current, password: event.target.value }))}
+                      placeholder="Min 8 chars, uppercase, number &amp; symbol"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    />
+                    <button type="button" onClick={() => setShowAdminFirstLoginPassword(v => !v)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600" aria-label={showAdminFirstLoginPassword ? 'Hide password' : 'Show password'}>
+                      {showAdminFirstLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label htmlFor="admin-firstlogin-confirm" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Confirm new password <span className="text-red-500">*</span></label>
-                  <input
-                    id="admin-firstlogin-confirm"
-                    type="password"
-                    required
-                    minLength={8}
-                    value={adminFirstLoginDraft.confirmPassword}
-                    onChange={(event) => setAdminFirstLoginDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
-                    placeholder="Re-enter new password"
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                  />
+                  <div className="relative">
+                    <input
+                      id="admin-firstlogin-confirm"
+                      type={showAdminFirstLoginPassword ? 'text' : 'password'}
+                      required
+                      minLength={8}
+                      value={adminFirstLoginDraft.confirmPassword}
+                      onChange={(event) => setAdminFirstLoginDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
+                      placeholder="Re-enter new password"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    />
+                    <button type="button" onClick={() => setShowAdminFirstLoginPassword(v => !v)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600" aria-label={showAdminFirstLoginPassword ? 'Hide password' : 'Show password'}>
+                      {showAdminFirstLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
                 <button
                   type="submit"
@@ -4161,17 +4175,22 @@ export default function AdminPanel() {
                         </div>
                         <div>
                           <label htmlFor="assistant-admin-password" className="mb-2 block text-sm font-medium text-gray-700">Temporary password</label>
-                          <input
-                            id="assistant-admin-password"
-                            type="password"
-                            required
-                            minLength={8}
-                            maxLength={128}
-                            disabled={!canManageAssistantAdmins}
-                            value={assistantAdminDraft.password}
-                            onChange={(event) => setAssistantAdminDraft((current) => ({ ...current, password: event.target.value }))}
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                          />
+                          <div className="relative">
+                            <input
+                              id="assistant-admin-password"
+                              type={showAssistantPassword ? 'text' : 'password'}
+                              required
+                              minLength={8}
+                              maxLength={128}
+                              disabled={!canManageAssistantAdmins}
+                              value={assistantAdminDraft.password}
+                              onChange={(event) => setAssistantAdminDraft((current) => ({ ...current, password: event.target.value }))}
+                              className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                            />
+                            <button type="button" onClick={() => setShowAssistantPassword(v => !v)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600" aria-label={showAssistantPassword ? 'Hide password' : 'Show password'}>
+                              {showAssistantPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
                         </div>
                         <div>
                           <label htmlFor="assistant-admin-role" className="mb-2 block text-sm font-medium text-gray-700">Assistant role</label>
@@ -4382,16 +4401,21 @@ export default function AdminPanel() {
                                     </div>
                                     <div className="sm:col-span-2">
                                       <label htmlFor={`assistant-cred-password-${assistant.id}`} className="mb-1 block text-xs font-medium text-gray-600">New password (leave blank to keep current)</label>
-                                      <input
-                                        id={`assistant-cred-password-${assistant.id}`}
-                                        type="password"
-                                        minLength={8}
-                                        maxLength={128}
-                                        value={assistantAdminCredDraft.password}
-                                        onChange={(event) => setAssistantAdminCredDraft((current) => ({ ...current, password: event.target.value }))}
-                                        placeholder="Min 8 characters"
-                                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
-                                      />
+                                      <div className="relative">
+                                        <input
+                                          id={`assistant-cred-password-${assistant.id}`}
+                                          type={showAssistantCredPassword ? 'text' : 'password'}
+                                          minLength={8}
+                                          maxLength={128}
+                                          value={assistantAdminCredDraft.password}
+                                          onChange={(event) => setAssistantAdminCredDraft((current) => ({ ...current, password: event.target.value }))}
+                                          placeholder="Min 8 characters"
+                                          className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+                                        />
+                                        <button type="button" onClick={() => setShowAssistantCredPassword(v => !v)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600" aria-label={showAssistantCredPassword ? 'Hide password' : 'Show password'}>
+                                          {showAssistantCredPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
                                   <div className="mt-3 flex items-center gap-2">
@@ -5750,37 +5774,52 @@ export default function AdminPanel() {
                       </div>
                       <div>
                         <label htmlFor="admin-settings-password" className="mb-2 block text-sm font-medium text-gray-700">New password</label>
-                        <input
-                          id="admin-settings-password"
-                          type="password"
-                          value={settingsDraft.password}
-                          onChange={(event) => setSettingsDraft((current) => ({ ...current, password: event.target.value }))}
-                          placeholder="Leave blank to keep current password"
-                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                        />
+                        <div className="relative">
+                          <input
+                            id="admin-settings-password"
+                            type={showAdminSettingsPassword ? 'text' : 'password'}
+                            value={settingsDraft.password}
+                            onChange={(event) => setSettingsDraft((current) => ({ ...current, password: event.target.value }))}
+                            placeholder="Leave blank to keep current password"
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                          />
+                          <button type="button" onClick={() => setShowAdminSettingsPassword(v => !v)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600" aria-label={showAdminSettingsPassword ? 'Hide password' : 'Show password'}>
+                            {showAdminSettingsPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
                       </div>
                       <div>
                         <label htmlFor="admin-settings-current-password" className="mb-2 block text-sm font-medium text-gray-700">Current password</label>
-                        <input
-                          id="admin-settings-current-password"
-                          type="password"
-                          value={settingsDraft.currentPassword}
-                          onChange={(event) => setSettingsDraft((current) => ({ ...current, currentPassword: event.target.value }))}
-                          placeholder="Required to change password"
-                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                        />
+                        <div className="relative">
+                          <input
+                            id="admin-settings-current-password"
+                            type={showAdminSettingsPassword ? 'text' : 'password'}
+                            value={settingsDraft.currentPassword}
+                            onChange={(event) => setSettingsDraft((current) => ({ ...current, currentPassword: event.target.value }))}
+                            placeholder="Required to change password"
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                          />
+                          <button type="button" onClick={() => setShowAdminSettingsPassword(v => !v)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600" aria-label={showAdminSettingsPassword ? 'Hide password' : 'Show password'}>
+                            {showAdminSettingsPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <div className="max-w-md">
                       <label htmlFor="admin-settings-confirm-password" className="mb-2 block text-sm font-medium text-gray-700">Confirm password</label>
-                      <input
-                        id="admin-settings-confirm-password"
-                        type="password"
-                        value={settingsDraft.confirmPassword}
-                        onChange={(event) => setSettingsDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
-                        placeholder="Repeat new password"
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                      />
+                      <div className="relative">
+                        <input
+                          id="admin-settings-confirm-password"
+                          type={showAdminSettingsPassword ? 'text' : 'password'}
+                          value={settingsDraft.confirmPassword}
+                          onChange={(event) => setSettingsDraft((current) => ({ ...current, confirmPassword: event.target.value }))}
+                          placeholder="Repeat new password"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        />
+                        <button type="button" onClick={() => setShowAdminSettingsPassword(v => !v)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600" aria-label={showAdminSettingsPassword ? 'Hide password' : 'Show password'}>
+                          {showAdminSettingsPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                     <button
                       type="submit"
