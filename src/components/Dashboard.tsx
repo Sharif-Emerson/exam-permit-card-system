@@ -1245,7 +1245,7 @@ export default function Dashboard() {
     )
   }
 
-  if (error || !studentData) {
+  if (!studentData) {
     return (
       <div className="min-h-screen bg-slate-50 px-4 py-12">
         <div className="mx-auto max-w-sm rounded-2xl border border-amber-200 bg-white p-5 text-center shadow-sm">
@@ -1284,6 +1284,11 @@ export default function Dashboard() {
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               Welcome. Before continuing, set a strong password and add your phone number.
             </p>
+            {error && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+                {error}
+              </div>
+            )}
             <form onSubmit={(event) => void handleCompleteFirstLoginSetup(event)} className="mt-4 space-y-3">
               <div>
                 <label htmlFor="first-login-profile-upload" className="mb-1 block text-xs font-medium text-gray-700 dark:text-slate-300">Passport Photo (recommended 3:4 portrait)</label>
