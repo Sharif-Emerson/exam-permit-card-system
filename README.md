@@ -287,18 +287,20 @@ To deploy:
 
 1. Deploy the frontend to Vercel or Netlify.
 2. Choose one API strategy.
-  - Use a public backend URL with:
-    - `VITE_BACKEND_PROVIDER=rest`
-    - `VITE_API_BASE_URL=https://your-backend.example.com`
-  - Or expose your backend behind the same origin at `/api`.
 
-3. Deploy [examples/rest-backend](examples/rest-backend) as a separate Node service using its Dockerfile.
-4. Set backend environment variables:
-  - `PORT`
-  - `APP_DB_PATH`
-  - `APP_UPLOADS_DIR`
-  - `SESSION_TTL_HOURS`
-  - `CORS_ALLOWED_ORIGINS`
+- Use a public backend URL with:
+  - `VITE_BACKEND_PROVIDER=rest`
+  - `VITE_API_BASE_URL=https://your-backend.example.com`
+- Or expose your backend behind the same origin at `/api`.
+
+1. Deploy [examples/rest-backend](examples/rest-backend) as a separate Node service using its Dockerfile.
+2. Set backend environment variables:
+
+- `PORT`
+- `APP_DB_PATH`
+- `APP_UPLOADS_DIR`
+- `SESSION_TTL_HOURS`
+- `CORS_ALLOWED_ORIGINS`
 
 For Vercel Preview deployments, this repository now includes a same-origin `/api` proxy function. Set `API_BASE_URL=https://your-backend.example.com` in the Vercel project settings for `Preview` and `Production` so the proxy knows where to forward requests. If `API_BASE_URL` is missing, `/api/*` returns a deployment error instead of silently falling through to the SPA.
 
@@ -331,8 +333,8 @@ To run it on a public server:
   docker compose -f docker-compose.deploy.yml up -d --build
   ```
 
-4. Point your domain at that server.
-5. Put TLS in front of it with your platform load balancer, Caddy, Nginx Proxy Manager, or another reverse proxy.
+1. Point your domain at that server.
+2. Put TLS in front of it with your platform load balancer, Caddy, Nginx Proxy Manager, or another reverse proxy.
 
 With this setup, the frontend can use the default `/api` production path and does not need `VITE_API_BASE_URL` at build time.
 
