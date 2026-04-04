@@ -35,6 +35,7 @@ import { DIALOG_Z } from '../constants/dialogLayers'
 import { buildPermitQrPayload } from '../utils/permitQr'
 import BrandMark from './BrandMark'
 import PermitCard from './PermitCard'
+import { KIU_SEMESTERS } from '../config/universityData'
 import { createSemesterRegistration, createSupportRequest, fetchPermitActivityHistory, fetchSemesterRegistrations, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, fetchSystemFeeSettings, recordPermitActivity, sendSupportRequestMessage, updateStudentAccount } from '../services/profileService'
 import type { PermitActivityRecord, StudentProfile, SupportContact, SupportRequest, UniversityDeadline } from '../types'
 import { FALLBACK_PROFILE_IMAGE } from './PermitCard'
@@ -500,7 +501,7 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false)
 
   const [applicationDraft, setApplicationDraft] = useState<ApplicationDraft>({
-    semester: `${deriveAcademicSession()} ${deriveSemesterLabel()}`,
+    semester: KIU_SEMESTERS[0],
   })
   const [settingsDraft, setSettingsDraft] = useState<SettingsDraft>({
     name: '',
@@ -1192,8 +1193,8 @@ export default function Dashboard() {
   }, [applicationHistory, semesterFilter, statusFilter])
 
   const availableSemesters = useMemo(() => {
-    return Array.from(new Set(applicationHistory.map((record) => record.semester)))
-  }, [applicationHistory])
+    return KIU_SEMESTERS
+  }, [])
 
   const permitHistoryBySemester = useMemo(() => {
     const seenSemesters = new Set<string>()
@@ -1251,18 +1252,25 @@ export default function Dashboard() {
 
   if (!studentData) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-12">
-        <div className="mx-auto max-w-sm rounded-2xl border border-amber-200 bg-white p-5 text-center shadow-sm">
-          <p className="mb-4 text-sm text-slate-700">{error || 'No student record was found for this account.'}</p>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Retry
-          </button>
-        </div>
+      <div className={`${darkMode ? 'dark' : ''} min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center`}>
+        {loading ? (
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600" />
+            <p className="text-sm text-slate-500 dark:text-slate-400">Loading your dashboard…</p>
+          </div>
+        ) : (
+          <div className="mx-auto max-w-sm rounded-2xl border border-amber-200 bg-white p-5 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <p className="mb-4 text-sm text-slate-700 dark:text-slate-300">{error || 'No student record was found for this account.'}</p>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Retry
+            </button>
+          </div>
+        )}
         {showSignOut && (
           <SignOutDialog
             signingOut={signingOut}
@@ -1280,6 +1288,28 @@ export default function Dashboard() {
 
   return (
     <div className={`${darkMode ? 'dark' : ''} student-dashboard-shell`}>
+      {loading && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-white/60 dark:bg-slate-950/60 backdrop-blur-sm pointer-events-none">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600" />
+        </div>
+      )}
+      {successMessage && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-emerald-200 bg-white shadow-2xl dark:border-emerald-900 dark:bg-slate-900">
+            <div className="flex items-center gap-3 border-b border-emerald-100 px-5 py-4 dark:border-emerald-900/60">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500 dark:text-emerald-400" />
+              <span className="flex-1 text-sm font-semibold text-emerald-700 dark:text-emerald-300">Success</span>
+              <button type="button" aria-label="Dismiss" onClick={() => setSuccessMessage('')} className="rounded-full p-1 text-emerald-400 hover:bg-emerald-100 hover:text-emerald-600 dark:hover:bg-emerald-900/40">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="px-5 py-4 text-sm text-emerald-700 dark:text-emerald-300">{successMessage}</p>
+            <div className="flex justify-end px-5 pb-4">
+              <button type="button" onClick={() => setSuccessMessage('')} className="rounded-full bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400">OK</button>
+            </div>
+          </div>
+        </div>
+      )}
       {error && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-none">
           <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-red-200 bg-white shadow-2xl dark:border-red-900 dark:bg-slate-900">
@@ -1689,22 +1719,7 @@ export default function Dashboard() {
             </header>
 
             <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-              {successMessage && (
-                <div className="mb-5">
-                  <div className="flex items-start justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
-                    <span>{successMessage}</span>
-                    <button
-                      type="button"
-                      title="Dismiss message"
-                      aria-label="Dismiss message"
-                      onClick={() => setSuccessMessage('')}
-                      className="rounded-full p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
+
 
               {activeSection === 'overview' && <section className="mb-6 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
                 <div className="rounded-[2rem] border border-emerald-200/80 bg-[linear-gradient(135deg,_rgba(236,253,245,0.95),_rgba(239,246,255,0.92)_52%,_rgba(254,252,232,0.9))] p-6 shadow-xl shadow-emerald-200/55 backdrop-blur dark:border-emerald-900/30 dark:bg-[linear-gradient(135deg,_rgba(2,44,34,0.9),_rgba(15,23,42,0.9)_55%,_rgba(120,53,15,0.65))] dark:shadow-none">
