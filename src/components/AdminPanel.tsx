@@ -1,4 +1,4 @@
-﻿import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useState, useRef } from 'react'
+import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useState, useRef } from 'react'
 
   // Ref to preserve search input focus
 import {
@@ -18,14 +18,14 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteSemesterRegistration, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchSemesterRegistrations, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateSemesterRegistration, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync } from '../services/profileService'
+import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync } from '../services/profileService'
 import { completeAdminFirstLogin } from '../services/authService'
 import type { SisStatus, SisSyncResult } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
 import type { FaqItem } from './faqStorage'
 import { buildPermitQrPayload } from '../utils/permitQr'
 import { parseFinancialSpreadsheet } from '../services/spreadsheetImport'
-import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AssistantAdminAccount, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SemesterRegistration, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline } from '../types'
+import type { AdminActivityLog, AdminPermission, AdminProfileUpdateInput, AssistantAdminAccount, AuthUser, CreateStudentInput, FinancialImportRow, FinancialImportUpdate, StudentCategory, StudentProfile, StudentExam, SupportRequest, SupportRequestStatus, SystemFeeSettings, TrashedStudentProfile, UniversityDeadline } from '../types'
 import { DIALOG_Z } from '../constants/dialogLayers'
 import SignOutDialog from './SignOutDialog'
 
@@ -39,8 +39,8 @@ type ImportPreviewRow = {
   reason?: string
   studentName?: string
 }
-type NavSection = 'dashboard' | 'students' | 'dustbin' | 'support' | 'semester-requests' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'assistants' | 'settings'
-const ADMIN_VALID_SECTIONS = new Set<NavSection>(['dashboard', 'students', 'dustbin', 'support', 'semester-requests', 'permits', 'import', 'reports', 'permit-cards', 'assistants', 'settings'])
+type NavSection = 'dashboard' | 'students' | 'dustbin' | 'support' | 'permits' | 'import' | 'reports' | 'permit-cards' | 'assistants' | 'settings'
+const ADMIN_VALID_SECTIONS = new Set<NavSection>(['dashboard', 'students', 'dustbin', 'support', 'permits', 'import', 'reports', 'permit-cards', 'assistants', 'settings'])
 
 function readAdminSectionFromHash(): NavSection | null {
   if (typeof window === 'undefined') return null
@@ -284,7 +284,6 @@ function getAdminSections(permissions: Set<AdminPermission>, scope: AdminCapabil
   }
 
   if (permissions.has('manage_student_profiles')) {
-    sections.add('semester-requests')
     sections.add('permit-cards')
   }
 
@@ -565,7 +564,6 @@ export default function AdminPanel() {
   const canViewPermitActivity = adminCapability.sections.includes('permits')
   const canManageSupportRequests = adminCapability.sections.includes('support')
   const canManageStudentProfiles = adminCapability.sections.includes('permit-cards')
-  const canManageSemesterRequests = adminCapability.sections.includes('semester-requests')
   const canManageFinancials = adminCapability.canImportFinancials
   const bulkImportTabs = useMemo((): BulkImportSubSection[] => {
     const tabs: BulkImportSubSection[] = []
@@ -599,10 +597,6 @@ export default function AdminPanel() {
   const [supportStatusDrafts, setSupportStatusDrafts] = useState<SupportStatusDrafts>({})
   const [loadingSupportRequests, setLoadingSupportRequests] = useState(false)
   const [savingSupportRequestId, setSavingSupportRequestId] = useState<string | null>(null)
-  const [semesterRequests, setSemesterRequests] = useState<SemesterRegistration[]>([])
-  const [loadingSemesterRequests, setLoadingSemesterRequests] = useState(false)
-  const [savingSemesterRequestId, setSavingSemesterRequestId] = useState<string | null>(null)
-  const [semesterAdminNotes, setSemesterAdminNotes] = useState<Record<string, string>>({})
   const [activityPage, setActivityPage] = useState(1)
   const [activityTotalItems, setActivityTotalItems] = useState(0)
   const [activityTotalPages, setActivityTotalPages] = useState(1)
@@ -623,6 +617,7 @@ export default function AdminPanel() {
   const [filterProgram, setFilterProgram] = useState<string>('')
   const [filterCourse, setFilterCourse] = useState<string>('')
   const [filterCollege, setFilterCollege] = useState<string>('')
+  const [filterSemester, setFilterSemester] = useState<string>('')
   const [page, setPage] = useState(1)
   const [pageSize] = useState(STUDENT_PAGE_SIZE)
   const [totalItems, setTotalItems] = useState(0)
@@ -1078,35 +1073,6 @@ export default function AdminPanel() {
     }
   }, [canManageSupportRequests])
 
-  const loadSemesterRequests = useCallback(async (options?: { silent?: boolean }) => {
-    if (!canManageSemesterRequests) {
-      setSemesterRequests([])
-      return
-    }
-
-    try {
-      if (!options?.silent) {
-        setLoadingSemesterRequests(true)
-      }
-      const nextRequests = await fetchSemesterRegistrations()
-      setSemesterRequests(nextRequests)
-      setSemesterAdminNotes((current) => {
-        const nextNotes: Record<string, string> = {}
-        for (const req of nextRequests) {
-          nextNotes[req.id] = current[req.id] ?? req.adminNote ?? ''
-        }
-        return nextNotes
-      })
-    } catch (loadError) {
-      const nextError = loadError instanceof Error ? loadError.message : 'Unable to load semester requests.'
-      setError(nextError)
-    } finally {
-      if (!options?.silent) {
-        setLoadingSemesterRequests(false)
-      }
-    }
-  }, [canManageSemesterRequests])
-
   const loadFeeSettings = useCallback(async () => {
     if (!user || user.role !== 'admin') {
       return
@@ -1416,17 +1382,6 @@ export default function AdminPanel() {
   }, [activeSection, canManageSupportRequests, loadSupportRequestQueue])
 
   useEffect(() => {
-    if (!canManageSemesterRequests) {
-      setSemesterRequests([])
-      return
-    }
-
-    if (activeSection === 'semester-requests') {
-      void loadSemesterRequests()
-    }
-  }, [activeSection, canManageSemesterRequests, loadSemesterRequests])
-
-  useEffect(() => {
     void loadFeeSettings()
   }, [loadFeeSettings])
 
@@ -1486,15 +1441,12 @@ export default function AdminPanel() {
       if (canManageSupportRequests && activeSection === 'support') {
         void loadSupportRequestQueue({ silent: true })
       }
-      if (canManageSemesterRequests && activeSection === 'semester-requests') {
-        void loadSemesterRequests({ silent: true })
-      }
     }, 30000)
 
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [activeSection, canManageStudentProfiles, canManageSemesterRequests, canManageSupportRequests, canViewPermitActivity, loadActivityLogs, loadSemesterRequests, loadStudents, loadSupportRequestQueue, loadTrashedStudents])
+  }, [activeSection, canManageStudentProfiles, canManageSupportRequests, canViewPermitActivity, loadActivityLogs, loadStudents, loadSupportRequestQueue, loadTrashedStudents])
 
   useEffect(() => {
     if (activeSection !== 'settings') {
@@ -1618,7 +1570,10 @@ export default function AdminPanel() {
   if (filterCollege) {
     filteredStudents = filteredStudents.filter((student) => student.college === filterCollege)
   }
-  const hasActiveStudentFilters = Boolean(searchQuery.trim()) || filterStatus !== 'all' || showPrintedOnly || filterDepartment || filterProgram || filterCourse || filterCollege
+  if (filterSemester) {
+    filteredStudents = filteredStudents.filter((student) => (student.semester ?? '') === filterSemester)
+  }
+  const hasActiveStudentFilters = Boolean(searchQuery.trim()) || filterStatus !== 'all' || showPrintedOnly || filterDepartment || filterProgram || filterCourse || filterCollege || filterSemester
   const permitDepartmentOptions = useMemo(
     () => Array.from(new Set(students.map((student) => (student.department ?? '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [students],
@@ -1637,6 +1592,10 @@ export default function AdminPanel() {
       : []
     return Array.from(new Set([...fromStudents, ...fromCurriculum])).sort((a, b) => a.localeCompare(b))
   }, [students, filterProgram])
+  const permitSemesterOptions = useMemo(
+    () => Array.from(new Set(students.map((student) => (student.semester ?? '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [students],
+  )
   const activeStudentFilterLabels = [
     searchQuery.trim() ? `Search: ${searchQuery.trim()}` : null,
     filterStatus === 'paid' ? 'Status: Cleared only' : null,
@@ -1646,6 +1605,7 @@ export default function AdminPanel() {
     filterProgram ? `Program: ${filterProgram}` : null,
     filterCourse ? `Course: ${filterCourse}` : null,
     filterCollege ? `College: ${filterCollege}` : null,
+    filterSemester ? `Semester: ${filterSemester}` : null,
   ].filter((label): label is string => Boolean(label))
   const openSupportRequestCount = supportRequests.filter((request) => request.status !== 'resolved').length
   const permitEventCount = permitActivityLogs.length
@@ -1811,6 +1771,7 @@ export default function AdminPanel() {
     setFilterProgram('')
     setFilterCourse('')
     setFilterCollege('')
+    setFilterSemester('')
     setPage(1)
     void loadStudents({
       page: 1,
@@ -2648,7 +2609,6 @@ export default function AdminPanel() {
     { id: 'students', key: 'students', label: 'Students', icon: <Users className="w-5 h-5" />, badge: outstandingStudents > 0 ? outstandingStudents : undefined },
     { id: 'dustbin', key: 'dustbin', label: 'General Dustbin', icon: <Trash2 className="w-5 h-5" />, badge: trashedStudents.length > 0 ? trashedStudents.length : undefined },
     { id: 'support-requests', key: 'support', label: 'Support Requests', icon: <Bell className="w-5 h-5" />, badge: openSupportRequestCount > 0 ? openSupportRequestCount : undefined },
-    { id: 'semester-requests', key: 'semester-requests', label: 'Semester Requests', icon: <CalendarDays className="w-5 h-5" />, badge: semesterRequests.filter((r) => r.status === 'pending').length > 0 ? semesterRequests.filter((r) => r.status === 'pending').length : undefined },
     { id: 'sub-admins', key: 'assistants', label: 'Sub-Admins', icon: <Shield className="w-5 h-5" /> },
     { id: 'permit-activity', key: 'permits', label: 'Permit Activity', icon: <FileCheck className="w-5 h-5" />, badge: permitUnreadCount > 0 ? permitUnreadCount : undefined },
     { id: 'permit-cards', key: 'permit-cards', label: 'Permit Cards', icon: <CreditCard className="w-5 h-5" />, badge: clearedStudents > 0 ? clearedStudents : undefined },
@@ -2779,52 +2739,6 @@ export default function AdminPanel() {
   function handleDragEnter(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault()
     setDragActive(true)
-  }
-
-  async function handleSaveSemesterRequest(requestId: string, decision: 'approved' | 'rejected') {
-    if (!canManageSemesterRequests) {
-      setError('Your admin view does not allow semester request updates.')
-      return
-    }
-
-    try {
-      setSavingSemesterRequestId(requestId)
-      setError('')
-      setSuccessMessage('')
-
-      const adminNote = (semesterAdminNotes[requestId] ?? '').trim()
-      const updated = await updateSemesterRegistration(requestId, { status: decision, adminNote })
-
-      setSemesterRequests((current) => current.map((r) => (r.id === requestId ? updated : r)))
-      setSemesterAdminNotes((current) => ({ ...current, [requestId]: updated.adminNote ?? '' }))
-      setSuccessMessage(`Semester request for ${updated.studentName} has been ${decision}.`)
-    } catch (saveError) {
-      const nextError = saveError instanceof Error ? saveError.message : 'Unable to update semester request.'
-      setError(nextError)
-    } finally {
-      setSavingSemesterRequestId(null)
-    }
-  }
-
-  async function handleDeleteSemesterRequest(requestId: string) {
-    if (!canManageSemesterRequests) {
-      setError('Your admin view does not allow deleting semester requests.')
-      return
-    }
-    setPendingConfirmation({
-      title: 'Delete semester request?',
-      message: 'This will permanently remove the semester registration request. This cannot be undone.',
-      confirmLabel: 'Delete request',
-      tone: 'danger',
-      action: async () => {
-        setSavingSemesterRequestId(requestId)
-        setError('')
-        await deleteSemesterRegistration(requestId)
-        setSemesterRequests((current) => current.filter((r) => r.id !== requestId))
-        setSavingSemesterRequestId(null)
-        setSuccessMessage('Semester request deleted.')
-      },
-    })
   }
 
   async function handleDeleteSupportRequest(requestId: string) {
@@ -3846,6 +3760,76 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
+                {/* ── Student Filters ── */}
+                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/50">
+                  <label className="text-xs font-medium text-gray-700 dark:text-slate-300">
+                    Department:
+                    <select
+                      value={filterDepartment}
+                      onChange={(e) => setFilterDepartment(e.target.value)}
+                      className="ml-2 rounded border border-gray-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                    >
+                      <option value="">All departments</option>
+                      {permitDepartmentOptions.map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs font-medium text-gray-700 dark:text-slate-300">
+                    Program:
+                    <select
+                      value={filterProgram}
+                      onChange={(e) => {
+                        const next = e.target.value
+                        setFilterProgram(next)
+                        setFilterCourse(next ? (KIU_CURRICULUM[next]?.defaultCourse ?? '') : '')
+                      }}
+                      className="ml-2 rounded border border-gray-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                    >
+                      <option value="">All programs</option>
+                      {permitProgramOptions.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs font-medium text-gray-700 dark:text-slate-300">
+                    Course:
+                    <select
+                      value={filterCourse}
+                      onChange={(e) => setFilterCourse(e.target.value)}
+                      className="ml-2 rounded border border-gray-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                    >
+                      <option value="">All courses</option>
+                      {permitCourseOptions.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs font-medium text-gray-700 dark:text-slate-300">
+                    Year / Semester:
+                    <select
+                      value={filterSemester}
+                      onChange={(e) => setFilterSemester(e.target.value)}
+                      className="ml-2 rounded border border-gray-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                    >
+                      <option value="">All semesters</option>
+                      {permitSemesterOptions.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {hasActiveStudentFilters && (
+                    <button
+                      type="button"
+                      onClick={resetStudentView}
+                      className="ml-auto inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                    >
+                      <X className="h-3 w-3" />
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+
                 {hasActiveStudentFilters && (
                   <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -4698,108 +4682,6 @@ export default function AdminPanel() {
                 )}
               </div>
             )}
-            {/* ────────────── SEMESTER REQUESTS ────────────── */}
-            {activeSection === 'semester-requests' && (
-              <div className="space-y-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">Semester Requests</h1>
-                    <p className="text-sm text-gray-500">Student-submitted semester registration requests pending review.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void loadSemesterRequests()}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-                  >
-                    <RefreshCcw className="h-4 w-4" />
-                    Refresh
-                  </button>
-                </div>
-                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                  {loadingSemesterRequests ? (
-                    <div className="px-5 py-10 text-center text-sm text-gray-400">Loading semester requests...</div>
-                  ) : semesterRequests.length === 0 ? (
-                    <div className="px-5 py-10 text-center text-sm text-gray-400">No semester registration requests have been submitted yet.</div>
-                  ) : (
-                    <div className="divide-y divide-gray-100">
-                      {semesterRequests.map((req) => {
-                        const isSavingThis = savingSemesterRequestId === req.id
-                        return (
-                          <div key={req.id} className="px-5 py-5">
-                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                              <div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">{req.studentName}</h3>
-                                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                                    req.status === 'approved'
-                                      ? 'bg-emerald-100 text-emerald-700'
-                                      : req.status === 'rejected'
-                                        ? 'bg-red-100 text-red-700'
-                                        : 'bg-amber-100 text-amber-700'
-                                  }`}>
-                                    {req.status}
-                                  </span>
-                                </div>
-                                <p className="mt-1 text-sm text-gray-500">{req.registrationNumber || req.studentEmail}</p>
-                                <p className="mt-1 text-sm text-gray-700">Requested semester: <span className="font-medium">{req.requestedSemester}</span></p>
-                                <p className="mt-1 text-xs text-gray-400">Submitted {new Date(req.createdAt).toLocaleString()}</p>
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                <p>Email: {req.studentEmail}</p>
-                                <p>Request ID: {req.id}</p>
-                              </div>
-                            </div>
-                            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                              <div>
-                                <label htmlFor={`sem-note-${req.id}`} className="mb-1 block text-sm font-medium text-gray-700">Admin note (optional)</label>
-                                <input
-                                  id={`sem-note-${req.id}`}
-                                  type="text"
-                                  value={semesterAdminNotes[req.id] ?? ''}
-                                  onChange={(event) => setSemesterAdminNotes((current) => ({ ...current, [req.id]: event.target.value }))}
-                                  placeholder="Add a note for the student..."
-                                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => void handleSaveSemesterRequest(req.id, 'approved')}
-                                disabled={isSavingThis || req.status === 'approved'}
-                                className="inline-flex items-center justify-center gap-2 self-end rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                              >
-                                <CheckCircle2 className="h-4 w-4" />
-                                {isSavingThis ? 'Saving...' : 'Approve'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleSaveSemesterRequest(req.id, 'rejected')}
-                                disabled={isSavingThis || req.status === 'rejected'}
-                                className="inline-flex items-center justify-center gap-2 self-end rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
-                              >
-                                <X className="h-4 w-4" />
-                                Reject
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleDeleteSemesterRequest(req.id)}
-                                disabled={isSavingThis}
-                                className="inline-flex items-center justify-center gap-2 self-end rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-
-            {/* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ PERMIT ACTIVITY Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
             {activeSection === 'permits' && (
               <div className="space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
