@@ -338,6 +338,124 @@ To run it on a public server:
 
 With this setup, the frontend can use the default `/api` production path and does not need `VITE_API_BASE_URL` at build time.
 
+## 3.7 Functional Requirements
+
+Functional requirements define the specific behaviours, operations, and capabilities that the system must provide to satisfy the needs of its intended users. The Exam Permit System serves two distinct user roles — students and administrators — and must fulfil a set of clearly defined functions for each. The requirements that follow are derived from the system's design, implemented features, and the operational needs of a university examination administration context.
+
+**3.7.1 Authentication and Session Management**
+
+FR-01: The system shall allow users to authenticate using a registered email address, phone number, or student registration number together with a password.
+
+FR-02: The system shall validate credentials against the backend user store and return an appropriate error message when invalid credentials are submitted, without disclosing whether the email or password was the incorrect field.
+
+FR-03: The system shall issue a short-lived bearer token upon successful authentication and use it to authorise all subsequent API requests.
+
+FR-04: The system shall automatically expire sessions after a configurable period of inactivity and require the user to re-authenticate.
+
+FR-05: The system shall support university single sign-on (SSO) via an OpenID Connect (OIDC) flow, allowing eligible institutions to authenticate users through their existing identity provider.
+
+FR-06: The system shall enforce role-based routing, redirecting authenticated students to the student dashboard and authenticated administrators to the admin panel immediately after login.
+
+FR-07: The system shall prevent unauthenticated users from accessing any protected route and redirect them to the login page.
+
+FR-08: The system shall provide a password reset flow that allows a registered user to set a new password by supplying a verification credential.
+
+FR-09: The system shall prompt an administrator to change their password on first login if the account was provisioned with a temporary credential.
+
+**3.7.2 Student Portal — Permit and Eligibility**
+
+FR-10: The system shall display the student's current examination permit status prominently on the dashboard, indicating whether the student is cleared, has an outstanding fee balance, or is subject to a print restriction.
+
+FR-11: The system shall display the student's fee summary, including total assessed fees, amount paid, outstanding balance, and a visual payment progress indicator.
+
+FR-12: The system shall allow a student whose fee balance is zero and who has not exceeded their monthly print limit to print their examination permit directly from the browser.
+
+FR-13: The system shall allow an eligible student to download their examination permit as a PDF file.
+
+FR-14: The system shall enforce a monthly print limit per student and disable the print and download actions once the limit is reached, displaying a clear message stating the reason.
+
+FR-15: The system shall generate and display a QR code on the permit card that encodes a publicly accessible verification URL unique to each student's permit token.
+
+FR-16: The system shall display the student's examination details on the permit card, including course name, programme, examination date, time, venue, and seat number.
+
+FR-17: The system shall display all registered course units for the student on the permit card.
+
+FR-18: The system shall block permit printing for students whose enrollment status is recorded as graduated or on leave, and display a descriptive message directing them to the relevant administrative office.
+
+**3.7.3 Student Portal — Profile and Support**
+
+FR-19: The system shall allow a student to view their own profile information, including name, student ID, email address, phone number, department, programme, college, and avatar.
+
+FR-20: The system shall allow a student to update their own name, email address, phone number, avatar URL, and password through a self-service profile settings interface.
+
+FR-21: The system shall display the student's permit print and download history, including the semester associated with each recorded action.
+
+FR-22: The system shall provide a support section within the student dashboard where the student can view frequently asked questions and contact information for relevant university support desks.
+
+FR-23: The system shall allow a student to submit a support request with a subject, description, and optional file attachment.
+
+**3.7.4 Administrator Portal — Student Management**
+
+FR-24: The system shall display a paginated list of all registered student profiles in the admin panel, supporting search by name, email, or registration number.
+
+FR-25: The system shall allow an administrator to filter the student list by department, programme, course, semester, student category, enrollment status, and fee clearance status.
+
+FR-26: The system shall allow an authorised administrator to create a new student profile by entering the student's name, email address, registration number, programme, course, department, examination details, and initial fee values.
+
+FR-27: The system shall allow an authorised administrator to edit an existing student's profile details, including name, email address, phone number, registration number, programme, course, department, examination schedule, and avatar.
+
+FR-28: The system shall allow an authorised administrator to soft-delete a student profile, placing it in a recoverable trash state rather than permanently removing it.
+
+FR-29: The system shall allow an authorised administrator to restore a soft-deleted student profile from the trash or permanently purge it.
+
+FR-30: The system shall allow an authorised administrator to grant a student additional permit print allocations beyond the standard monthly limit.
+
+**3.7.5 Administrator Portal — Financial Management**
+
+FR-31: The system shall allow an authorised administrator to update a student's amount paid and total fees individually through a financial edit form.
+
+FR-32: The system shall automatically clear a student for permit printing when their recorded payment is set equal to or greater than their total assessed fees, without requiring a separate clearance action.
+
+FR-33: The system shall allow an authorised administrator to upload a financial data file in Excel (.xlsx) or CSV (.csv) format for bulk updating of student payment records.
+
+FR-34: The system shall parse the uploaded spreadsheet and display a preview table of all matched and unmatched rows before any changes are applied to the database.
+
+FR-35: The system shall apply bulk financial changes to the database only after the administrator explicitly confirms the import from the preview screen.
+
+FR-36: The system shall provide an administrator-downloadable CSV import template pre-populated with the correct column headers and formatting for financial data submission.
+
+**3.7.6 Administrator Portal — Audit and Reporting**
+
+FR-37: The system shall record every administrator-initiated financial action — including payment updates, profile edits, and bulk imports — to an activity log that captures the administrator identity, affected student, action type, and timestamp.
+
+FR-38: The system shall display the recent activity log to authorised administrators within the admin panel.
+
+FR-39: The system shall allow an authorised administrator to export the permit print and download activity history to a CSV file for institutional audit and reconciliation.
+
+FR-40: The system shall display summary statistics on the admin dashboard, including the number of students cleared, those with outstanding balances, and recent permit activity counts.
+
+**3.7.7 Administrator Portal — Access Control**
+
+FR-41: The system shall support multiple administrator permission levels, including super-admin, registrar, finance, operations, and assistant-admin, each carrying a defined set of permitted actions.
+
+FR-42: The system shall prevent an administrator from performing actions outside their assigned permission scope and return an appropriate error if an unauthorised action is attempted.
+
+FR-43: The system shall support assistant administrator roles that restrict access to student records belonging to specific departments only.
+
+**3.7.8 Permit Verification**
+
+FR-44: The system shall provide a public permit verification endpoint that accepts a student's permit token via QR code scan and returns the permit details, enabling invigilators to verify a student's examination eligibility without requiring a login.
+
+**3.7.9 General System Requirements**
+
+FR-45: The system shall present a responsive user interface that functions correctly on mobile, tablet, and desktop screen sizes.
+
+FR-46: The system shall support a light and dark display mode, with the user's preference persisted locally in the browser.
+
+FR-47: The system shall display descriptive error messages to the user when a backend operation fails, without exposing internal implementation details.
+
+FR-48: The system shall preserve unsaved form changes and prompt the user for confirmation before navigating away from a page with pending edits.
+
 ## 3.8 Ethical Consideration
 
 The development of software systems that process personal and financial data carries significant ethical responsibilities. The Exam Permit System was designed with these responsibilities in mind, ensuring that the collection, storage, and use of student information adheres to principles of privacy, fairness, security, and accountability. This section outlines the ethical considerations that informed the design and implementation of the system.
