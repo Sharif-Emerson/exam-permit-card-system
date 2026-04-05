@@ -340,35 +340,31 @@ With this setup, the frontend can use the default `/api` production path and doe
 
 ## 3.8 Ethical Consideration
 
-The Exam Permit System handles sensitive personal and financial data belonging to students and staff. The following ethical principles were applied throughout its design and implementation.
+The development of software systems that process personal and financial data carries significant ethical responsibilities. The Exam Permit System was designed with these responsibilities in mind, ensuring that the collection, storage, and use of student information adheres to principles of privacy, fairness, security, and accountability. This section outlines the ethical considerations that informed the design and implementation of the system.
 
-### Data Privacy
+**3.8.1 Data Privacy and Minimal Collection**
 
-The system collects only the information strictly required to determine a student's exam eligibility: name, email address, phone number, registration number, fee totals, and payment records. No biometric data, location data, or behavioural tracking is collected. Student application history and dark-mode preference are stored locally in the user's own browser and are never transmitted to a server.
+A fundamental principle guiding the design of this system is data minimisation — the practice of collecting only the information that is strictly necessary to fulfil the system's purpose. In the context of the Exam Permit System, the data required to determine a student's eligibility for an examination permit is limited to: full name, email address, phone number, registration number, total assessed fees, and amount paid. No biometric data, geographic location data, or behavioural analytics are collected at any point. Furthermore, non-sensitive preferences such as application history and interface settings are stored exclusively within the user's own browser using local storage mechanisms and are never transmitted to the server. This approach minimises the exposure of personal data and reduces the potential harm in the event of a security incident.
 
-### Data Security
+**3.8.2 Data Security and Integrity**
 
-All passwords are hashed at rest using a key-derivation function before being written to the database. Plaintext passwords are never logged or stored. Session tokens are short-lived and expire automatically. Every API endpoint that modifies student or financial data requires a valid bearer token and enforces server-side role checks so that a student cannot access another student's records or any admin-only route.
+The system applies industry-standard measures to protect personal and financial data at rest and in transit. All user passwords are processed through a key-derivation function prior to being written to the database, ensuring that plaintext credentials are never stored or logged. Session authentication is implemented using short-lived bearer tokens that expire automatically, limiting the window of exposure in the event that a token is compromised. Server-side role validation is enforced on every endpoint that reads or modifies sensitive data, preventing a student account from accessing another student's records or any administrative functionality. These controls collectively ensure that the system's data integrity and confidentiality obligations are met at the infrastructure level rather than relying solely on client-side enforcement.
 
-### Role-Based Access and Least Privilege
+**3.8.3 Role-Based Access Control and the Principle of Least Privilege**
 
-Access to sensitive operations is restricted by role. Students can read and update only their own profile. Administrators can update financial records and clear students for printing, but those actions are scoped so that one role cannot impersonate or exceed the permissions of another. A dedicated admin-activity log records every financial change — including who made it and when — to create a clear accountability trail.
+The system enforces strict role-based access control across all operations. Student accounts are authorised only to view and update their own profile information. Administrative accounts are granted the ability to manage financial records and student clearance status; however, individual administrator roles carry different levels of permission, and no role is able to exceed its defined scope. This implementation of the principle of least privilege reduces the risk of accidental or deliberate misuse of elevated access. Every financial modification performed by an administrator is recorded in a dedicated activity log that captures the identity of the acting administrator, the affected student record, and a timestamp of the action. This log is immutable from within the application and exists to create a clear accountability trail.
 
-### Financial Fairness and Transparency
+**3.8.4 Fairness and Transparency in Financial Decision-Making**
 
-The fee clearance decision is deterministic and automatic: a student is cleared for printing when their recorded payment equals or exceeds their total fees. No manual override without a logged admin action is possible. Students can see their exact fee breakdown, total owed, amount paid, and remaining balance at all times, so they are never unaware of why a permit is being withheld.
+A critical ethical concern in systems of this nature is the potential for opaque or biased decision-making that could unjustly affect a student's ability to sit an examination. To address this, the fee clearance decision within the system is fully deterministic and automated: a student is eligible to print or download their permit if and only if their recorded payment equals or exceeds their total assessed fees. No subjective judgement or undocumented manual intervention is possible without a corresponding logged administrative action. Students are provided with an itemised view of their financial status at all times, including total fees, amount paid, and remaining balance. This transparency ensures that students are always informed of the specific reason their permit is withheld and are not subject to unexplained restrictions.
 
-### Audit and Accountability
+**3.8.5 Human Oversight in Automated Processes**
 
-Every admin-side financial update is written to an immutable activity log that records the acting administrator's identity, the affected student, and the change made. This log can be exported to CSV for institutional audit or reconciliation purposes, providing an evidence trail if a dispute arises.
+Despite the system's use of automated processing, critical actions are designed to keep a human decision-maker in the loop. Bulk financial imports — which have the potential to affect a large number of student records simultaneously — are staged behind a mandatory preview step. Administrators are required to review the parsed data and confirm the changes before any records are modified in the database. This design choice reflects a deliberate commitment to responsible automation, ensuring that errors in imported data can be identified and corrected prior to application rather than discovered after the fact.
 
-### Responsible AI and Automation
+**3.8.6 Regulatory and Institutional Compliance**
 
-Bulk financial imports are intentionally staged behind a preview step. Administrators must review the parsed rows before any changes are applied to the database. This design prevents accidental mass-updates and keeps a human in the decision loop for high-impact data changes.
-
-### Regulatory Alignment
-
-The system is designed to be compatible with data-protection obligations such as those established by GDPR-style frameworks. Personal data can be updated or corrected by both the student and an administrator. The system does not share student data with third parties. Where the application is deployed, the institution operating it remains the data controller and is responsible for ensuring that its use complies with applicable local law.
+The system has been designed with awareness of data-protection obligations consistent with frameworks such as the General Data Protection Regulation (GDPR). Student records may be updated or corrected by both the student and an authorised administrator, supporting the right to data accuracy. The system does not transmit personal data to third-party services. The institution deploying the system assumes the role of data controller and bears responsibility for ensuring that its use conforms to the applicable legal and regulatory requirements of the jurisdiction in which it operates. Deployment documentation included with the repository directs operators to configure the system with appropriately restricted credentials and persistent storage paths, rather than retaining default example values that may not meet institutional security standards.
 
 ## Notes
 
