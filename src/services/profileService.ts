@@ -221,6 +221,10 @@ export async function updateSemesterRegistration(id: string, values: { status: '
   return activeDataAdapter.updateSemesterRegistration(id, values)
 }
 
+export async function deleteSemesterRegistration(id: string): Promise<void> {
+  return activeDataAdapter.deleteSemesterRegistration(id)
+}
+
 export async function deleteSupportRequest(id: string): Promise<void> {
   return activeDataAdapter.deleteSupportRequest(id)
 }

@@ -46,6 +46,7 @@ import {
   listSemesterRegistrations,
   createSemesterRegistration,
   updateSemesterRegistrationStatus,
+  deleteSemesterRegistrationById,
   deleteSupportRequestById,
   resetUserPassword,
   restoreStudentProfile,
@@ -2874,6 +2875,15 @@ app.patch('/semester-registrations/:id', authenticate, requireAdminPermission('m
   })
 
   response.json(updated)
+})
+
+app.delete('/semester-registrations/:id', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to delete semester registrations.'), (request, response) => {
+  const deleted = deleteSemesterRegistrationById(request.params.id)
+  if (!deleted) {
+    response.status(404).json({ message: 'Semester registration request not found.' })
+    return
+  }
+  response.status(204).end()
 })
 
 app.post('/admin/advance-semester', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to advance student semesters.'), (request, response) => {

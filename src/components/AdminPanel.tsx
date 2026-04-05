@@ -6,7 +6,7 @@ import {
   FileSpreadsheet, FileUp, KeyRound, LayoutDashboard, LogOut, Menu,
   Moon, Pencil, QrCode, RefreshCcw, Save, Search, Settings, Shield, ShieldAlert, Sun, Trash2, Upload, Users, X,
 } from 'lucide-react'
-import { KIU_BURSARY_RATE, KIU_COLLEGES, KIU_COURSES, KIU_CURRICULUM, KIU_DEPARTMENT_DEFAULT_PROGRAM, KIU_DEPARTMENTS, KIU_SEMESTERS, KiuCourseUnit, getProgramsForDepartment, getTuitionForProgram } from '../config/universityData'
+import { KIU_BURSARY_RATE, KIU_COLLEGES, KIU_COURSES, KIU_CURRICULUM, KIU_DEPARTMENT_DEFAULT_PROGRAM, KIU_DEPARTMENTS, KiuCourseUnit, getProgramsForDepartment, getSemestersForProgram, getTuitionForProgram } from '../config/universityData'
 import BrandMark from './BrandMark'
 import PermitCard from './PermitCard'
 import ConfirmDialog from './ConfirmDialog'
@@ -18,7 +18,7 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchSemesterRegistrations, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateSemesterRegistration, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync } from '../services/profileService'
+import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteSemesterRegistration, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchSemesterRegistrations, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateSemesterRegistration, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync } from '../services/profileService'
 import { completeAdminFirstLogin } from '../services/authService'
 import type { SisStatus, SisSyncResult } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
@@ -1793,7 +1793,13 @@ export default function AdminPanel() {
     }
 
     setActiveSection('students')
-    setSuccessMessage('Student verification view opened. Search by name, email, or registration number to review a record.')
+    setPendingConfirmation({
+      title: 'Verify Student',
+      message: 'Student verification view opened. Search by name, email, or registration number to review a record.',
+      confirmLabel: 'Got it',
+      tone: 'primary',
+      action: async () => {},
+    })
   }
 
   function resetStudentView() {
@@ -2798,6 +2804,27 @@ export default function AdminPanel() {
     } finally {
       setSavingSemesterRequestId(null)
     }
+  }
+
+  async function handleDeleteSemesterRequest(requestId: string) {
+    if (!canManageSemesterRequests) {
+      setError('Your admin view does not allow deleting semester requests.')
+      return
+    }
+    setPendingConfirmation({
+      title: 'Delete semester request?',
+      message: 'This will permanently remove the semester registration request. This cannot be undone.',
+      confirmLabel: 'Delete request',
+      tone: 'danger',
+      action: async () => {
+        setSavingSemesterRequestId(requestId)
+        setError('')
+        await deleteSemesterRegistration(requestId)
+        setSemesterRequests((current) => current.filter((r) => r.id !== requestId))
+        setSavingSemesterRequestId(null)
+        setSuccessMessage('Semester request deleted.')
+      },
+    })
   }
 
   async function handleDeleteSupportRequest(requestId: string) {
@@ -4752,6 +4779,15 @@ export default function AdminPanel() {
                                 <X className="h-4 w-4" />
                                 Reject
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteSemesterRequest(req.id)}
+                                disabled={isSavingThis}
+                                className="inline-flex items-center justify-center gap-2 self-end rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Delete
+                              </button>
                             </div>
                           </div>
                         )
@@ -5755,6 +5791,29 @@ export default function AdminPanel() {
                   <p className="text-sm text-gray-500">System configuration and account information.</p>
                 </div>
 
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-gray-100 px-6 py-4">
+                    <h2 className="font-semibold text-gray-800">Appearance</h2>
+                    <p className="mt-1 text-xs text-gray-400">Switch between light and dark mode for the admin portal.</p>
+                  </div>
+                  <div className="flex items-center justify-between px-6 py-5">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Theme</p>
+                      <p className="text-xs text-gray-500">{darkMode ? 'Dark mode is active' : 'Light mode is active'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                      aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                      {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                      {darkMode ? 'Switch to Light' : 'Switch to Dark'}
+                    </button>
+                  </div>
+                </div>
+
                 {canManageStudentProfiles && (
                   <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                     <div className="border-b border-gray-100 px-6 py-4">
@@ -6093,7 +6152,7 @@ export default function AdminPanel() {
                     </div>
                   ) : user?.scope === 'assistant-admin' ? (
                     <div className="px-6 py-4 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-t border-amber-100 dark:border-amber-800">
-                      <p><strong>âš  Limited Access:</strong> Only support/help team members can edit the FAQ.</p>
+                      <p><strong>Limited Access:</strong> Only support/help team members can edit the FAQ.</p>
                     </div>
                   ) : null}
                   <form className="space-y-4 px-6 py-5" onSubmit={handleSaveFaq}>
@@ -6612,8 +6671,8 @@ export default function AdminPanel() {
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
                     <option value="">Select Semester</option>
-                    {KIU_SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
-                    {editDraft.semester && !KIU_SEMESTERS.includes(editDraft.semester) && (
+                    {getSemestersForProgram(editDraft.program).map(s => <option key={s} value={s}>{s}</option>)}
+                    {editDraft.semester && !getSemestersForProgram(editDraft.program).includes(editDraft.semester) && (
                       <option value={editDraft.semester}>{editDraft.semester} (Current)</option>
                     )}
                   </select>
@@ -6914,7 +6973,7 @@ export default function AdminPanel() {
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   >
                     <option value="">Select Semester</option>
-                    {KIU_SEMESTERS.map((semester) => <option key={semester} value={semester}>{semester}</option>)}
+                    {getSemestersForProgram(createDraft.program).map((semester) => <option key={semester} value={semester}>{semester}</option>)}
                   </select>
                 </div>
                 <div>

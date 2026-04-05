@@ -2141,6 +2141,15 @@ export function deleteSupportRequestById(id) {
   return true
 }
 
+export function deleteSemesterRegistrationById(id) {
+  const existing = db.prepare('SELECT id FROM semester_registrations WHERE id = ?').get(id)
+  if (!existing) {
+    return false
+  }
+  db.prepare('DELETE FROM semester_registrations WHERE id = ?').run(id)
+  return true
+}
+
 export function deleteStudentProfile(profileId, deletedByAdminId = null) {
   const profileRow = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profileId)
 

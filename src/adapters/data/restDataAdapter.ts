@@ -865,6 +865,9 @@ export const restDataAdapter: DataAdapter = {
     })
     return toSemesterRegistration(payload)
   },
+  async deleteSemesterRegistration(id: string): Promise<void> {
+    await request(`/semester-registrations/${id}`, { method: 'DELETE' })
+  },
 
   async deleteSupportRequest(id: string): Promise<void> {
     await request(`/support-requests/${id}`, { method: 'DELETE' })

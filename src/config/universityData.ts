@@ -176,6 +176,63 @@ export const KIU_SEMESTERS = [
   'Year 5 Semester 2',
 ]
 
+/** Duration in years for each KIU program */
+export const KIU_PROGRAM_DURATION_YEARS: Record<string, number> = {
+  // College of Health Sciences
+  'MBChB (Medicine and Surgery)': 5,
+  'Bachelor of Dental Surgery (BDS)': 5,
+  'Bachelor of Pharmacy (BPharm)': 4,
+  'BSc Nursing Science': 4,
+  'BSc Medical Laboratory Science': 3,
+  'BSc Physiotherapy': 4,
+  'BSc Environmental Health Science': 3,
+  'BSc Public Health': 3,
+  'BSc Human Nutrition and Dietetics': 3,
+  // Faculty of Science and Technology
+  'BSc Computer Science': 3,
+  'BSc Information Technology': 3,
+  'BSc Software Engineering': 3,
+  'Bachelor of Computer Science (BCS)': 3,
+  'Bachelor of Information Technology (BIT)': 3,
+  'BSc Electrical Engineering': 4,
+  'BSc Civil Engineering': 4,
+  'BSc Mechanical Engineering': 4,
+  'BSc Architecture': 5,
+  'BSc Mathematics': 3,
+  'BSc Statistics': 3,
+  // School of Law
+  'Bachelor of Laws (LLB)': 5,
+  // Faculty of Business and Management Sciences
+  'BBA (Business Administration)': 3,
+  'Bachelor of Commerce (BCom)': 3,
+  'Bachelor of Human Resource Management': 3,
+  'Bachelor of Banking and Finance': 3,
+  'Bachelor of Procurement and Logistics': 3,
+  'Bachelor of Accounting and Finance': 3,
+  // Faculty of Arts and Social Sciences
+  'Bachelor of Mass Communication': 3,
+  'Bachelor of Development Studies': 3,
+  'Bachelor of Social Work and Social Administration': 3,
+  // Faculty of Education
+  'Bachelor of Education (Arts)': 3,
+  'Bachelor of Education (Science)': 3,
+  'Bachelor of Education (Business Studies)': 3,
+  // Faculty of Clinical Medicine & Dentistry
+  'Bachelor of Clinical Medicine and Community Health': 4,
+  'BSc Anaesthesia Science': 4,
+}
+
+/**
+ * Returns only the semesters valid for a given program's duration.
+ * Falls back to all KIU_SEMESTERS if the program is unknown.
+ */
+export function getSemestersForProgram(program: string | null | undefined): string[] {
+  if (!program) return KIU_SEMESTERS
+  const years = KIU_PROGRAM_DURATION_YEARS[program]
+  if (!years) return KIU_SEMESTERS
+  return KIU_SEMESTERS.slice(0, years * 2)
+}
+
 export interface KiuCourseUnit {
   unitName: string
   venue: string

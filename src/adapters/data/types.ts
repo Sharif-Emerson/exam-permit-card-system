@@ -101,6 +101,7 @@ export interface DataAdapter {
   fetchSemesterRegistrations: () => Promise<SemesterRegistration[]>
   createSemesterRegistration: (requestedSemester: string) => Promise<SemesterRegistration>
   updateSemesterRegistration: (id: string, values: { status: 'approved' | 'rejected'; adminNote?: string }) => Promise<SemesterRegistration>
+  deleteSemesterRegistration: (id: string) => Promise<void>
   deleteSupportRequest: (id: string) => Promise<void>
   advanceAllStudentSemesters: () => Promise<{ advanced: number; carryDebt: number; skipped: number }>
   fetchPublicSupportContacts: () => Promise<PublicSupportContact[]>

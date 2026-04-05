@@ -35,9 +35,9 @@ import { DIALOG_Z } from '../constants/dialogLayers'
 import { buildPermitQrPayload } from '../utils/permitQr'
 import BrandMark from './BrandMark'
 import PermitCard from './PermitCard'
-import { KIU_SEMESTERS } from '../config/universityData'
-import { createSemesterRegistration, createSupportRequest, fetchPermitActivityHistory, fetchSemesterRegistrations, fetchStudentProfileById, fetchSupportContacts, fetchSupportRequests, fetchSystemFeeSettings, recordPermitActivity, sendSupportRequestMessage, updateStudentAccount } from '../services/profileService'
-import type { PermitActivityRecord, StudentProfile, SupportContact, SupportRequest, UniversityDeadline } from '../types'
+import { KIU_SEMESTERS, getSemestersForProgram } from '../config/universityData'
+import { createSemesterRegistration, createSupportRequest, fetchPermitActivityHistory, fetchSemesterRegistrations, fetchStudentProfileById, fetchSupportRequests, fetchSystemFeeSettings, recordPermitActivity, sendSupportRequestMessage, updateStudentAccount } from '../services/profileService'
+import type { PermitActivityRecord, StudentProfile, SupportRequest, UniversityDeadline } from '../types'
 import { FALLBACK_PROFILE_IMAGE } from './PermitCard'
 import SignOutDialog from './SignOutDialog'
 import Faq from './Faq'
@@ -493,7 +493,6 @@ export default function Dashboard() {
   const [loadingSupport, setLoadingSupport] = useState(false)
   const [submittingSupport, setSubmittingSupport] = useState(false)
   const [supportRequests, setSupportRequests] = useState<SupportRequest[]>([])
-  const [supportContacts, setSupportContacts] = useState<SupportContact[]>([])
   const [permitHistory, setPermitHistory] = useState<PermitActivityRecord[]>([])
   const hasInitializedProfileRef = useRef(false)
   const notificationButtonRef = useRef<HTMLButtonElement>(null)
@@ -593,21 +592,10 @@ export default function Dashboard() {
     }
 
     try {
-      const [contactsResult, historyResult] = await Promise.allSettled([
-        fetchSupportContacts(),
-        fetchPermitActivityHistory(),
-      ])
-      if (contactsResult.status === 'fulfilled') {
-        setSupportContacts(contactsResult.value)
-      }
-      if (historyResult.status === 'fulfilled') {
-        setPermitHistory(historyResult.value)
-      }
-      if (contactsResult.status === 'rejected' && historyResult.status === 'rejected') {
-        throw contactsResult.reason
-      }
+      const history = await fetchPermitActivityHistory()
+      setPermitHistory(history)
     } catch (loadError) {
-      const nextError = loadError instanceof Error ? loadError.message : 'Unable to load support contacts or permit history.'
+      const nextError = loadError instanceof Error ? loadError.message : 'Unable to load permit history.'
       setError(nextError)
     }
   }, [user])
@@ -722,6 +710,12 @@ export default function Dashboard() {
       window.location.hash = activeSection
     }
   }, [activeSection])
+
+  useEffect(() => {
+    if (activeSection === 'applications' && user?.role === 'student') {
+      void loadSupportContactsAndHistory()
+    }
+  }, [activeSection, user?.role, loadSupportContactsAndHistory])
 
   useEffect(() => {
     if (!user || user.role !== 'student' || typeof window === 'undefined') {
@@ -1198,8 +1192,8 @@ export default function Dashboard() {
   }, [applicationHistory, semesterFilter, statusFilter])
 
   const availableSemesters = useMemo(() => {
-    return KIU_SEMESTERS
-  }, [])
+    return getSemestersForProgram(studentData?.course ?? studentData?.program)
+  }, [studentData?.course, studentData?.program])
 
   const permitHistoryBySemester = useMemo(() => {
     const seenSemesters = new Set<string>()
@@ -2343,23 +2337,6 @@ export default function Dashboard() {
                   <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
                     <div className="space-y-6">
                       <Faq />
-                      <section className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-xl shadow-blue-100/30 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none">
-                        <UserCircle2 className="h-9 w-9 text-sky-600 dark:text-sky-300" />
-                        <h2 className="mt-4 text-xl font-semibold">Contact desk</h2>
-                        <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                          {supportContacts.length > 0 ? supportContacts.map((contact) => (
-                            <div key={contact.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/70">
-                              <p className="font-semibold text-slate-900 dark:text-white">{contact.name}</p>
-                              <p>{contact.scope.replace('-', ' ')}</p>
-                              <p>Email: {contact.email}</p>
-                              <p>Phone: {contact.phoneNumber}</p>
-                            </div>
-                          )) : (
-                            <p>No admin contacts are available right now.</p>
-                          )}
-                          <p>Office hours: Mon - Fri, 8:00 AM to 4:00 PM</p>
-                        </div>
-                      </section>
                     </div>
 
                     <div className="space-y-6">
