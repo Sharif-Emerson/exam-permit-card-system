@@ -456,31 +456,109 @@ FR-47: The system shall display descriptive error messages to the user when a ba
 
 FR-48: The system shall preserve unsaved form changes and prompt the user for confirmation before navigating away from a page with pending edits.
 
-## 3.8 Ethical Consideration
+## 3.8 Non-Functional Requirements
+
+Non-functional requirements define the quality attributes, constraints, and operational standards that the system must satisfy beyond its core functional behaviour. Where functional requirements specify what the system does, non-functional requirements specify how well it does it. The following requirements govern the performance, security, usability, reliability, maintainability, and portability of the Exam Permit System.
+
+**3.8.1 Performance**
+
+NFR-01: The system shall load the student dashboard and admin panel initial view within three seconds on a standard broadband connection under normal server load.
+
+NFR-02: The system shall return API responses for read operations — such as fetching a student profile or listing student records — within two seconds under a concurrent load of at least fifty active users.
+
+NFR-03: The system shall generate and display a permit QR code within one second of the student permit data being received from the backend.
+
+NFR-04: The financial spreadsheet preview operation shall parse and display results for files containing up to five hundred student rows within five seconds.
+
+**3.8.2 Security**
+
+NFR-05: All passwords shall be stored exclusively as salted, hashed values using a key-derivation function; plaintext passwords shall never be persisted to the database or written to application logs.
+
+NFR-06: All session tokens shall expire after a configurable period and shall be invalidated on explicit sign-out, preventing token reuse after a session ends.
+
+NFR-07: Every API endpoint that modifies or returns sensitive data shall enforce server-side authentication and role-based authorisation checks; client-side role filtering alone shall not be considered sufficient protection.
+
+NFR-08: The system shall enforce rate limiting on the login endpoint to mitigate brute-force credential attacks.
+
+NFR-09: The system shall not expose internal error messages, stack traces, or database schema details in API error responses returned to the client.
+
+NFR-10: Cross-Origin Resource Sharing (CORS) shall be explicitly configured on the backend to restrict API access to known, authorised origins only.
+
+NFR-11: All data transmitted between the client and the server in a production deployment shall be encrypted using TLS (HTTPS); unencrypted HTTP communication shall not be permitted in production.
+
+**3.8.3 Usability**
+
+NFR-12: The user interface shall be fully operable on screen widths from 320 px (small mobile) to 1920 px (large desktop) without horizontal scrolling or loss of content.
+
+NFR-13: All interactive elements — including buttons, form fields, and navigation items — shall meet a minimum touch target size of 44 × 44 pixels to support mobile and touch-based interaction.
+
+NFR-14: Error messages displayed to the user shall be written in plain language that clearly describes the problem and, where possible, the corrective action required.
+
+NFR-15: The system shall provide visual feedback — such as a loading indicator or disabled state — whenever an asynchronous operation is in progress, preventing duplicate submissions.
+
+NFR-16: The system shall support a light and a dark colour scheme, persisting the user's choice across sessions without requiring re-selection after each login.
+
+NFR-17: Key screens — including the login page, student dashboard, and permit card — shall pass automated accessibility checks for colour contrast, keyboard navigability, and ARIA labelling in conformance with WCAG 2.1 Level AA.
+
+**3.8.4 Reliability and Availability**
+
+NFR-18: The system shall be designed for continuous availability and shall be deployable to hosting environments that provide an uptime service-level agreement of at least 99.5%.
+
+NFR-19: The application shall handle backend unavailability gracefully, presenting a descriptive error message to the user rather than an unhandled exception or blank screen.
+
+NFR-20: The system shall preserve data consistency during bulk financial imports by executing the apply step as an atomic operation; a partial failure shall not leave the database in an inconsistent state.
+
+NFR-21: The backend database shall be stored on a persistent volume that survives container restarts and redeployments, ensuring that no student or financial data is lost due to infrastructure changes.
+
+**3.8.5 Maintainability**
+
+NFR-22: The frontend codebase shall be written in TypeScript with strict type checking enabled, reducing the likelihood of runtime type errors and improving long-term maintainability.
+
+NFR-23: The system shall include an automated test suite covering unit, component, integration, regression, security, accessibility, and end-to-end scenarios, enabling changes to be validated quickly without manual regression testing.
+
+NFR-24: The frontend and backend shall communicate exclusively through a documented REST API contract, allowing either component to be replaced or upgraded independently without requiring simultaneous changes to the other.
+
+NFR-25: Application configuration — including API base URL, session duration, CORS origins, and database path — shall be provided through environment variables rather than hard-coded values, enabling the system to be reconfigured for different deployment environments without modifying source code.
+
+**3.8.6 Scalability**
+
+NFR-26: The backend shall support horizontal scaling by remaining stateless with respect to session data; authentication state shall be carried in the bearer token rather than stored in server memory.
+
+NFR-27: The student list endpoint shall support server-side pagination so that the system can manage institutions with thousands of student records without degrading response times or client memory consumption.
+
+**3.8.7 Portability and Deployability**
+
+NFR-28: The frontend shall be deployable as a static single-page application to any hosting platform that supports SPA route rewrites, including Vercel, Netlify, and self-hosted Nginx.
+
+NFR-29: The backend shall be containerised using Docker, enabling it to be deployed consistently across development, staging, and production environments regardless of the host operating system.
+
+NFR-30: The system shall support a same-origin deployment model — where the frontend and backend are served from the same domain — to eliminate cross-origin browser restrictions in production without requiring CORS configuration.
+
+## 3.9 Ethical Consideration
 
 The development of software systems that process personal and financial data carries significant ethical responsibilities. The Exam Permit System was designed with these responsibilities in mind, ensuring that the collection, storage, and use of student information adheres to principles of privacy, fairness, security, and accountability. This section outlines the ethical considerations that informed the design and implementation of the system.
 
-**3.8.1 Data Privacy and Minimal Collection**
+**3.9.1 Data Privacy and Minimal Collection**
 
 A fundamental principle guiding the design of this system is data minimisation — the practice of collecting only the information that is strictly necessary to fulfil the system's purpose. In the context of the Exam Permit System, the data required to determine a student's eligibility for an examination permit is limited to: full name, email address, phone number, registration number, total assessed fees, and amount paid. No biometric data, geographic location data, or behavioural analytics are collected at any point. Furthermore, non-sensitive preferences such as application history and interface settings are stored exclusively within the user's own browser using local storage mechanisms and are never transmitted to the server. This approach minimises the exposure of personal data and reduces the potential harm in the event of a security incident.
 
-**3.8.2 Data Security and Integrity**
+**3.9.2 Data Security and Integrity**
 
 The system applies industry-standard measures to protect personal and financial data at rest and in transit. All user passwords are processed through a key-derivation function prior to being written to the database, ensuring that plaintext credentials are never stored or logged. Session authentication is implemented using short-lived bearer tokens that expire automatically, limiting the window of exposure in the event that a token is compromised. Server-side role validation is enforced on every endpoint that reads or modifies sensitive data, preventing a student account from accessing another student's records or any administrative functionality. These controls collectively ensure that the system's data integrity and confidentiality obligations are met at the infrastructure level rather than relying solely on client-side enforcement.
 
-**3.8.3 Role-Based Access Control and the Principle of Least Privilege**
+**3.9.3 Role-Based Access Control and the Principle of Least Privilege**
 
 The system enforces strict role-based access control across all operations. Student accounts are authorised only to view and update their own profile information. Administrative accounts are granted the ability to manage financial records and student clearance status; however, individual administrator roles carry different levels of permission, and no role is able to exceed its defined scope. This implementation of the principle of least privilege reduces the risk of accidental or deliberate misuse of elevated access. Every financial modification performed by an administrator is recorded in a dedicated activity log that captures the identity of the acting administrator, the affected student record, and a timestamp of the action. This log is immutable from within the application and exists to create a clear accountability trail.
 
-**3.8.4 Fairness and Transparency in Financial Decision-Making**
+**3.9.4 Fairness and Transparency in Financial Decision-Making**
 
 A critical ethical concern in systems of this nature is the potential for opaque or biased decision-making that could unjustly affect a student's ability to sit an examination. To address this, the fee clearance decision within the system is fully deterministic and automated: a student is eligible to print or download their permit if and only if their recorded payment equals or exceeds their total assessed fees. No subjective judgement or undocumented manual intervention is possible without a corresponding logged administrative action. Students are provided with an itemised view of their financial status at all times, including total fees, amount paid, and remaining balance. This transparency ensures that students are always informed of the specific reason their permit is withheld and are not subject to unexplained restrictions.
 
-**3.8.5 Human Oversight in Automated Processes**
+**3.9.5 Human Oversight in Automated Processes**
 
 Despite the system's use of automated processing, critical actions are designed to keep a human decision-maker in the loop. Bulk financial imports — which have the potential to affect a large number of student records simultaneously — are staged behind a mandatory preview step. Administrators are required to review the parsed data and confirm the changes before any records are modified in the database. This design choice reflects a deliberate commitment to responsible automation, ensuring that errors in imported data can be identified and corrected prior to application rather than discovered after the fact.
 
-**3.8.6 Regulatory and Institutional Compliance**
+**3.9.6 Regulatory and Institutional Compliance**
 
 The system has been designed with awareness of data-protection obligations consistent with frameworks such as the General Data Protection Regulation (GDPR). Student records may be updated or corrected by both the student and an authorised administrator, supporting the right to data accuracy. The system does not transmit personal data to third-party services. The institution deploying the system assumes the role of data controller and bears responsibility for ensuring that its use conforms to the applicable legal and regulatory requirements of the jurisdiction in which it operates. Deployment documentation included with the repository directs operators to configure the system with appropriately restricted credentials and persistent storage paths, rather than retaining default example values that may not meet institutional security standards.
 
