@@ -123,9 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function signIn(email: string, password: string) {
+    const session = await activeAuthAdapter.signIn(email, password)
     setLoading(true)
     try {
-      const session = await activeAuthAdapter.signIn(email, password)
       const nextUser = await loadUserProfile(session.userId, session.user)
       return nextUser
     } finally {
