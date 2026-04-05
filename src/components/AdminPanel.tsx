@@ -3043,27 +3043,27 @@ export default function AdminPanel() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-slate-500">Menu</p>
+          <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-slate-400">Menu</p>
           <ul className="space-y-1">
             {visibleNavItems.map((item) => (
               <li key={item.id}>
                 <button
                   type="button"
                   onClick={() => { setActiveSection(item.key); setSidebarOpen(false) }}
-                  className={`sidebar-menu-item flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`sidebar-menu-item flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-medium transition-all ${
                     activeSection === item.key
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white'
+                      ? 'bg-[linear-gradient(135deg,_#1d4ed8,_#0f766e,_#ca8a04)] text-white shadow-lg shadow-sky-300/40 dark:shadow-none'
+                      : 'text-gray-600 hover:bg-white/70 hover:text-gray-900 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-white'
                   }`}
                 >
-                  <span className={activeSection === item.key ? 'text-emerald-600 dark:text-emerald-300' : 'text-gray-400 dark:text-slate-500'}>
+                  <span className={activeSection === item.key ? 'text-white' : 'text-gray-400 dark:text-slate-400'}>
                     {item.icon}
                   </span>
                   <span className="flex-1 text-left">{item.label}</span>
                   {item.badge !== undefined && (
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        activeSection === item.key ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-600 dark:bg-slate-800 dark:text-slate-300'
+                        activeSection === item.key ? 'bg-white/25 text-white' : 'bg-gray-200 text-gray-600 dark:bg-slate-700 dark:text-slate-300'
                       }`}
                     >
                       {item.badge}
@@ -3078,7 +3078,7 @@ export default function AdminPanel() {
         {/* Admin profile + logout at bottom */}
         <div className="border-t border-gray-200 p-4 dark:border-slate-800">
           <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-sm font-bold text-emerald-700 dark:text-emerald-300">
               {user?.name?.[0]?.toUpperCase() ?? 'A'}
             </div>
             <div className="min-w-0 flex-1">
@@ -3256,7 +3256,7 @@ export default function AdminPanel() {
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div>
-                                <p className="text-sm font-semibold text-gray-900">{alert.title}</p>
+                                <p className="text-sm font-semibold text-gray-900 dark:text-white">{alert.title}</p>
                                 <p className="mt-1 text-xs leading-5 text-gray-600">{alert.message}</p>
                               </div>
                               <Bell className="h-4 w-4 shrink-0 text-gray-400" />
@@ -3383,7 +3383,7 @@ export default function AdminPanel() {
               <div className="space-y-6">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                   <div>
-                    <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
                     <p className="text-sm text-gray-500">Operational overview for {adminCapability.label.toLowerCase()}.</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
@@ -3409,7 +3409,7 @@ export default function AdminPanel() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-gray-900">{alert.title}</p>
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{alert.title}</p>
                             <p className="mt-1 text-xs leading-5 text-gray-600">{alert.message}</p>
                           </div>
                           <Bell className="h-4 w-4 text-gray-400" />
@@ -3450,7 +3450,7 @@ export default function AdminPanel() {
                       </button>
                     </div>
                     <div>
-                      <h2 className="font-semibold text-gray-900">Quick Actions</h2>
+                      <h2 className="font-semibold text-gray-900 dark:text-white">Quick Actions</h2>
                       <p className="text-sm text-gray-500">High-frequency actions for permit operations, reporting, and alerts.</p>
                     </div>
                     <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 shadow-sm shadow-blue-100/70">Access scope: {adminCapability.label}</span>
@@ -3468,7 +3468,7 @@ export default function AdminPanel() {
                           <span className="text-emerald-600">{action.icon}</span>
                           {action.disabled && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Restricted</span>}
                         </div>
-                        <p className="mt-3 text-sm font-semibold text-gray-900">{action.label}</p>
+                        <p className="mt-3 text-sm font-semibold text-gray-900 dark:text-white">{action.label}</p>
                         <p className="mt-1 text-xs leading-5 text-gray-500">{action.description}</p>
                       </button>
                     ))}
@@ -3549,7 +3549,7 @@ export default function AdminPanel() {
                   <div className="rounded-xl border border-red-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.94),_rgba(255,251,235,0.9))] shadow-sm shadow-red-200/40">
                     <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
                       <div>
-                        <h2 className="font-semibold text-gray-800">Pending Approvals</h2>
+                        <h2 className="font-semibold text-gray-800 dark:text-slate-100">Pending Approvals</h2>
                         <p className="text-xs text-gray-400">Students who still need clearance before permit issuance</p>
                       </div>
                       <button
@@ -3564,7 +3564,7 @@ export default function AdminPanel() {
                       {students.filter((student) => student.feesBalance > 0).slice(0, 5).map((student) => (
                         <div key={student.id} className="flex items-center justify-between gap-4 px-5 py-4">
                           <div>
-                            <p className="font-medium text-gray-900">{student.name}</p>
+                            <p className="font-medium text-gray-900 dark:text-white">{student.name}</p>
                             <p className="text-xs text-gray-400">{student.studentId} â€¢ {student.department ?? student.course}</p>
                           </div>
                           <div className="text-right">
@@ -3581,7 +3581,7 @@ export default function AdminPanel() {
 
                   <div className="rounded-xl border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.95),_rgba(240,249,255,0.92))] shadow-sm shadow-blue-200/40">
                     <div className="border-b border-gray-100 px-5 py-4">
-                      <h2 className="font-semibold text-gray-800">Permit Assignment Overview</h2>
+                      <h2 className="font-semibold text-gray-800 dark:text-slate-100">Permit Assignment Overview</h2>
                       <p className="text-xs text-gray-400">Assigned permit items pulled from current student records</p>
                     </div>
                     <div className="divide-y divide-gray-100">
@@ -3589,7 +3589,7 @@ export default function AdminPanel() {
                         <div key={`${item.student.id}-${item.exam.id}`} className="px-5 py-4">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="font-medium text-gray-900">{item.exam.title}</p>
+                              <p className="font-medium text-gray-900 dark:text-white">{item.exam.title}</p>
                               <p className="text-xs text-gray-400">{item.student.name} â€¢ {item.student.studentId}</p>
                             </div>
                             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">Assigned</span>
@@ -3607,7 +3607,7 @@ export default function AdminPanel() {
                 <div className="grid gap-6 lg:grid-cols-2">
                   <div className="rounded-xl border border-amber-200/80 bg-[linear-gradient(145deg,_rgba(254,252,232,0.95),_rgba(255,247,237,0.92))] p-6 shadow-sm shadow-amber-200/45">
                     <div className="flex items-center justify-between">
-                      <h2 className="font-semibold text-gray-800">Permit Status Breakdown</h2>
+                      <h2 className="font-semibold text-gray-800 dark:text-slate-100">Permit Status Breakdown</h2>
                       <FileCheck className="h-4 w-4 text-gray-400" />
                     </div>
                     <div className="mt-4 grid grid-cols-2 gap-3">
@@ -3633,7 +3633,7 @@ export default function AdminPanel() {
 
                   <div className="rounded-xl border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.95),_rgba(250,245,255,0.9))] p-6 shadow-sm shadow-blue-200/40">
                     <div className="flex items-center justify-between">
-                      <h2 className="font-semibold text-gray-800">Analytics &amp; Insights</h2>
+                      <h2 className="font-semibold text-gray-800 dark:text-slate-100">Analytics &amp; Insights</h2>
                       <BarChart2 className="h-4 w-4 text-gray-400" />
                     </div>
                     <div className="mt-4 space-y-4">
@@ -3659,7 +3659,7 @@ export default function AdminPanel() {
                 {/* Recent permit activity table */}
                 <div className="rounded-xl border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.95),_rgba(248,250,252,0.92))] shadow-sm shadow-blue-200/40">
                   <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-                    <h2 className="font-semibold text-gray-800">Recent Permit Activity</h2>
+                    <h2 className="font-semibold text-gray-800 dark:text-slate-100">Recent Permit Activity</h2>
                     <p className="text-xs text-gray-400">{permitActivityLogs.length} event{permitActivityLogs.length !== 1 ? 's' : ''} on this page</p>
                     <button
                       type="button"
@@ -3685,7 +3685,7 @@ export default function AdminPanel() {
                           const student = students.find((s) => s.id === log.targetProfileId)
                           return (
                             <tr key={log.id} className="hover:bg-gray-50">
-                              <td className="px-5 py-3 font-medium text-gray-800">{student?.name ?? log.targetProfileId}</td>
+                              <td className="px-5 py-3 font-medium text-gray-800 dark:text-slate-100">{student?.name ?? log.targetProfileId}</td>
                               <td className="px-5 py-3">
                                 <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.action === 'print_permit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                                   {log.action === 'print_permit' ? 'Printed' : 'Downloaded'}
@@ -3729,14 +3729,14 @@ export default function AdminPanel() {
                 <div className="grid gap-6 lg:grid-cols-2">
                   <div className="rounded-xl border border-rose-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(248,250,252,0.9))] shadow-sm shadow-rose-200/40">
                     <div className="border-b border-gray-100 px-5 py-4">
-                      <h2 className="font-semibold text-gray-800">Audit Trail</h2>
+                      <h2 className="font-semibold text-gray-800 dark:text-slate-100">Audit Trail</h2>
                       <p className="text-xs text-gray-400">Recent administrative actions captured by the backend</p>
                     </div>
                     <div className="divide-y divide-gray-100">
                       {recentSystemActivity.map((log) => (
                         <div key={log.id} className="flex items-start justify-between gap-3 px-5 py-4">
                           <div>
-                            <p className="font-medium text-gray-900">{formatAdminActionLabel(log.action)}</p>
+                            <p className="font-medium text-gray-900 dark:text-white">{formatAdminActionLabel(log.action)}</p>
                             <p className="text-xs text-gray-400">Actor: {log.adminId} â€¢ Target: {log.targetProfileId}</p>
                           </div>
                           <span className="text-xs text-gray-400">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</span>
@@ -3750,7 +3750,7 @@ export default function AdminPanel() {
 
                   <div className="rounded-xl border border-yellow-200/80 bg-[linear-gradient(145deg,_rgba(254,252,232,0.95),_rgba(255,247,237,0.9))] shadow-sm shadow-yellow-200/40">
                     <div className="border-b border-gray-100 px-5 py-4">
-                      <h2 className="font-semibold text-gray-800">Section Shortcuts</h2>
+                      <h2 className="font-semibold text-gray-800 dark:text-slate-100">Section Shortcuts</h2>
                       <p className="text-xs text-gray-400">Jump into the areas available for this admin scope</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-3">
@@ -3778,7 +3778,7 @@ export default function AdminPanel() {
               <div className="space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h1 className="text-xl font-bold text-gray-900">Students</h1>
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">Students</h1>
                     <p className="text-sm text-gray-500">
                       {showPrintedOnly
                         ? `Showing ${filteredStudents.length} printed student(s) on this page out of ${totalItems} matched student record(s)`
@@ -3886,7 +3886,7 @@ export default function AdminPanel() {
                           return (
                             <tr key={student.id} className="hover:bg-gray-50">
                               <td className="px-5 py-3">
-                                <div className="font-medium text-gray-900">{student.name}</div>
+                                <div className="font-medium text-gray-900 dark:text-white">{student.name}</div>
                                 <div className="text-xs text-gray-400">{student.studentId} Ã‚Â· {student.email}</div>
                                 <div className="mt-1 text-xs text-gray-400">
                                   {student.program ?? student.course} Ã‚Â· {student.department ?? 'No department'}
@@ -4032,7 +4032,7 @@ export default function AdminPanel() {
                   <div className="border-b border-amber-100 px-5 py-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <h2 className="font-semibold text-gray-800">Trash</h2>
+                        <h2 className="font-semibold text-gray-800 dark:text-slate-100">Trash</h2>
                         <p className="text-xs text-gray-400">Deleted student records stay here until the retention period expires.</p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -4059,7 +4059,7 @@ export default function AdminPanel() {
                       {trashedStudents.map((student) => (
                         <div key={student.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                           <div>
-                            <p className="font-medium text-gray-900">{student.name}</p>
+                            <p className="font-medium text-gray-900 dark:text-white">{student.name}</p>
                             <p className="text-xs text-gray-400">{student.studentId ?? 'No registration number'} Â· {student.email}</p>
                             {(() => {
                               const daysUntilPurge = getDaysUntilDate(student.purgeAfterAt)
@@ -4104,7 +4104,7 @@ export default function AdminPanel() {
               <div className="space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h1 className="text-xl font-bold text-gray-900">General Dustbin</h1>
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">General Dustbin</h1>
                     <p className="text-sm text-gray-500">Deleted records are retained for a limited period and can be restored or permanently removed.</p>
                   </div>
                   <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
@@ -4116,7 +4116,7 @@ export default function AdminPanel() {
                   <div className="border-b border-amber-100 px-5 py-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <h2 className="font-semibold text-gray-800">Deleted Student Records</h2>
+                        <h2 className="font-semibold text-gray-800 dark:text-slate-100">Deleted Student Records</h2>
                         <p className="text-xs text-gray-400">Records auto-purge on their retention date unless restored first.</p>
                       </div>
                       {canManageStudentProfiles && trashedStudents.length > 0 ? (
@@ -4138,7 +4138,7 @@ export default function AdminPanel() {
                       {trashedStudents.map((student) => (
                         <div key={student.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                           <div>
-                            <p className="font-medium text-gray-900">{student.name}</p>
+                            <p className="font-medium text-gray-900 dark:text-white">{student.name}</p>
                             <p className="text-xs text-gray-400">{student.studentId ?? 'No registration number'} Â· {student.email}</p>
                             {(() => {
                               const daysUntilPurge = getDaysUntilDate(student.purgeAfterAt)
@@ -4179,7 +4179,7 @@ export default function AdminPanel() {
 
                 <div className="rounded-xl border border-blue-200 bg-white shadow-sm">
                   <div className="border-b border-blue-100 px-5 py-4">
-                    <h2 className="font-semibold text-gray-800">Permit Activity Cleanup</h2>
+                    <h2 className="font-semibold text-gray-800 dark:text-slate-100">Permit Activity Cleanup</h2>
                     <p className="text-xs text-gray-400">Permit print/download logs can be permanently cleared from here.</p>
                   </div>
                   <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -4202,7 +4202,7 @@ export default function AdminPanel() {
               <div className="space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h1 className="text-xl font-bold text-gray-900">{activeSection === 'assistants' ? 'Sub-Admin Management' : 'Support Requests'}</h1>
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">{activeSection === 'assistants' ? 'Sub-Admin Management' : 'Support Requests'}</h1>
                     <p className="text-sm text-gray-500">{activeSection === 'assistants' ? 'Create and manage delegated admin accounts for support/help and department permit printing.' : 'Review student help tickets, update statuses, and send replies from the admin desk.'}</p>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -4258,7 +4258,7 @@ export default function AdminPanel() {
                 {activeSection === 'assistants' && showAssistantAdminPanel && (
                   <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                     <div className="border-b border-gray-100 px-6 py-4">
-                      <h2 className="font-semibold text-gray-800">Assistant Admin Delegation</h2>
+                      <h2 className="font-semibold text-gray-800 dark:text-slate-100">Assistant Admin Delegation</h2>
                       <p className="mt-1 text-xs text-gray-400">Create sub-admin accounts for support/help and department-based permit printing.</p>
                       {!canManageAssistantAdmins && (
                         <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -4392,7 +4392,7 @@ export default function AdminPanel() {
 
                     <div className="space-y-3 px-6 py-5">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-gray-800">Existing sub-admin accounts</h3>
+                        <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-100">Existing sub-admin accounts</h3>
                         <button
                           type="button"
                           onClick={() => void loadAssistantAdmins()}
@@ -4418,7 +4418,7 @@ export default function AdminPanel() {
                             <div key={assistant.id} className="rounded-lg border border-gray-200 px-4 py-3">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div className="flex items-center gap-2">
-                                  <p className="text-sm font-semibold text-gray-800">{assistant.name}</p>
+                                  <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">{assistant.name}</p>
                                   {assistant.firstLoginRequired && (
                                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Awaiting setup</span>
                                   )}
@@ -4595,7 +4595,7 @@ export default function AdminPanel() {
                 {activeSection === 'support' && (
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-100 px-5 py-4">
-                    <h2 className="font-semibold text-gray-800">Support Queue</h2>
+                    <h2 className="font-semibold text-gray-800 dark:text-slate-100">Support Queue</h2>
                     <p className="text-xs text-gray-400">Student-submitted requests routed to administrators with support permissions.</p>
                   </div>
                   {loadingSupportRequests ? (
@@ -4612,7 +4612,7 @@ export default function AdminPanel() {
                             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                               <div>
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <h3 className="text-base font-semibold text-gray-900">{request.subject}</h3>
+                                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">{request.subject}</h3>
                                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                                     request.status === 'resolved'
                                       ? 'bg-emerald-100 text-emerald-700'
@@ -4703,7 +4703,7 @@ export default function AdminPanel() {
               <div className="space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h1 className="text-xl font-bold text-gray-900">Semester Requests</h1>
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">Semester Requests</h1>
                     <p className="text-sm text-gray-500">Student-submitted semester registration requests pending review.</p>
                   </div>
                   <button
@@ -4729,7 +4729,7 @@ export default function AdminPanel() {
                             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                               <div>
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <h3 className="text-base font-semibold text-gray-900">{req.studentName}</h3>
+                                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">{req.studentName}</h3>
                                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                                     req.status === 'approved'
                                       ? 'bg-emerald-100 text-emerald-700'
@@ -4804,7 +4804,7 @@ export default function AdminPanel() {
               <div className="space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h1 className="text-xl font-bold text-gray-900">Permit Activity</h1>
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">Permit Activity</h1>
                     <p className="text-sm text-gray-500">Showing {activityPageStart}-{activityPageEnd} of {activityTotalItems} event(s)</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -4858,7 +4858,7 @@ export default function AdminPanel() {
                           const student = students.find((s) => s.id === log.targetProfileId)
                           return (
                             <tr key={log.id} className={`transition-colors hover:bg-gray-50 ${!log.isRead ? 'bg-blue-50 dark:bg-blue-950/20' : ''}`}>
-                              <td className="px-5 py-3 font-medium text-gray-800">{student?.name ?? log.targetProfileId}</td>
+                              <td className="px-5 py-3 font-medium text-gray-800 dark:text-slate-100">{student?.name ?? log.targetProfileId}</td>
                               <td className="px-5 py-3 text-gray-500">{student?.studentId ?? '-'}</td>
                               <td className="px-5 py-3">
                                 <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.action === 'print_permit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
@@ -4934,7 +4934,7 @@ export default function AdminPanel() {
             {activeSection === 'import' && (
               <div className="space-y-5">
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">Bulk import and integrations</h1>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">Bulk import and integrations</h1>
                   <p className="text-sm text-gray-500">
                     Choose financial updates, new student accounts from a spreadsheet, or server-to-server batch provisioning details.
                   </p>
@@ -4973,7 +4973,7 @@ export default function AdminPanel() {
 
                 {bulkImportSubSection === 'financial' && canManageFinancials && (
                   <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h2 className="mb-1 text-lg font-semibold text-gray-900">Bulk financial import</h2>
+                    <h2 className="mb-1 text-lg font-semibold text-gray-900 dark:text-white">Bulk financial import</h2>
                     <p className="mb-4 text-sm text-gray-500">Upload a .xlsx or .csv file to update student financial data in bulk.</p>
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <p className="max-w-sm text-sm text-gray-600">
@@ -5012,7 +5012,7 @@ export default function AdminPanel() {
                       <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
                         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div>
-                            <h3 className="font-semibold text-gray-800">Import preview</h3>
+                            <h3 className="font-semibold text-gray-800 dark:text-slate-100">Import preview</h3>
                             <p className="text-xs text-gray-500">
                               {importPreviewRows.length} row(s) from {importFileName} â€” {pendingImportUpdates.length} row(s) are ready to apply.
                             </p>
@@ -5088,11 +5088,11 @@ export default function AdminPanel() {
 
                 {bulkImportSubSection === 'api' && canManageStudentProfiles && (
                   <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-semibold text-gray-900">HTTP batch provisioning</h2>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">HTTP batch provisioning</h2>
                     <p className="text-sm text-gray-600">
                       Your student information system can create accounts by calling the REST API with a shared secret. Set <code className="rounded bg-gray-100 px-1 text-xs">STUDENT_PROVISION_API_KEY</code> on the server, then send{' '}
                       <code className="rounded bg-gray-100 px-1 text-xs">X-Provision-Key</code> on each request. Maximum{' '}
-                      <strong className="font-medium text-gray-800">500</strong> students per request; split larger cohorts into multiple calls.
+                      <strong className="font-medium text-gray-800 dark:text-slate-100">500</strong> students per request; split larger cohorts into multiple calls.
                     </p>
                     <div>
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Endpoint</p>
@@ -5208,12 +5208,12 @@ export default function AdminPanel() {
                         </p>
                       )}
                     </div>
-                    <h2 className="pt-2 text-lg font-semibold text-gray-900">University sign-in (OIDC)</h2>
+                    <h2 className="pt-2 text-lg font-semibold text-gray-900 dark:text-white">University sign-in (OIDC)</h2>
                     <p className="text-sm text-gray-600">
                       When the backend is configured with <code className="rounded bg-gray-100 px-1 text-xs">OIDC_ISSUER</code>, <code className="rounded bg-gray-100 px-1 text-xs">OIDC_CLIENT_ID</code>,{' '}
                       <code className="rounded bg-gray-100 px-1 text-xs">OIDC_CLIENT_SECRET</code>, <code className="rounded bg-gray-100 px-1 text-xs">OIDC_REDIRECT_URI</code>, and{' '}
                       <code className="rounded bg-gray-100 px-1 text-xs">FRONTEND_ORIGIN</code>, students who already exist in this portal can use{' '}
-                      <span className="font-medium text-gray-800">Sign in with university</span> on the login page. New students must still be provisioned first (spreadsheet or API).
+                      <span className="font-medium text-gray-800 dark:text-slate-100">Sign in with university</span> on the login page. New students must still be provisioned first (spreadsheet or API).
                     </p>
                   </div>
                 )}
@@ -5225,7 +5225,7 @@ export default function AdminPanel() {
               <div className="space-y-6">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <h1 className="text-xl font-bold text-gray-900">Reports &amp; Analytics</h1>
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">Reports &amp; Analytics</h1>
                     <p className="text-sm text-gray-500">Financial clearance breakdown, permit trends, and exportable operational summaries.</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -5262,7 +5262,7 @@ export default function AdminPanel() {
                 <div className="grid gap-6 lg:grid-cols-2">
                   {/* Bar chart: students by course */}
                   <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h2 className="mb-4 font-semibold text-gray-800">Students by Course</h2>
+                    <h2 className="mb-4 font-semibold text-gray-800 dark:text-slate-100">Students by Course</h2>
                     {courseNames.length === 0 ? (
                       <p className="text-sm text-gray-400">No course data available.</p>
                     ) : (
@@ -5307,7 +5307,7 @@ export default function AdminPanel() {
 
                   {/* Donut chart: clearance ratio */}
                   <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <h2 className="mb-4 font-semibold text-gray-800">Clearance Status</h2>
+                    <h2 className="mb-4 font-semibold text-gray-800 dark:text-slate-100">Clearance Status</h2>
                     {totalStudents === 0 ? (
                       <p className="text-sm text-gray-400">No student data yet.</p>
                     ) : (
@@ -5360,7 +5360,7 @@ export default function AdminPanel() {
 
                   {/* Permit issuance summary */}
                   <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
-                    <h2 className="mb-4 font-semibold text-gray-800">Permit Issuance Summary</h2>
+                    <h2 className="mb-4 font-semibold text-gray-800 dark:text-slate-100">Permit Issuance Summary</h2>
                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                       <div className="rounded-lg bg-blue-50 p-4 text-center">
                         <p className="text-2xl font-bold text-blue-700">
@@ -5390,7 +5390,7 @@ export default function AdminPanel() {
                   </div>
 
                   <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
-                    <h2 className="mb-4 font-semibold text-gray-800">Integration Readiness</h2>
+                    <h2 className="mb-4 font-semibold text-gray-800 dark:text-slate-100">Integration Readiness</h2>
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
                         <p className="text-xs uppercase tracking-wide text-emerald-500">Student Database Sync</p>
@@ -5418,14 +5418,14 @@ export default function AdminPanel() {
             {activeSection === 'permit-cards' && (
               <div className="space-y-5">
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">Permit Card Management</h1>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">Permit Card Management</h1>
                   <p className="text-sm text-gray-500">
                     {clearedStudents} cleared student(s) eligible to print. {outstandingStudents} still have outstanding balances.
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <h2 className="text-sm font-semibold text-gray-900">Permit layout (student-facing card)</h2>
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Permit layout (student-facing card)</h2>
                   <p className="mt-1 text-xs text-gray-500">Saved in this browser; student permit cards read these settings on load.</p>
                   <div className="mt-3 flex flex-wrap gap-4">
                     <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-medium text-gray-700">
@@ -5605,7 +5605,7 @@ export default function AdminPanel() {
                               aria-label={`Select ${student.name} for bulk permit printing`}
                             />
                             <div className="min-w-0">
-                            <p className="truncate font-semibold text-gray-900">{student.name}</p>
+                            <p className="truncate font-semibold text-gray-900 dark:text-white">{student.name}</p>
                             <p className="text-xs text-gray-400">{student.studentId} - {student.email}</p>
                             <p className="text-xs text-gray-400">{student.program ?? 'No program'} - {student.semester ?? 'No semester'}</p>
                             </div>
@@ -5787,13 +5787,13 @@ export default function AdminPanel() {
             {activeSection === 'settings' && (
               <div className="space-y-6">
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">Settings</h1>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">Settings</h1>
                   <p className="text-sm text-gray-500">System configuration and account information.</p>
                 </div>
 
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-100 px-6 py-4">
-                    <h2 className="font-semibold text-gray-800">Appearance</h2>
+                    <h2 className="font-semibold text-gray-800 dark:text-slate-100">Appearance</h2>
                     <p className="mt-1 text-xs text-gray-400">Switch between light and dark mode for the admin portal.</p>
                   </div>
                   <div className="flex items-center justify-between px-6 py-5">
@@ -5817,7 +5817,7 @@ export default function AdminPanel() {
                 {canManageStudentProfiles && (
                   <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                     <div className="border-b border-gray-100 px-6 py-4">
-                      <h2 className="font-semibold text-gray-800">Semester Advancement</h2>
+                      <h2 className="font-semibold text-gray-800 dark:text-slate-100">Semester Advancement</h2>
                       <p className="mt-1 text-xs text-gray-400">Advance all students to their next semester. Students with outstanding balances will carry their debt forward combined with the new semester fee.</p>
                     </div>
                     <div className="px-6 py-5">
@@ -5843,7 +5843,7 @@ export default function AdminPanel() {
                 {canManageFinancials && (
                   <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                     <div className="border-b border-gray-100 px-6 py-4">
-                      <h2 className="font-semibold text-gray-800">Fee Structure</h2>
+                      <h2 className="font-semibold text-gray-800 dark:text-slate-100">Fee Structure</h2>
                       <p className="mt-1 text-xs text-gray-400">Set the default exam clearance fees used for new local and international student accounts.</p>
                     </div>
                     <form className="space-y-4 px-6 py-5" onSubmit={(event) => void handleSaveFeeStructure(event)}>
@@ -5911,7 +5911,7 @@ export default function AdminPanel() {
                     <form className="space-y-4 border-t border-gray-100 px-6 py-5" onSubmit={(event) => void handleSaveDeadlines(event)}>
                       <div className="mb-2 flex items-center justify-between">
                         <div>
-                          <h3 className="text-sm font-semibold text-gray-800">Important Deadlines</h3>
+                          <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-100">Important Deadlines</h3>
                           <p className="text-[10px] text-gray-400 uppercase tracking-tight">Shown on all student dashboards</p>
                         </div>
                         <button
@@ -6039,7 +6039,7 @@ export default function AdminPanel() {
 
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-100 px-6 py-4">
-                    <h2 className="font-semibold text-gray-800">Account Settings</h2>
+                    <h2 className="font-semibold text-gray-800 dark:text-slate-100">Account Settings</h2>
                     <p className="mt-1 text-xs text-gray-400">Update your admin name, email, phone number, or password.</p>
                   </div>
                   <form className="space-y-4 px-6 py-5" onSubmit={(event) => void handleSaveAdminSettings(event)}>
@@ -6387,7 +6387,7 @@ export default function AdminPanel() {
         >
           <div className={`relative ${DIALOG_Z.modalContent} max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl`}>
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <h2 id="admin-edit-student-title" className="text-base font-semibold text-gray-900">Edit Student Profile</h2>
+              <h2 id="admin-edit-student-title" className="text-base font-semibold text-gray-900 dark:text-white">Edit Student Profile</h2>
               <button
                 type="button"
                 title="Close edit student dialog"
@@ -6806,7 +6806,7 @@ export default function AdminPanel() {
         >
           <div className={`relative ${DIALOG_Z.modalContent} max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-xl`}>
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <h2 id="admin-create-student-title" className="text-base font-semibold text-gray-900">Add New Student</h2>
+              <h2 id="admin-create-student-title" className="text-base font-semibold text-gray-900 dark:text-white">Add New Student</h2>
               <button
                 type="button"
                 title="Close add student dialog"
