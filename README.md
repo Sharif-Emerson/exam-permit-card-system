@@ -338,6 +338,38 @@ To run it on a public server:
 
 With this setup, the frontend can use the default `/api` production path and does not need `VITE_API_BASE_URL` at build time.
 
+## 3.8 Ethical Consideration
+
+The Exam Permit System handles sensitive personal and financial data belonging to students and staff. The following ethical principles were applied throughout its design and implementation.
+
+### Data Privacy
+
+The system collects only the information strictly required to determine a student's exam eligibility: name, email address, phone number, registration number, fee totals, and payment records. No biometric data, location data, or behavioural tracking is collected. Student application history and dark-mode preference are stored locally in the user's own browser and are never transmitted to a server.
+
+### Data Security
+
+All passwords are hashed at rest using a key-derivation function before being written to the database. Plaintext passwords are never logged or stored. Session tokens are short-lived and expire automatically. Every API endpoint that modifies student or financial data requires a valid bearer token and enforces server-side role checks so that a student cannot access another student's records or any admin-only route.
+
+### Role-Based Access and Least Privilege
+
+Access to sensitive operations is restricted by role. Students can read and update only their own profile. Administrators can update financial records and clear students for printing, but those actions are scoped so that one role cannot impersonate or exceed the permissions of another. A dedicated admin-activity log records every financial change — including who made it and when — to create a clear accountability trail.
+
+### Financial Fairness and Transparency
+
+The fee clearance decision is deterministic and automatic: a student is cleared for printing when their recorded payment equals or exceeds their total fees. No manual override without a logged admin action is possible. Students can see their exact fee breakdown, total owed, amount paid, and remaining balance at all times, so they are never unaware of why a permit is being withheld.
+
+### Audit and Accountability
+
+Every admin-side financial update is written to an immutable activity log that records the acting administrator's identity, the affected student, and the change made. This log can be exported to CSV for institutional audit or reconciliation purposes, providing an evidence trail if a dispute arises.
+
+### Responsible AI and Automation
+
+Bulk financial imports are intentionally staged behind a preview step. Administrators must review the parsed rows before any changes are applied to the database. This design prevents accidental mass-updates and keeps a human in the decision loop for high-impact data changes.
+
+### Regulatory Alignment
+
+The system is designed to be compatible with data-protection obligations such as those established by GDPR-style frameworks. Personal data can be updated or corrected by both the student and an administrator. The system does not share student data with third parties. Where the application is deployed, the institution operating it remains the data controller and is responsible for ensuring that its use complies with applicable local law.
+
 ## Notes
 
 - Student application history and dark-mode preference are stored locally in the browser.
