@@ -250,19 +250,19 @@ function buildPermitBlockers(
 function deriveStatus(student: StudentProfile, history: PermitApplicationRecord[]): PermitStatus {
   const latestApplication = history[0]
 
-  // Admin explicitly rejected — always honour
-  if (latestApplication?.status === 'rejected') {
-    return 'rejected'
+  // Fees cleared — always approved regardless of application history
+  if (student.feesBalance === 0) {
+    return 'approved'
   }
 
-  // Admin explicitly approved — always honour
+  // Admin explicitly approved
   if (latestApplication?.status === 'approved') {
     return 'approved'
   }
 
-  // Fees cleared — auto-approve regardless of pending application
-  if (student.feesBalance === 0) {
-    return 'approved'
+  // Admin explicitly rejected (only honoured when fees are still outstanding)
+  if (latestApplication?.status === 'rejected') {
+    return 'rejected'
   }
 
   return 'pending'
@@ -2058,37 +2058,7 @@ export default function Dashboard() {
                       </div>
                     </section>
 
-                    <div className="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
-                      <section className="rounded-[2rem] border border-amber-200/80 bg-[linear-gradient(140deg,_rgba(254,252,232,0.95),_rgba(239,246,255,0.9))] p-6 shadow-xl shadow-amber-200/45 backdrop-blur dark:border-amber-900/30 dark:bg-[linear-gradient(140deg,_rgba(69,26,3,0.72),_rgba(15,23,42,0.9))] dark:shadow-none">
-                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Semester Registration</p>
-                        <h2 className="mt-2 text-2xl font-semibold">Submit a semester request</h2>
-                        <form className="mt-6 space-y-4" onSubmit={(event) => void handleApplicationSubmit(event)}>
-                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Semester
-                            <select
-                              value={applicationDraft.semester}
-                              onChange={(event) => setApplicationDraft({ semester: event.target.value })}
-                              size={5}
-                              className="mt-2 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-                            >
-                              {availableSemesters.length === 0 ? (
-                                <option value={applicationDraft.semester}>{applicationDraft.semester}</option>
-                              ) : availableSemesters.map((semester) => (
-                                <option key={semester} value={semester}>{semester}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <button
-                            type="submit"
-                            disabled={submittingApplication}
-                            className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
-                          >
-                            {submittingApplication ? 'Submitting...' : 'Submit request'}
-                          </button>
-                        </form>
-                      </section>
-
-                      <section className="rounded-[2rem] border border-red-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(239,246,255,0.92))] p-6 shadow-xl shadow-red-200/45 backdrop-blur dark:border-red-900/30 dark:bg-[linear-gradient(145deg,_rgba(69,10,10,0.72),_rgba(30,41,59,0.88))] dark:shadow-none">
+                    <section className="rounded-[2rem] border border-red-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(239,246,255,0.92))] p-6 shadow-xl shadow-red-200/45 backdrop-blur dark:border-red-900/30 dark:bg-[linear-gradient(145deg,_rgba(69,10,10,0.72),_rgba(30,41,59,0.88))] dark:shadow-none">
                         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Application History</p>
                         <h2 className="mt-2 text-2xl font-semibold">Permit requests</h2>
                         <div className="mt-6 max-h-80 overflow-x-auto overflow-y-auto rounded-3xl border border-slate-200 dark:border-slate-800">
@@ -2124,8 +2094,7 @@ export default function Dashboard() {
                             </tbody>
                           </table>
                         </div>
-                      </section>
-                    </div>
+                    </section>
 
                     <section className="rounded-[2rem] border border-yellow-200/80 bg-[linear-gradient(145deg,_rgba(254,252,232,0.95),_rgba(240,249,255,0.9))] p-6 shadow-xl shadow-yellow-200/45 backdrop-blur dark:border-yellow-900/30 dark:bg-[linear-gradient(145deg,_rgba(66,32,6,0.7),_rgba(15,23,42,0.9))] dark:shadow-none">
                       <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Printed Permit History</p>
