@@ -167,7 +167,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
 
     try {
-      await loadUserProfile(user.id, user)
+      const session = await activeAuthAdapter.getSession()
+      if (session) {
+        await loadUserProfile(session.userId, session.user)
+      }
     } finally {
       setLoading(false)
     }
