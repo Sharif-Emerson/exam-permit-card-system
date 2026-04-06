@@ -63,7 +63,7 @@ import {
   // Session helpers
   createSession,
 } from './lib/database.js'
-import { sendEmail, sendSms, getEmailStatus } from './lib/notification.js'
+import { sendSms } from './lib/notification.js'
 import * as oidcFlow from './lib/oidc-flow.js'
 import { getSisStatus, previewSisConnection } from './lib/sis-client.js'
 import { isPermitIntegrityEnabled, signPermitPayload, verifyPermitPayload } from './lib/permit-integrity.js'
@@ -159,24 +159,8 @@ function isLoopbackOrigin(origin) {
 }
 
 async function notifyStudentOnAdminSupportReply(requestRecord, adminMessage) {
-  if (!requestRecord?.studentEmail || !adminMessage?.trim()) {
+  if (!adminMessage?.trim()) {
     return
-  }
-  const subject = `Support update: ${requestRecord.subject || 'Your request'}`
-  const text = [
-    `Hello ${requestRecord.studentName || 'Student'},`,
-    '',
-    'An administrator replied to your support request.',
-    '',
-    `Subject: ${requestRecord.subject || 'Support request'}`,
-    `Reply: ${adminMessage.trim()}`,
-    '',
-    'Please log in to the portal to continue the conversation.',
-  ].join('\n')
-  try {
-    await sendEmail(requestRecord.studentEmail, subject, text)
-  } catch (error) {
-    console.warn('[support-notify] Email failed:', error instanceof Error ? error.message : error)
   }
   try {
     const studentProfile = getProfileById(requestRecord.studentId)
@@ -1072,37 +1056,6 @@ app.get('/system-settings', authenticate, (request, response) => {
   response.json(settings)
 })
 
-// ── Email status & test ────────────────────────────────────────────────────
-app.get('/admin/email-status', authenticate, requireAdminPermission('manage_financials', 'You do not have permission to view email settings.'), async (_request, response) => {
-  const status = await getEmailStatus()
-  response.json(status)
-})
-
-app.post('/admin/email-test', authenticate, requireAdminPermission('manage_financials', 'You do not have permission to send test emails.'), async (request, response) => {
-  const to = typeof request.body.to === 'string' ? request.body.to.trim() : ''
-  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-    response.status(400).json({ message: 'A valid recipient email address is required.' })
-    return
-  }
-  let result
-  try {
-    result = await sendEmail(
-      to,
-      'KIU Exam Portal — Test Email',
-      `This is a test email from the KIU Exam Portal notification system.\n\nIf you received this, your email configuration is working correctly.\n\nSent at: ${new Date().toISOString()}`
-    )
-  } catch (emailError) {
-    const msg = emailError instanceof Error ? emailError.message : String(emailError)
-    response.status(502).json({ message: `Failed to send test email: ${msg}` })
-    return
-  }
-  if (result.skipped) {
-    response.status(503).json({ message: 'Email provider is not configured. Add SMTP_HOST, SMTP_USER, SMTP_PASS (and optionally EMAIL_FROM) to your .env file.' })
-    return
-  }
-  response.json({ success: true, message: `Test email sent to ${to}.` })
-})
-
 app.put('/system-settings', authenticate, requireAdminPermission('manage_financials', 'You do not have permission to update fee settings.'), (request, response) => {
   const localStudentFee = parseNumber(request.body.local_student_fee)
   const internationalStudentFee = parseNumber(request.body.international_student_fee)
@@ -1944,11 +1897,7 @@ app.patch('/profiles/:id/financials', authenticate, requireAdminPermission('mana
 
   response.json(updatedProfile)
 
-  // Send payment reminder if not fully paid
   if (updatedProfile.amount_paid < updatedProfile.total_fees) {
-    if (updatedProfile.email) {
-      sendEmail(updatedProfile.email, 'Payment Reminder', `Dear ${updatedProfile.name}, your outstanding balance is $${updatedProfile.total_fees - updatedProfile.amount_paid}. Please clear your fees to print your permit.`).catch(() => {})
-    }
     if (updatedProfile.phone_number) {
       sendSms(updatedProfile.phone_number, `Payment reminder: Outstanding balance $${updatedProfile.total_fees - updatedProfile.amount_paid}.`).catch(() => {})
     }
@@ -2085,10 +2034,6 @@ app.post('/profiles/:id/permit-print-grants', authenticate, requireAdminPermissi
 
   response.json(updatedProfile)
 
-  // Send permit ready notification
-  if (updatedProfile.email) {
-    sendEmail(updatedProfile.email, 'Permit Ready', `Dear ${updatedProfile.name}, your exam permit is now ready for download and printing.`).catch(() => {})
-  }
   if (updatedProfile.phone_number) {
     sendSms(updatedProfile.phone_number, 'Your exam permit is now ready for download and printing.').catch(() => {})
   }

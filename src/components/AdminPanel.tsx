@@ -18,7 +18,7 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteAssistantAdmin, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync, fetchPublicPermit, fetchAdminCurriculum, uploadAdminCurriculum, resetAdminCurriculum, reportForgery } from '../services/profileService'
+import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteAssistantAdmin, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchSisStatus, triggerSisSync, fetchPublicPermit, fetchAdminCurriculum, uploadAdminCurriculum, resetAdminCurriculum, reportForgery } from '../services/profileService'
 import { completeAdminFirstLogin } from '../services/authService'
 import type { SisStatus, SisSyncResult, CurriculumStatus } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
@@ -690,11 +690,6 @@ export default function AdminPanel() {
   const [savingSettings, setSavingSettings] = useState(false)
   const [savingFeeStructure, setSavingFeeStructure] = useState(false)
   const [savingDeadlines, setSavingDeadlines] = useState(false)
-  const [emailStatus, setEmailStatus] = useState<{ configured: boolean; provider: string; from: string; host: string | null } | null>(null)
-  const [emailApiUnavailable, setEmailApiUnavailable] = useState(false)
-  const [emailTestRecipient, setEmailTestRecipient] = useState('')
-  const [emailTestSending, setEmailTestSending] = useState(false)
-  const [emailTestResult, setEmailTestResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [sisStatus, setSisStatus] = useState<SisStatus | null>(null)
   const [sisSyncing, setSisSyncing] = useState(false)
   const [sisSyncResult, setSisSyncResult] = useState<{ ok: boolean; message: string } | null>(null)
@@ -1507,12 +1502,6 @@ export default function AdminPanel() {
     void loadAssistantAdmins()
 
     if (activeSection === 'settings') {
-      // Load email configuration status from backend
-      setEmailApiUnavailable(false)
-      void fetchEmailStatus()
-        .then((status) => { setEmailStatus(status); setEmailApiUnavailable(false) })
-        .catch(() => { setEmailStatus(null); setEmailApiUnavailable(true) })
-
       // Load SIS status from backend
       void fetchSisStatus()
         .then((status) => setSisStatus(status))
@@ -2054,7 +2043,13 @@ export default function AdminPanel() {
     }
 
     setLastReminderAt(new Date().toISOString())
-    setSuccessMessage(`Queued in-app reminder notices for ${outstandingStudents} outstanding student account(s). Email and SMS gateways are not configured in this demo environment.`)
+    setPendingConfirmation({
+      title: 'In-App Reminders Queued',
+      message: `Queued in-app reminder notices for ${outstandingStudents} outstanding student account(s). Email and SMS gateways are not configured in this environment.`,
+      confirmLabel: 'Got it',
+      tone: 'primary',
+      action: async () => {},
+    })
   }
 
   function handleExportPermitActivity() {
@@ -2694,21 +2689,6 @@ export default function AdminPanel() {
     setFaqDraft(cleaned.length > 0 ? cleaned : loadFaqs())
     setFaqSaved(true)
     setTimeout(() => setFaqSaved(false), 2500)
-  }
-
-  async function handleSendTestEmail(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setEmailTestResult(null)
-    if (!emailTestRecipient.trim()) return
-    setEmailTestSending(true)
-    try {
-      const result = await sendTestEmail(emailTestRecipient.trim())
-      setEmailTestResult({ ok: result.success, message: result.message })
-    } catch (err) {
-      setEmailTestResult({ ok: false, message: err instanceof Error ? err.message : 'Failed to send test email.' })
-    } finally {
-      setEmailTestSending(false)
-    }
   }
 
   async function handleSaveFeeStructure(event: FormEvent<HTMLFormElement>) {
@@ -6796,76 +6776,6 @@ export default function AdminPanel() {
                       {faqSaved && <span className="text-xs font-medium text-emerald-500 dark:text-emerald-400">âœ“ Saved â€” students will see these changes immediately.</span>}
                     </div>
                   </form>
-                </div>
-
-                <div className="mt-8 rounded-[1.5rem] border border-sky-100 bg-sky-50 dark:border-sky-900/40 dark:bg-sky-950/30 p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900 text-sky-600 dark:text-sky-300">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-sky-800 dark:text-sky-200">Email &amp; Notifications</p>
-                      <p className="text-xs text-sky-500 dark:text-sky-400">Configure outgoing email for student notifications and reminders</p>
-                    </div>
-                  </div>
-
-                  {emailApiUnavailable ? (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">Backend server is unreachable — make sure it is running to use email features.</p>
-                  ) : emailStatus === null ? (
-                    <p className="text-xs text-sky-400 dark:text-sky-500">Loading email statusâ€¦</p>
-                  ) : (
-                    <div className="mb-4 flex flex-wrap items-center gap-3">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${emailStatus.configured ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${emailStatus.configured ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-                        {emailStatus.configured ? 'Email configured' : 'Email not configured'}
-                      </span>
-                      {emailStatus.configured && (
-                        <>
-                          <span className="text-xs text-sky-600 dark:text-sky-400">Provider: <strong>{emailStatus.provider.toUpperCase()}</strong></span>
-                          <span className="text-xs text-sky-600 dark:text-sky-400">From: <strong>{emailStatus.from}</strong></span>
-                          {emailStatus.host && <span className="text-xs text-sky-600 dark:text-sky-400">Host: <strong>{emailStatus.host}</strong></span>}
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {!emailStatus?.configured && (
-                    <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50/80 p-4 text-xs dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
-                      <p className="font-semibold text-amber-700 dark:text-amber-300 mb-1">How to enable email sending</p>
-                      <p className="mb-2 text-amber-700 dark:text-amber-300">Add the following to your backend <code className="rounded bg-amber-100 dark:bg-amber-900 px-1">examples/rest-backend/.env.local</code>:</p>
-                      <pre className="overflow-x-auto rounded bg-slate-900 text-emerald-200 p-3 text-[11px] leading-relaxed">{`# For custom domain (e.g. admin@kiu.examcard.com):\nSMTP_HOST=mail.kiu.examcard.com\nSMTP_PORT=587\nSMTP_SECURE=false\nSMTP_USER=admin@kiu.examcard.com\nSMTP_PASS=your-email-password\nEMAIL_FROM=KIU Exam Portal <admin@kiu.examcard.com>\n\n# Or for Gmail:\n# EMAIL_USER=you@gmail.com\n# EMAIL_PASS=your-app-password`}</pre>
-                      <p className="mt-2 text-amber-600 dark:text-amber-400">Restart the backend after saving. Then use the test form below to confirm delivery.</p>
-                    </div>
-                  )}
-
-                  <form className="flex flex-wrap items-end gap-3 mt-2" onSubmit={(event) => void handleSendTestEmail(event)}>
-                    <div className="flex-1 min-w-[16rem]">
-                      <label htmlFor="email-test-recipient" className="mb-1 block text-xs font-medium text-sky-700 dark:text-sky-300">Send a test email to</label>
-                      <input
-                        id="email-test-recipient"
-                        type="email"
-                        required
-                        placeholder="recipient@example.com"
-                        disabled={emailApiUnavailable}
-                        value={emailTestRecipient}
-                        onChange={(e) => { setEmailTestRecipient(e.target.value); setEmailTestResult(null) }}
-                        className="w-full rounded-lg border border-sky-200 dark:border-sky-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:opacity-50"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={emailTestSending || emailApiUnavailable}
-                      title={emailApiUnavailable ? 'Backend server is unreachable' : undefined}
-                      className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
-                    >
-                      {emailTestSending ? 'Sendingâ€¦' : 'Send test email'}
-                    </button>
-                  </form>
-                  {emailTestResult && (
-                    <p className={`mt-3 text-xs font-medium ${emailTestResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {emailTestResult.ok ? 'âœ“' : 'âœ—'} {emailTestResult.message}
-                    </p>
-                  )}
                 </div>
                 </>
                 )}

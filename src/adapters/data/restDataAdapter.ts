@@ -927,31 +927,6 @@ export async function triggerSisSync(): Promise<SisSyncResult> {
   return payload as SisSyncResult
 }
 
-export type EmailStatus = { configured: boolean; provider: string; from: string; host: string | null }
-
-export async function fetchEmailStatus(): Promise<EmailStatus> {
-  const payload = await request('/admin/email-status')
-  const record = payload as Record<string, unknown>
-  return {
-    configured: record.configured === true,
-    provider: typeof record.provider === 'string' ? record.provider : 'none',
-    from: typeof record.from === 'string' ? record.from : '',
-    host: typeof record.host === 'string' ? record.host : null,
-  }
-}
-
-export async function sendTestEmail(to: string): Promise<{ success: boolean; message: string }> {
-  const payload = await request('/admin/email-test', {
-    method: 'POST',
-    body: JSON.stringify({ to }),
-  })
-  const record = payload as Record<string, unknown>
-  return {
-    success: record.success === true,
-    message: typeof record.message === 'string' ? record.message : 'Done.',
-  }
-}
-
 export type PermitScanRecord = {
   permitToken: string
   profileId: string

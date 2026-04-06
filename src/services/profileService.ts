@@ -1,6 +1,6 @@
 import { activeDataAdapter } from '../adapters/data'
-import { fetchEmailStatus as _fetchEmailStatus, sendTestEmail as _sendTestEmail, fetchSisStatus as _fetchSisStatus, triggerSisSync as _triggerSisSync, fetchPublicPermit as _fetchPublicPermit, fetchAdminCurriculum as _fetchAdminCurriculum, uploadAdminCurriculum as _uploadAdminCurriculum, resetAdminCurriculum as _resetAdminCurriculum, reportForgery as _reportForgery } from '../adapters/data/restDataAdapter'
-import type { EmailStatus, SisStatus, SisSyncResult, PermitScanRecord, CurriculumStatus } from '../adapters/data/restDataAdapter'
+import { fetchSisStatus as _fetchSisStatus, triggerSisSync as _triggerSisSync, fetchPublicPermit as _fetchPublicPermit, fetchAdminCurriculum as _fetchAdminCurriculum, uploadAdminCurriculum as _uploadAdminCurriculum, resetAdminCurriculum as _resetAdminCurriculum, reportForgery as _reportForgery } from '../adapters/data/restDataAdapter'
+import type { SisStatus, SisSyncResult, PermitScanRecord, CurriculumStatus } from '../adapters/data/restDataAdapter'
 import type { FinancialUpdateValues, StudentAccountsImportApplyResult, StudentProvisionPreviewRow } from '../adapters/data/types'
 import type {
   AssistantAdminAccount,
@@ -249,15 +249,7 @@ export async function adminResetStudentPassword(studentId: string, newPassword: 
   return activeDataAdapter.adminResetStudentPassword(studentId, newPassword)
 }
 
-export type { EmailStatus, SisStatus, SisSyncResult, PermitScanRecord }
-
-export async function fetchEmailStatus(): Promise<EmailStatus> {
-  return _fetchEmailStatus()
-}
-
-export async function sendTestEmail(to: string): Promise<{ success: boolean; message: string }> {
-  return _sendTestEmail(to)
-}
+export type { SisStatus, SisSyncResult, PermitScanRecord }
 
 export async function fetchSisStatus(): Promise<SisStatus> {
   return _fetchSisStatus()
