@@ -9,6 +9,8 @@
     "dev:rest": "node scripts/dev-rest-stack.mjs",
     "dev:rest:e2e": "node scripts/dev-rest-e2e.mjs",
     "dev:rest:backend": "npm --prefix examples/rest-backend run dev",
+    "selfhost:backend": "powershell -ExecutionPolicy Bypass -File scripts/start-selfhost-backend.ps1",
+    "selfhost:backup": "powershell -ExecutionPolicy Bypass -File scripts/backup-selfhost-data.ps1",
     "dev:rest:frontend": "node scripts/run-vite-rest.mjs dev",
     "check:rest": "npm --prefix examples/rest-backend run check",
     "build": "npm run check:rest && node scripts/run-vite-rest.mjs build",

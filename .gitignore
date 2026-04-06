@@ -37,6 +37,7 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+.tools/
 
 # Playwright
 playwright-report/
