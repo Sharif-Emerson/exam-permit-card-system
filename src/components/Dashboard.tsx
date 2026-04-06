@@ -855,6 +855,14 @@ export default function Dashboard() {
 
     try {
       await recordPermitActivity(studentData.id, 'print_permit')
+      setPermitHistory((current) => [{
+        id: `local-print-${Date.now()}`,
+        studentId: studentData.id,
+        action: 'print_permit',
+        semester: studentData.semester?.trim() || currentSession,
+        source: 'student-portal',
+        createdAt: new Date().toISOString(),
+      }, ...current])
       await loadSupportContactsAndHistory()
       await syncStudentProfile({ syncDrafts: false })
       openPrintDialog()
@@ -954,6 +962,14 @@ export default function Dashboard() {
 
     try {
       await recordPermitActivity(studentData.id, 'download_permit')
+      setPermitHistory((current) => [{
+        id: `local-download-${Date.now()}`,
+        studentId: studentData.id,
+        action: 'download_permit',
+        semester: studentData.semester?.trim() || currentSession,
+        source: 'student-portal',
+        createdAt: new Date().toISOString(),
+      }, ...current])
       await loadSupportContactsAndHistory()
       await syncStudentProfile({ syncDrafts: false })
       openPrintDialog()
@@ -1201,11 +1217,13 @@ export default function Dashboard() {
     return [...permitHistory]
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .filter((record) => {
-        if (seenSemesters.has(record.semester)) {
+        const semesterKey = record.semester?.trim() || 'General'
+
+        if (seenSemesters.has(semesterKey)) {
           return false
         }
 
-        seenSemesters.add(record.semester)
+        seenSemesters.add(semesterKey)
         return true
       })
   }, [permitHistory])

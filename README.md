@@ -564,4 +564,3 @@ The system has been designed with awareness of data-protection obligations consi
 - Student application history and dark-mode preference are stored locally in the browser.
 - The QR code encodes a permit verification URL/token for the public permit endpoint.
 - The example REST backend uses better-sqlite3 for SQLite persistence.
-
