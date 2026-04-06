@@ -1072,21 +1072,9 @@ export default function Dashboard() {
     return base
   }, [examPeriodDeadline, permitStatus, studentData])
 
-  const permitHistoryBySemester = useMemo(() => {
-    const seenSemesters = new Set<string>()
-
+  const permitHistoryRows = useMemo(() => {
     return [...permitHistory]
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-      .filter((record) => {
-        const semesterKey = record.semester?.trim() || 'General'
-
-        if (seenSemesters.has(semesterKey)) {
-          return false
-        }
-
-        seenSemesters.add(semesterKey)
-        return true
-      })
   }, [permitHistory])
 
   const profileImage = studentData?.profileImage?.trim() ? studentData.profileImage : FALLBACK_PROFILE_IMAGE
@@ -1845,10 +1833,10 @@ export default function Dashboard() {
                         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Printed Permit History</p>
                         <h2 className="mt-2 text-2xl font-semibold">Latest printed semesters</h2>
                         <div className="mt-5 max-h-72 space-y-3 overflow-y-auto pr-1">
-                          {permitHistoryBySemester.slice(0, 3).map((record) => (
+                          {permitHistoryRows.slice(0, 3).map((record) => (
                             <div key={record.id} className="rounded-3xl border border-rose-100 bg-rose-50/85 p-4 shadow-sm shadow-rose-100/60 dark:border-slate-800 dark:bg-slate-900/70">
                               <div className="flex items-center justify-between gap-3">
-                                <p className="text-sm font-semibold">{record.semester}</p>
+                                <p className="text-sm font-semibold">{record.semester?.trim() || 'General'}</p>
                                 <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                                   {record.action === 'print_permit' ? 'Printed' : 'Downloaded'}
                                 </span>
@@ -1856,7 +1844,7 @@ export default function Dashboard() {
                               <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">{formatDateTime(record.createdAt)}</p>
                             </div>
                           ))}
-                          {permitHistoryBySemester.length === 0 && (
+                          {permitHistoryRows.length === 0 && (
                             <div className="rounded-3xl border border-dashed border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-300">
                               No print activity yet. Print or download your permit to create a record.
                             </div>
@@ -1883,15 +1871,15 @@ export default function Dashboard() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                            {permitHistoryBySemester.map((record) => (
+                            {permitHistoryRows.map((record) => (
                               <tr key={record.id} className="bg-white/80 dark:bg-slate-950/40">
-                                <td className="px-5 py-4 font-medium text-slate-900 dark:text-white">{record.semester}</td>
+                                <td className="px-5 py-4 font-medium text-slate-900 dark:text-white">{record.semester?.trim() || 'General'}</td>
                                 <td className="px-5 py-4">{record.action === 'print_permit' ? 'Printed permit' : 'Downloaded permit'}</td>
                                 <td className="px-5 py-4 capitalize">{record.source.replace('-', ' ')}</td>
                                 <td className="px-5 py-4 text-slate-600 dark:text-slate-300">{formatDateTime(record.createdAt)}</td>
                               </tr>
                             ))}
-                            {permitHistoryBySemester.length === 0 && (
+                            {permitHistoryRows.length === 0 && (
                               <tr>
                                 <td colSpan={4} className="px-5 py-8 text-center text-slate-500 dark:text-slate-300">
                                   No printed or downloaded permit history is available yet.
