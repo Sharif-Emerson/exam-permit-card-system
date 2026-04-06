@@ -1428,12 +1428,12 @@ export default function AdminPanel() {
   }, [loadFeeSettings])
 
   useEffect(() => {
-    if (!user?.id || user.role !== 'admin') {
+    if (!user || !user.id || user.role !== 'admin') {
       return
     }
 
     setReadAdminAlertIds(readAdminNotificationReadSet(user.id))
-  }, [user?.id, user.role])
+  }, [user?.id, user?.role])
 
   useEffect(() => {
     setPage(1)
@@ -1717,7 +1717,6 @@ export default function AdminPanel() {
       tone: 'critical' as const,
       actionLabel: 'Review Students',
       onAction: () => setActiveSection('students'),
-      style: { color: 'red' }, // Added inline style for red text in dark mode
     }] : []),
     ...(permitStatusCounts.expired > 0 ? [{
       id: 'expired',
@@ -6767,8 +6766,7 @@ export default function AdminPanel() {
                     <div className="flex items-center gap-3 pt-1">
                       <button
                         type="submit"
-                        disabled={user?.scope === 'assistant-admin'}
-                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
                       >
                         <Save className="h-4 w-4" />
                         Save FAQ

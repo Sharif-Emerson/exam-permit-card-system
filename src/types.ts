@@ -45,6 +45,7 @@ export interface DatabaseProfileRow {
   instructions: string | null
   profile_image: string | null
   permit_token: string | null
+  permit_signature?: string | null
   exams_json: string | null
   exams?: StudentExam[] | null
   monthly_print_count?: number | null
@@ -238,7 +239,7 @@ export interface AuthUser {
   name: string
   phoneNumber?: string
   scope?: AdminScope
-  assistantRole?: 'department_prints' | 'invigilator'
+  assistantRole?: 'department_prints' | 'invigilator' | 'support_help'
   assistantDepartments?: string[]
   permissions?: AdminPermission[]
   firstLoginRequired?: boolean
@@ -249,7 +250,7 @@ export interface AssistantAdminAccount {
   name: string
   email: string
   phoneNumber: string
-  role: 'department_prints' | 'invigilator'
+  role: 'department_prints' | 'invigilator' | 'support_help'
   departments: string[]
   firstLoginRequired: boolean
 }

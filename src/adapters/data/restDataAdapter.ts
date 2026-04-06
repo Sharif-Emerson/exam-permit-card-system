@@ -826,14 +826,14 @@ export const restDataAdapter: DataAdapter = {
     const payload = await request('/admin/assistants', { method: 'GET' })
     return extractCollection(payload).map(toAssistantAdminAccount)
   },
-  async createAssistantAdmin(values: { name: string; email: string; phoneNumber?: string; password: string; role: 'department_prints' | 'invigilator'; departments: string[] }): Promise<AssistantAdminAccount> {
+  async createAssistantAdmin(values: { name: string; email: string; phoneNumber?: string; password: string; role: 'department_prints' | 'invigilator' | 'support_help'; departments: string[] }): Promise<AssistantAdminAccount> {
     const payload = await request('/admin/assistants', {
       method: 'POST',
       body: JSON.stringify(values),
     })
     return toAssistantAdminAccount(payload)
   },
-  async updateAssistantAdmin(assistantId: string, values: { role: 'department_prints' | 'invigilator'; departments: string[] }): Promise<AssistantAdminAccount> {
+  async updateAssistantAdmin(assistantId: string, values: { role: 'department_prints' | 'invigilator' | 'support_help'; departments: string[] }): Promise<AssistantAdminAccount> {
     const payload = await request(`/admin/assistants/${assistantId}`, {
       method: 'PATCH',
       body: JSON.stringify(values),
