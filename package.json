@@ -29,8 +29,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx --max-warnings 0",
     "test": "npm run check:rest && vitest run",
-    "preview": "node scripts/run-vite-rest.mjs preview",
-    "postinstall": "npm --prefix examples/rest-backend install"
+    "preview": "npm run build && wrangler dev",
+    "postinstall": "npm --prefix examples/rest-backend install",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "cors": "^2.8.6",
@@ -47,6 +48,7 @@
     "twilio": "^5.13.1"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.31.0",
     "@eslint/js": "^9.22.0",
     "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
@@ -70,6 +72,7 @@
     "typescript": "^5.8.2",
     "vite": "^8.0.1",
     "vitest": "^4.1.0",
-    "vitest-axe": "^0.1.0"
+    "vitest-axe": "^0.1.0",
+    "wrangler": "^4.80.0"
   }
 }

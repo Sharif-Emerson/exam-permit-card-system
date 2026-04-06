@@ -48,3 +48,9 @@ examples/rest-backend/data/*.sqlite
 examples/rest-backend/data/*.sqlite-shm
 examples/rest-backend/data/*.sqlite-wal
 examples/rest-backend/uploads/*.csv
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
