@@ -995,3 +995,37 @@ export async function fetchPublicPermit(token: string): Promise<PermitScanRecord
     integrity: typeof record.integrity === 'string' ? record.integrity : null,
   }
 }
+
+export type CurriculumStatus = {
+  source: 'custom' | 'embedded'
+  programCount: number
+  programs: string[]
+  curriculum: Record<string, unknown>
+}
+
+export async function fetchAdminCurriculum(): Promise<CurriculumStatus> {
+  const payload = await request('/admin/curriculum')
+  const record = payload as Record<string, unknown>
+  return {
+    source: record.source === 'custom' ? 'custom' : 'embedded',
+    programCount: typeof record.programCount === 'number' ? record.programCount : 0,
+    programs: Array.isArray(record.programs) ? record.programs.map(String) : [],
+    curriculum: record.curriculum && typeof record.curriculum === 'object' && !Array.isArray(record.curriculum) ? record.curriculum as Record<string, unknown> : {},
+  }
+}
+
+export async function uploadAdminCurriculum(data: Record<string, unknown>): Promise<{ ok: boolean; programCount: number }> {
+  const payload = await request('/admin/curriculum', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+  const record = payload as Record<string, unknown>
+  return {
+    ok: record.ok === true,
+    programCount: typeof record.programCount === 'number' ? record.programCount : 0,
+  }
+}
+
+export async function resetAdminCurriculum(): Promise<void> {
+  await request('/admin/curriculum', { method: 'DELETE' })
+}

@@ -2317,6 +2317,69 @@ app.post('/admin/bulk-sync-curriculum', authenticate, requireAdminPermission('ma
   }
 });
 
+// Curriculum management endpoints
+app.get('/admin/curriculum', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to view curriculum settings.'), (_request, response) => {
+  const custom = getCustomCurriculum()
+  const source = custom ? 'custom' : 'embedded'
+  const curriculum = custom ?? KIU_CURRICULUM
+  const programs = Object.keys(curriculum)
+  response.json({ source, programCount: programs.length, programs, curriculum })
+})
+
+app.put('/admin/curriculum', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to update curriculum settings.'), (request, response) => {
+  if (request.adminScope !== 'super-admin') {
+    response.status(403).json({ message: 'Only super admin can upload a custom curriculum.' })
+    return
+  }
+  const body = request.body
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    response.status(400).json({ message: 'Request body must be a JSON object mapping program names to curriculum entries.' })
+    return
+  }
+  // Validate structure: each key maps to an object with a semesters property
+  const keys = Object.keys(body)
+  if (keys.length === 0) {
+    response.status(400).json({ message: 'Curriculum must contain at least one program.' })
+    return
+  }
+  for (const key of keys) {
+    const entry = body[key]
+    if (!entry || typeof entry !== 'object' || typeof entry.semesters !== 'object' || Array.isArray(entry.semesters)) {
+      response.status(400).json({ message: `Invalid curriculum entry for program "${key}": expected { semesters: { ... } }.` })
+      return
+    }
+  }
+  saveCustomCurriculum(body)
+  refreshEffectiveCurriculum()
+  insertActivityLog({
+    adminId: request.userId,
+    targetProfileId: request.userId,
+    action: 'upload_custom_curriculum',
+    details: { programCount: keys.length },
+    campusId: request.user?.campusId,
+    campusName: request.user?.campusName,
+  })
+  response.json({ ok: true, programCount: keys.length })
+})
+
+app.delete('/admin/curriculum', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to reset curriculum settings.'), (request, response) => {
+  if (request.adminScope !== 'super-admin') {
+    response.status(403).json({ message: 'Only super admin can reset the curriculum.' })
+    return
+  }
+  clearCustomCurriculum()
+  refreshEffectiveCurriculum()
+  insertActivityLog({
+    adminId: request.userId,
+    targetProfileId: request.userId,
+    action: 'reset_curriculum',
+    details: {},
+    campusId: request.user?.campusId,
+    campusName: request.user?.campusName,
+  })
+  response.json({ ok: true })
+})
+
 app.post('/permit-activity', authenticate, (request, response) => {
   const { studentId, action } = request.body ?? {}
   const profile = getProfileById(request.userId)

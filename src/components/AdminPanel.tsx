@@ -18,9 +18,9 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteAssistantAdmin, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync, fetchPublicPermit } from '../services/profileService'
+import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteAssistantAdmin, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync, fetchPublicPermit, fetchAdminCurriculum, uploadAdminCurriculum, resetAdminCurriculum } from '../services/profileService'
 import { completeAdminFirstLogin } from '../services/authService'
-import type { SisStatus, SisSyncResult } from '../services/profileService'
+import type { SisStatus, SisSyncResult, CurriculumStatus } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
 import type { FaqItem } from './faqStorage'
 import { buildPermitQrPayload } from '../utils/permitQr'
@@ -669,6 +669,10 @@ export default function AdminPanel() {
   const [sisStatus, setSisStatus] = useState<SisStatus | null>(null)
   const [sisSyncing, setSisSyncing] = useState(false)
   const [sisSyncResult, setSisSyncResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [curriculumStatus, setCurriculumStatus] = useState<CurriculumStatus | null>(null)
+  const [curriculumUploading, setCurriculumUploading] = useState(false)
+  const [curriculumUploadResult, setCurriculumUploadResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [curriculumResetting, setCurriculumResetting] = useState(false)
   const [faqDraft, setFaqDraft] = useState<FaqItem[]>(() => loadFaqs())
   const [faqSaved, setFaqSaved] = useState(false)
   const [assistantAdmins, setAssistantAdmins] = useState<AssistantAdminAccount[]>([])
@@ -1484,6 +1488,12 @@ export default function AdminPanel() {
       void fetchSisStatus()
         .then((status) => setSisStatus(status))
         .catch(() => setSisStatus(null))
+
+      // Load curriculum status from backend
+      setCurriculumStatus(null)
+      void fetchAdminCurriculum()
+        .then((status) => setCurriculumStatus(status))
+        .catch(() => setCurriculumStatus(null))
     }
   }, [activeSection, canManageAssistantAdmins, loadAssistantAdmins])
 
@@ -5956,6 +5966,159 @@ export default function AdminPanel() {
                         <CalendarDays className="h-4 w-4" />
                         Advance all students to next semester
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {canManageStudentProfiles && (
+                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <div className="border-b border-gray-100 dark:border-slate-700 px-6 py-4">
+                      <h2 className="font-semibold text-gray-800 dark:text-slate-100">Curriculum Management</h2>
+                      <p className="mt-1 text-xs text-gray-400">Upload a custom curriculum JSON to replace the embedded one used when syncing student course units.</p>
+                    </div>
+                    <div className="space-y-4 px-6 py-5">
+                      {/* Status row */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        {curriculumStatus ? (
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+                            curriculumStatus.source === 'custom'
+                              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
+                              : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'
+                          }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${curriculumStatus.source === 'custom' ? 'bg-indigo-500' : 'bg-gray-400'}`} />
+                            {curriculumStatus.source === 'custom' ? 'Custom curriculum active' : 'Embedded curriculum active'}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">Loading curriculum status…</span>
+                        )}
+                        {curriculumStatus && (
+                          <span className="text-xs text-gray-500">{curriculumStatus.programCount} programme{curriculumStatus.programCount !== 1 ? 's' : ''}</span>
+                        )}
+                      </div>
+
+                      {/* Download template */}
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-gray-700 dark:text-slate-300">Download template</p>
+                        <p className="mb-2 text-xs text-gray-500">Use the current active curriculum as a starting template for editing.</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const data = curriculumStatus?.curriculum ?? {}
+                            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                            const url = URL.createObjectURL(blob)
+                            const a = document.createElement('a')
+                            a.href = url
+                            a.download = 'curriculum-template.json'
+                            a.click()
+                            URL.revokeObjectURL(url)
+                          }}
+                          disabled={!curriculumStatus}
+                          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-800 px-4 py-2 text-xs font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Download JSON template
+                        </button>
+                      </div>
+
+                      {/* Upload custom curriculum */}
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-gray-700 dark:text-slate-300">Upload custom curriculum</p>
+                        <p className="mb-2 text-xs text-gray-500">JSON file must be an object mapping programme names to <code className="rounded bg-gray-100 dark:bg-slate-700 px-1">{"{ semesters: { ... } }"}</code> entries.</p>
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
+                          {curriculumUploading ? (
+                            <>
+                              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                              Uploading…
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-3.5 w-3.5" />
+                              Upload JSON
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept=".json,application/json"
+                            className="sr-only"
+                            disabled={curriculumUploading}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0]
+                              if (!file) return
+                              e.target.value = ''
+                              setCurriculumUploadResult(null)
+                              setCurriculumUploading(true)
+                              try {
+                                const text = await file.text()
+                                const data = JSON.parse(text) as Record<string, unknown>
+                                const result = await uploadAdminCurriculum(data)
+                                setCurriculumUploadResult({ ok: true, message: `Uploaded successfully — ${result.programCount} programmes now active.` })
+                                const status = await fetchAdminCurriculum()
+                                setCurriculumStatus(status)
+                              } catch (err) {
+                                setCurriculumUploadResult({ ok: false, message: err instanceof Error ? err.message : 'Upload failed.' })
+                              } finally {
+                                setCurriculumUploading(false)
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      {curriculumUploadResult && (
+                        <p className={`text-xs rounded px-2 py-1 ${curriculumUploadResult.ok ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>
+                          {curriculumUploadResult.ok ? '✓' : '✗'} {curriculumUploadResult.message}
+                        </p>
+                      )}
+
+                      {/* Apply to all students */}
+                      <div className="border-t border-gray-100 dark:border-slate-700 pt-4">
+                        <p className="mb-1 text-xs font-medium text-gray-700 dark:text-slate-300">Apply curriculum to all students</p>
+                        <p className="mb-2 text-xs text-gray-500">Syncs course units and exam slots for every student based on their programme using the active curriculum.</p>
+                        <button
+                          type="button"
+                          onClick={() => setPendingConfirmation({
+                            title: 'Apply curriculum to all students?',
+                            message: 'This will overwrite the course units and exam slots for every student based on their programme. Students with no curriculum match will be skipped. Continue?',
+                            confirmLabel: 'Apply to all students',
+                            tone: 'primary',
+                            action: async () => {
+                              try {
+                                const result = await bulkSyncCurriculum()
+                                setSuccessMessage(`Curriculum applied — ${result.updated} student${result.updated !== 1 ? 's' : ''} updated, ${result.failed.length} skipped.`)
+                              } catch (err) {
+                                setError(err instanceof Error ? err.message : 'Sync failed.')
+                              }
+                            },
+                          })}
+                          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                        >
+                          <RefreshCcw className="h-3.5 w-3.5" />
+                          Apply to all students
+                        </button>
+                        {curriculumStatus?.source === 'custom' && (
+                          <button
+                            type="button"
+                            disabled={curriculumResetting}
+                            onClick={async () => {
+                              setCurriculumResetting(true)
+                              setCurriculumUploadResult(null)
+                              try {
+                                await resetAdminCurriculum()
+                                const status = await fetchAdminCurriculum()
+                                setCurriculumStatus(status)
+                                setCurriculumUploadResult({ ok: true, message: 'Curriculum reset to embedded default.' })
+                              } catch (err) {
+                                setCurriculumUploadResult({ ok: false, message: err instanceof Error ? err.message : 'Reset failed.' })
+                              } finally {
+                                setCurriculumResetting(false)
+                              }
+                            }}
+                            className="ml-2 inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50"
+                          >
+                            {curriculumResetting ? 'Resetting…' : 'Reset to default'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

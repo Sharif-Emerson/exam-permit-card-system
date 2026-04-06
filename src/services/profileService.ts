@@ -1,6 +1,6 @@
 import { activeDataAdapter } from '../adapters/data'
-import { fetchEmailStatus as _fetchEmailStatus, sendTestEmail as _sendTestEmail, fetchSisStatus as _fetchSisStatus, triggerSisSync as _triggerSisSync, fetchPublicPermit as _fetchPublicPermit } from '../adapters/data/restDataAdapter'
-import type { EmailStatus, SisStatus, SisSyncResult, PermitScanRecord } from '../adapters/data/restDataAdapter'
+import { fetchEmailStatus as _fetchEmailStatus, sendTestEmail as _sendTestEmail, fetchSisStatus as _fetchSisStatus, triggerSisSync as _triggerSisSync, fetchPublicPermit as _fetchPublicPermit, fetchAdminCurriculum as _fetchAdminCurriculum, uploadAdminCurriculum as _uploadAdminCurriculum, resetAdminCurriculum as _resetAdminCurriculum } from '../adapters/data/restDataAdapter'
+import type { EmailStatus, SisStatus, SisSyncResult, PermitScanRecord, CurriculumStatus } from '../adapters/data/restDataAdapter'
 import type { FinancialUpdateValues, StudentAccountsImportApplyResult, StudentProvisionPreviewRow } from '../adapters/data/types'
 import type {
   AssistantAdminAccount,
@@ -270,3 +270,17 @@ export async function triggerSisSync(): Promise<SisSyncResult> {
 export async function fetchPublicPermit(token: string): Promise<PermitScanRecord> {
   return _fetchPublicPermit(token)
 }
+
+export async function fetchAdminCurriculum(): Promise<CurriculumStatus> {
+  return _fetchAdminCurriculum()
+}
+
+export async function uploadAdminCurriculum(data: Record<string, unknown>): Promise<{ ok: boolean; programCount: number }> {
+  return _uploadAdminCurriculum(data)
+}
+
+export async function resetAdminCurriculum(): Promise<void> {
+  return _resetAdminCurriculum()
+}
+
+export type { CurriculumStatus }
