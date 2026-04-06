@@ -129,7 +129,7 @@ type DashboardAlert = {
 
 type SupportReplyDrafts = Record<string, string>
 type SupportStatusDrafts = Record<string, SupportRequestStatus>
-type AssistantAdminRole = 'department_prints' | 'invigilator'
+type AssistantAdminRole = 'department_prints' | 'invigilator' | 'support_help'
 const ADMIN_EMAIL_DOMAIN = 'kiu.examcard.com'
 
 function nameToEmailPrefix(name: string): string {
@@ -250,10 +250,32 @@ function getAdminCapabilityLabel(scope: AdminCapabilityProfile['scope']) {
 
 function getAdminSections(permissions: Set<AdminPermission>, scope: AdminCapabilityProfile['scope'], assistantRole?: AssistantAdminRole): NavSection[] {
   if (scope === 'assistant-admin') {
-    if (assistantRole === 'invigilator') {
-      return ['scanner', 'permits', 'settings']
+    const sections = new Set<NavSection>(['settings'])
+
+    if (permissions.has('view_students')) {
+      sections.add('students')
     }
-    return ['permit-cards', 'permits', 'settings']
+
+    // Scanner should be visible for invigilator accounts and any assistant role with permit-audit visibility.
+    if (assistantRole === 'invigilator' || permissions.has('view_audit_logs')) {
+      sections.add('scanner')
+      sections.add('permits')
+    }
+
+    if (permissions.has('manage_student_profiles')) {
+      sections.add('permit-cards')
+      sections.add('import')
+    }
+
+    if (permissions.has('manage_support_requests')) {
+      sections.add('support')
+    }
+
+    if (permissions.has('export_reports')) {
+      sections.add('reports')
+    }
+
+    return Array.from(sections)
   }
 
   const sections = new Set<NavSection>(['dashboard', 'settings'])
