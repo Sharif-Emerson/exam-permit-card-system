@@ -631,11 +631,17 @@ export default function AdminPanel() {
   const [scanResult, setScanResult] = useState<PermitScanRecord | null>(null)
   const [scanLoading, setScanLoading] = useState(false)
   const [scanError, setScanError] = useState('')
+  const [cameraActive, setCameraActive] = useState(false)
+  const [cameraStarting, setCameraStarting] = useState(false)
+  const [cameraError, setCameraError] = useState('')
   const [forgeryReason, setForgeryReason] = useState('')
   const [forgeryNotes, setForgeryNotes] = useState('')
   const [forgeryReporting, setForgeryReporting] = useState(false)
   const [forgeryReportResult, setForgeryReportResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [showForgeryForm, setShowForgeryForm] = useState(false)
+  const cameraVideoRef = useRef<HTMLVideoElement | null>(null)
+  const cameraStreamRef = useRef<MediaStream | null>(null)
+  const cameraScanTimerRef = useRef<number | null>(null)
   const [searchInputValue, setSearchInputValue] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [showSignOut, setShowSignOut] = useState(false) // 2. Add showSignOut state
@@ -1525,6 +1531,18 @@ export default function AdminPanel() {
   }, [activeSection, canManageAssistantAdmins, loadAssistantAdmins])
 
   useEffect(() => {
+    if (activeSection !== 'scanner') {
+      stopCameraScanner()
+    }
+  }, [activeSection, stopCameraScanner])
+
+  useEffect(() => {
+    return () => {
+      stopCameraScanner()
+    }
+  }, [stopCameraScanner])
+
+  useEffect(() => {
     if (typeof window === 'undefined' || !user) {
       return
     }
@@ -1841,9 +1859,7 @@ export default function AdminPanel() {
     return t
   }
 
-  async function handlePermitScan(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const token = extractPermitTokenFromScanInput(scanInput)
+  async function handlePermitLookupByToken(token: string) {
     if (!token) return
     setScanLoading(true)
     setScanError('')
@@ -1856,6 +1872,102 @@ export default function AdminPanel() {
     } finally {
       setScanLoading(false)
     }
+  }
+
+  const stopCameraScanner = useCallback(() => {
+    if (cameraScanTimerRef.current !== null) {
+      window.clearInterval(cameraScanTimerRef.current)
+      cameraScanTimerRef.current = null
+    }
+
+    const stream = cameraStreamRef.current
+    if (stream) {
+      for (const track of stream.getTracks()) {
+        track.stop()
+      }
+      cameraStreamRef.current = null
+    }
+
+    if (cameraVideoRef.current) {
+      cameraVideoRef.current.srcObject = null
+    }
+
+    setCameraActive(false)
+  }, [])
+
+  const startCameraScanner = useCallback(async () => {
+    if (cameraActive || cameraStarting) {
+      return
+    }
+
+    if (typeof window === 'undefined' || !('BarcodeDetector' in window)) {
+      setCameraError('Camera QR scanning is not supported in this browser. Use manual token paste.')
+      return
+    }
+
+    try {
+      setCameraStarting(true)
+      setCameraError('')
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      })
+
+      const videoEl = cameraVideoRef.current
+      if (!videoEl) {
+        for (const track of stream.getTracks()) {
+          track.stop()
+        }
+        throw new Error('Camera preview is unavailable.')
+      }
+
+      videoEl.srcObject = stream
+      await videoEl.play()
+      cameraStreamRef.current = stream
+      setCameraActive(true)
+
+      const BarcodeDetectorCtor = (window as Window & { BarcodeDetector?: new (options?: { formats?: string[] }) => { detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue?: string }>> } }).BarcodeDetector
+      const detector = BarcodeDetectorCtor ? new BarcodeDetectorCtor({ formats: ['qr_code'] }) : null
+
+      cameraScanTimerRef.current = window.setInterval(() => {
+        void (async () => {
+          try {
+            if (!detector || !cameraVideoRef.current || cameraVideoRef.current.readyState < 2) {
+              return
+            }
+            const codes = await detector.detect(cameraVideoRef.current)
+            const raw = codes.find((item) => item.rawValue)?.rawValue
+            if (!raw) {
+              return
+            }
+
+            const token = extractPermitTokenFromScanInput(raw)
+            if (!token) {
+              return
+            }
+
+            stopCameraScanner()
+            setScanInput(token)
+            await handlePermitLookupByToken(token)
+          } catch {
+            // Ignore transient detection errors and continue scanning.
+          }
+        })()
+      }, 600)
+    } catch (err) {
+      setCameraError(err instanceof Error ? err.message : 'Unable to start camera scanner.')
+      stopCameraScanner()
+    } finally {
+      setCameraStarting(false)
+    }
+  }, [cameraActive, cameraStarting, stopCameraScanner])
+
+  async function handlePermitScan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const token = extractPermitTokenFromScanInput(scanInput)
+    if (!token) return
+    await handlePermitLookupByToken(token)
   }
 
   function resetStudentView() {
@@ -4833,7 +4945,11 @@ export default function AdminPanel() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h1 className="text-xl font-bold text-gray-900 dark:text-white">Permit Activity</h1>
-                    <p className="text-sm text-gray-500">Showing {activityPageStart}-{activityPageEnd} of {activityTotalItems} event(s)</p>
+                    <p className="text-sm text-gray-500">
+                      {permitActivityLogs.length === 0
+                        ? 'Showing 0-0 of 0 event(s)'
+                        : `Showing ${activityPageStart}-${activityPageEnd} of ${activityTotalItems} event(s)`}
+                    </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {canViewPermitActivity && permitUnreadCount > 0 ? (
@@ -5454,9 +5570,42 @@ export default function AdminPanel() {
                 <div className="rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm">
                   <div className="border-b border-gray-100 dark:border-slate-700 px-6 py-4">
                     <h2 className="font-semibold text-gray-800 dark:text-slate-100">Scan Permit</h2>
-                    <p className="mt-1 text-xs text-gray-400 dark:text-slate-400">Paste the raw QR content, the full verification URL, or the permit token directly.</p>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-slate-400">Paste the raw QR content, the full verification URL, or the unique permit token printed on the permit card.</p>
                   </div>
                   <div className="px-6 py-5">
+                    <div className="mb-4 rounded-lg border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { void startCameraScanner() }}
+                          disabled={cameraActive || cameraStarting}
+                          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                        >
+                          <QrCode className="h-3.5 w-3.5" />
+                          {cameraStarting ? 'Starting camera…' : cameraActive ? 'Camera Active' : 'Start Camera Scanner'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={stopCameraScanner}
+                          disabled={!cameraActive && !cameraStarting}
+                          className="inline-flex items-center gap-2 rounded-lg border border-sky-200 dark:border-sky-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-sky-700 dark:text-sky-300 hover:bg-sky-50 disabled:opacity-50"
+                        >
+                          Stop Camera
+                        </button>
+                      </div>
+                      {cameraError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{cameraError}</p>}
+                      <div className="mt-3 overflow-hidden rounded-lg border border-gray-200 dark:border-slate-700 bg-black">
+                        <video
+                          ref={cameraVideoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="h-52 w-full object-cover"
+                        />
+                      </div>
+                      <p className="mt-2 text-[11px] text-sky-700 dark:text-sky-300">Point camera at permit QR. When detected, verification runs automatically.</p>
+                    </div>
+
                     <form onSubmit={(e) => { void handlePermitScan(e) }} className="flex gap-2">
                       <input
                         type="text"

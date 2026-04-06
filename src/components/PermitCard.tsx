@@ -419,6 +419,8 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
                     <span className="text-sm text-slate-500 print:text-[10px]">QR data unavailable</span>
                   )}
                 </div>
+                <p className="mt-2 text-[11px] font-semibold text-slate-700 print:text-[9px]">Permit Token</p>
+                <p className="font-mono text-[11px] text-slate-600 break-all print:text-[9px]">{studentData.permitToken}</p>
                 <p className="hidden print:block print:mt-1 print:text-[8px] print:text-slate-500 print:uppercase print:tracking-wider">Official Scan Tag</p>
               </div>
             </div>
