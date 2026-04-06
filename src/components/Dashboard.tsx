@@ -1831,7 +1831,7 @@ export default function Dashboard() {
 
                       <section className="rounded-[2rem] border border-rose-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(254,252,232,0.9))] p-6 shadow-xl shadow-rose-200/45 backdrop-blur dark:border-rose-900/30 dark:bg-[linear-gradient(145deg,_rgba(60,9,9,0.72),_rgba(69,10,10,0.65)_55%,_rgba(51,65,85,0.8))] dark:shadow-none">
                         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Printed Permit History</p>
-                        <h2 className="mt-2 text-2xl font-semibold">Latest printed semesters</h2>
+                        <h2 className="mt-2 text-2xl font-semibold">Recent print activity</h2>
                         <div className="mt-5 max-h-72 space-y-3 overflow-y-auto pr-1">
                           {permitHistoryRows.slice(0, 3).map((record) => (
                             <div key={record.id} className="rounded-3xl border border-rose-100 bg-rose-50/85 p-4 shadow-sm shadow-rose-100/60 dark:border-slate-800 dark:bg-slate-900/70">
@@ -1859,7 +1859,7 @@ export default function Dashboard() {
                   <div className="space-y-6">
                     <section className="rounded-[2rem] border border-yellow-200/80 bg-[linear-gradient(145deg,_rgba(254,252,232,0.95),_rgba(240,249,255,0.9))] p-6 shadow-xl shadow-yellow-200/45 backdrop-blur dark:border-yellow-900/30 dark:bg-[linear-gradient(145deg,_rgba(66,32,6,0.7),_rgba(15,23,42,0.9))] dark:shadow-none">
                       <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Printed Permits</p>
-                      <h2 className="mt-2 text-2xl font-semibold">One record per semester</h2>
+                      <h2 className="mt-2 text-2xl font-semibold">All printed permits</h2>
                       <div className="mt-6 max-h-80 overflow-x-auto overflow-y-auto rounded-3xl border border-slate-200 dark:border-slate-800">
                         <table className="min-w-full text-left text-sm">
                           <thead className="sticky top-0 bg-slate-50 text-xs uppercase tracking-[0.25em] text-slate-500 dark:bg-slate-900 dark:text-slate-300">
