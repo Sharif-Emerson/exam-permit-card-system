@@ -2462,7 +2462,7 @@ app.get('/permit-activity', authenticate, (request, response) => {
   }
 
   const data = listActivityLogs()
-    .filter((entry) => entry.targetProfileId === requestedStudentId && (entry.action === 'print_permit' || entry.action === 'download_permit'))
+    .filter((entry) => entry.target_profile_id === requestedStudentId && (entry.action === 'print_permit' || entry.action === 'download_permit'))
     .map((entry) => ({
       id: entry.id,
       studentId: requestedStudentId,
