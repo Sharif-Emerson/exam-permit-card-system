@@ -2843,7 +2843,17 @@ export default function AdminPanel() {
     { id: 'reports', key: 'reports', label: 'Reports', icon: <BarChart2 className="w-5 h-5" /> },
     { id: 'settings', key: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
   ]
-  const visibleNavItems = navItems.filter((item) => adminCapability.sections.includes(item.key))
+  const visibleNavItems = navItems.filter((item) => {
+    if (!adminCapability.sections.includes(item.key)) {
+      return false
+    }
+
+    if (user?.scope === 'assistant-admin' && user.assistantRole === 'invigilator' && item.key === 'students') {
+      return false
+    }
+
+    return true
+  })
   const quickActions = [
     {
       key: 'bulk-import',
