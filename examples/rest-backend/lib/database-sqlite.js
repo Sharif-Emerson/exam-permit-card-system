@@ -52,7 +52,7 @@ db.exec(`
     phone_number TEXT,
     role TEXT NOT NULL CHECK (role IN ('admin', 'student')),
     admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations', 'assistant-admin')),
-    assistant_role TEXT CHECK (assistant_role IN ('support_help', 'department_prints')),
+    assistant_role TEXT CHECK (assistant_role IN ('support_help', 'department_prints', 'invigilator')),
     assistant_departments_json TEXT NOT NULL DEFAULT '[]',
     name TEXT NOT NULL,
     password_hash TEXT NOT NULL,
@@ -218,7 +218,7 @@ ensureColumn('users', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
 ensureColumn('users', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
 ensureColumn('users', 'phone_number TEXT')
 ensureColumn('users', "admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations', 'assistant-admin'))")
-ensureColumn('users', "assistant_role TEXT CHECK (assistant_role IN ('support_help', 'department_prints'))")
+ensureColumn('users', "assistant_role TEXT CHECK (assistant_role IN ('support_help', 'department_prints', 'invigilator'))")
 ensureColumn('users', "assistant_departments_json TEXT NOT NULL DEFAULT '[]'")
 ensureColumn('users', 'first_login_required INTEGER NOT NULL DEFAULT 0')
 ensureColumn('profiles', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
@@ -285,6 +285,61 @@ ensureColumn('support_request_messages', 'attachment_size_bytes INTEGER')
         updated_at TEXT NOT NULL,
         campus_id TEXT NOT NULL DEFAULT 'main-campus',
         campus_name TEXT NOT NULL DEFAULT 'Main Campus'
+      )
+    `)
+    db.exec(`INSERT INTO users_rebuilt SELECT ${selectParts} FROM users`)
+    db.exec('DROP TABLE users')
+    db.exec('ALTER TABLE users_rebuilt RENAME TO users')
+    db.exec('COMMIT')
+  } catch (migrationError) {
+    try { db.exec('ROLLBACK') } catch { /* ignore */ }
+    try { db.exec('DROP TABLE IF EXISTS users_rebuilt') } catch { /* ignore */ }
+    db.pragma('foreign_keys = ON')
+    throw migrationError
+  }
+  db.pragma('foreign_keys = ON')
+})()
+
+// Migration: add 'invigilator' to assistant_role CHECK constraint
+;(function migrateAssistantRoleInvigilator() {
+  const schemaRow = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='users'`).get()
+  if (!schemaRow || typeof schemaRow.sql !== 'string') return
+  if (schemaRow.sql.includes("'invigilator'")) return // Already up-to-date
+
+  const existingCols = db.pragma('table_info(users)').map((c) => c.name)
+  const allCols = [
+    'id', 'email', 'phone_number', 'role', 'admin_scope', 'assistant_role',
+    'assistant_departments_json', 'name', 'password_hash', 'created_at', 'updated_at',
+    'campus_id', 'campus_name', 'first_login_required',
+  ]
+  const selectParts = allCols.map((col) => {
+    if (existingCols.includes(col)) return col
+    if (col === 'campus_id') return "'main-campus' AS campus_id"
+    if (col === 'campus_name') return "'Main Campus' AS campus_name"
+    if (col === 'assistant_departments_json') return "'[]' AS assistant_departments_json"
+    if (col === 'first_login_required') return '0 AS first_login_required'
+    return `NULL AS ${col}`
+  }).join(', ')
+
+  db.pragma('foreign_keys = OFF')
+  try {
+    db.exec('BEGIN')
+    db.exec(`
+      CREATE TABLE users_rebuilt (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        phone_number TEXT,
+        role TEXT NOT NULL CHECK (role IN ('admin', 'student')),
+        admin_scope TEXT CHECK (admin_scope IN ('super-admin', 'registrar', 'finance', 'operations', 'assistant-admin')),
+        assistant_role TEXT CHECK (assistant_role IN ('support_help', 'department_prints', 'invigilator')),
+        assistant_departments_json TEXT NOT NULL DEFAULT '[]',
+        name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        campus_id TEXT NOT NULL DEFAULT 'main-campus',
+        campus_name TEXT NOT NULL DEFAULT 'Main Campus',
+        first_login_required INTEGER NOT NULL DEFAULT 0
       )
     `)
     db.exec(`INSERT INTO users_rebuilt SELECT ${selectParts} FROM users`)
@@ -1194,7 +1249,7 @@ export function listAssistantAdmins() {
     name: row.name,
     email: row.email,
     phoneNumber: row.phone_number ?? '',
-    role: row.assistant_role === 'support_help' ? 'support_help' : 'department_prints',
+    role: row.assistant_role === 'support_help' ? 'support_help' : (row.assistant_role === 'invigilator' ? 'invigilator' : 'department_prints'),
     departments: parseAssistantDepartments(row.assistant_departments_json),
     campusId: row.campus_id ?? 'main-campus',
     campusName: row.campus_name ?? 'Main Campus',
@@ -1209,7 +1264,7 @@ export function createAssistantAdmin(input) {
   const name = String(input.name ?? '').trim()
   const phoneNumber = normalizePhoneNumber(input.phone_number) || null
   const password = String(input.password ?? '').trim()
-  const role = input.role === 'support_help' ? 'support_help' : 'department_prints'
+  const role = input.role === 'support_help' ? 'support_help' : (input.role === 'invigilator' ? 'invigilator' : 'department_prints')
   const departments = Array.isArray(input.departments) ? input.departments.map((item) => String(item ?? '').trim()).filter(Boolean) : []
   const campusId = String(input.campus_id ?? 'main-campus').trim() || 'main-campus'
   const campusName = String(input.campus_name ?? 'Main Campus').trim() || 'Main Campus'
@@ -1244,7 +1299,7 @@ export function updateAssistantAdmin(id, updates) {
   if (!existing) {
     return null
   }
-  const role = updates.role === 'support_help' ? 'support_help' : 'department_prints'
+  const role = updates.role === 'support_help' ? 'support_help' : (updates.role === 'invigilator' ? 'invigilator' : 'department_prints')
   const departments = Array.isArray(updates.departments) ? updates.departments.map((item) => String(item ?? '').trim()).filter(Boolean) : parseAssistantDepartments(existing.assistant_departments_json)
   const updatedAt = nowIso()
   db.prepare(`

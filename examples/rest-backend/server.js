@@ -824,11 +824,16 @@ function getAdminPermissions(user) {
   ]
 
   if (scope === 'assistant-admin') {
-    const assistantRole = user.assistant_role === 'support_help' ? 'support_help' : 'department_prints'
+    const assistantRole = user.assistant_role === 'support_help' ? 'support_help' : (user.assistant_role === 'invigilator' ? 'invigilator' : 'department_prints')
     if (assistantRole === 'support_help') {
       return [
         'view_students',
         'manage_support_requests',
+      ]
+    }
+    if (assistantRole === 'invigilator') {
+      return [
+        'view_students',
       ]
     }
     return [
@@ -854,7 +859,7 @@ function createAuthenticatedUser(user) {
   const result = {
     ...user,
     scope: resolveAdminScope(user),
-    assistantRole: user.assistant_role === 'support_help' ? 'support_help' : (user.assistant_role === 'department_prints' ? 'department_prints' : undefined),
+    assistantRole: user.assistant_role === 'support_help' ? 'support_help' : (user.assistant_role === 'department_prints' ? 'department_prints' : (user.assistant_role === 'invigilator' ? 'invigilator' : undefined)),
     assistantDepartments: getAssistantAllowedDepartments(user),
     permissions: getAdminPermissions(user),
   }

@@ -1,6 +1,6 @@
 import { activeDataAdapter } from '../adapters/data'
-import { fetchEmailStatus as _fetchEmailStatus, sendTestEmail as _sendTestEmail, fetchSisStatus as _fetchSisStatus, triggerSisSync as _triggerSisSync } from '../adapters/data/restDataAdapter'
-import type { EmailStatus, SisStatus, SisSyncResult } from '../adapters/data/restDataAdapter'
+import { fetchEmailStatus as _fetchEmailStatus, sendTestEmail as _sendTestEmail, fetchSisStatus as _fetchSisStatus, triggerSisSync as _triggerSisSync, fetchPublicPermit as _fetchPublicPermit } from '../adapters/data/restDataAdapter'
+import type { EmailStatus, SisStatus, SisSyncResult, PermitScanRecord } from '../adapters/data/restDataAdapter'
 import type { FinancialUpdateValues, StudentAccountsImportApplyResult, StudentProvisionPreviewRow } from '../adapters/data/types'
 import type {
   AssistantAdminAccount,
@@ -197,11 +197,11 @@ export async function fetchAssistantAdmins(): Promise<AssistantAdminAccount[]> {
   return activeDataAdapter.fetchAssistantAdmins()
 }
 
-export async function createAssistantAdmin(values: { name: string; email: string; phoneNumber?: string; password: string; role: 'support_help' | 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
+export async function createAssistantAdmin(values: { name: string; email: string; phoneNumber?: string; password: string; role: 'support_help' | 'department_prints' | 'invigilator'; departments: string[] }): Promise<AssistantAdminAccount> {
   return activeDataAdapter.createAssistantAdmin(values)
 }
 
-export async function updateAssistantAdmin(assistantId: string, values: { role: 'support_help' | 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
+export async function updateAssistantAdmin(assistantId: string, values: { role: 'support_help' | 'department_prints' | 'invigilator'; departments: string[] }): Promise<AssistantAdminAccount> {
   return activeDataAdapter.updateAssistantAdmin(assistantId, values)
 }
 
@@ -245,7 +245,7 @@ export async function adminResetStudentPassword(studentId: string, newPassword: 
   return activeDataAdapter.adminResetStudentPassword(studentId, newPassword)
 }
 
-export type { EmailStatus, SisStatus, SisSyncResult }
+export type { EmailStatus, SisStatus, SisSyncResult, PermitScanRecord }
 
 export async function fetchEmailStatus(): Promise<EmailStatus> {
   return _fetchEmailStatus()
@@ -261,4 +261,8 @@ export async function fetchSisStatus(): Promise<SisStatus> {
 
 export async function triggerSisSync(): Promise<SisSyncResult> {
   return _triggerSisSync()
+}
+
+export async function fetchPublicPermit(token: string): Promise<PermitScanRecord> {
+  return _fetchPublicPermit(token)
 }

@@ -238,7 +238,7 @@ export interface AuthUser {
   name: string
   phoneNumber?: string
   scope?: AdminScope
-  assistantRole?: 'department_prints'
+  assistantRole?: 'department_prints' | 'invigilator'
   assistantDepartments?: string[]
   permissions?: AdminPermission[]
   firstLoginRequired?: boolean
@@ -249,7 +249,7 @@ export interface AssistantAdminAccount {
   name: string
   email: string
   phoneNumber: string
-  role: 'department_prints'
+  role: 'department_prints' | 'invigilator'
   departments: string[]
   firstLoginRequired: boolean
 }

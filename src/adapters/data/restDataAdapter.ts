@@ -410,7 +410,7 @@ function toAssistantAdminAccount(payload: unknown): AssistantAdminAccount {
     name: String(record.name ?? ''),
     email: String(record.email ?? ''),
     phoneNumber: String(record.phoneNumber ?? record.phone_number ?? ''),
-    role: 'department_prints',
+    role: record.role === 'support_help' ? 'support_help' : (record.role === 'invigilator' ? 'invigilator' : 'department_prints'),
     departments: Array.isArray(record.departments) ? record.departments.map((item) => String(item ?? '').trim()).filter(Boolean) : [],
     firstLoginRequired: record.firstLoginRequired === true,
   }
@@ -826,14 +826,14 @@ export const restDataAdapter: DataAdapter = {
     const payload = await request('/admin/assistants', { method: 'GET' })
     return extractCollection(payload).map(toAssistantAdminAccount)
   },
-  async createAssistantAdmin(values: { name: string; email: string; phoneNumber?: string; password: string; role: 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
+  async createAssistantAdmin(values: { name: string; email: string; phoneNumber?: string; password: string; role: 'department_prints' | 'invigilator'; departments: string[] }): Promise<AssistantAdminAccount> {
     const payload = await request('/admin/assistants', {
       method: 'POST',
       body: JSON.stringify(values),
     })
     return toAssistantAdminAccount(payload)
   },
-  async updateAssistantAdmin(assistantId: string, values: { role: 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
+  async updateAssistantAdmin(assistantId: string, values: { role: 'department_prints' | 'invigilator'; departments: string[] }): Promise<AssistantAdminAccount> {
     const payload = await request(`/admin/assistants/${assistantId}`, {
       method: 'PATCH',
       body: JSON.stringify(values),
@@ -946,5 +946,49 @@ export async function sendTestEmail(to: string): Promise<{ success: boolean; mes
   return {
     success: record.success === true,
     message: typeof record.message === 'string' ? record.message : 'Done.',
+  }
+}
+
+export type PermitScanRecord = {
+  permitToken: string
+  profileId: string
+  studentName: string
+  profileImage: string | null
+  cleared: boolean
+  exams: Array<{
+    subjectCode?: string
+    subjectName?: string
+    examDate?: string
+    examTime?: string
+    venue?: string
+    seatNumber?: string
+  }>
+  updatedAt: string | null
+  integrity: string | null
+}
+
+export async function fetchPublicPermit(token: string): Promise<PermitScanRecord> {
+  const payload = await requestWithApiFallback(`/permits/${encodeURIComponent(token)}`)
+  const record = payload as Record<string, unknown>
+  const examsRaw = Array.isArray(record.exams) ? record.exams : []
+  return {
+    permitToken: String(record.permitToken ?? record.permit_token ?? ''),
+    profileId: String(record.profileId ?? record.profile_id ?? ''),
+    studentName: String(record.studentName ?? record.student_name ?? ''),
+    profileImage: typeof record.profileImage === 'string' ? record.profileImage : (typeof record.profile_image === 'string' ? record.profile_image : null),
+    cleared: record.cleared === true,
+    exams: examsRaw.map((exam) => {
+      const e = exam as Record<string, unknown>
+      return {
+        subjectCode: typeof e.subjectCode === 'string' ? e.subjectCode : undefined,
+        subjectName: typeof e.subjectName === 'string' ? e.subjectName : undefined,
+        examDate: typeof e.examDate === 'string' ? e.examDate : undefined,
+        examTime: typeof e.examTime === 'string' ? e.examTime : undefined,
+        venue: typeof e.venue === 'string' ? e.venue : undefined,
+        seatNumber: typeof e.seatNumber === 'string' ? e.seatNumber : undefined,
+      }
+    }),
+    updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : null,
+    integrity: typeof record.integrity === 'string' ? record.integrity : null,
   }
 }
