@@ -1531,18 +1531,6 @@ export default function AdminPanel() {
   }, [activeSection, canManageAssistantAdmins, loadAssistantAdmins])
 
   useEffect(() => {
-    if (activeSection !== 'scanner') {
-      stopCameraScanner()
-    }
-  }, [activeSection, stopCameraScanner])
-
-  useEffect(() => {
-    return () => {
-      stopCameraScanner()
-    }
-  }, [stopCameraScanner])
-
-  useEffect(() => {
     if (typeof window === 'undefined' || !user) {
       return
     }
@@ -1962,6 +1950,18 @@ export default function AdminPanel() {
       setCameraStarting(false)
     }
   }, [cameraActive, cameraStarting, stopCameraScanner])
+
+  useEffect(() => {
+    if (activeSection !== 'scanner') {
+      stopCameraScanner()
+    }
+  }, [activeSection, stopCameraScanner])
+
+  useEffect(() => {
+    return () => {
+      stopCameraScanner()
+    }
+  }, [stopCameraScanner])
 
   async function handlePermitScan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
