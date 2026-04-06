@@ -95,8 +95,8 @@ export interface DataAdapter {
   previewStudentAccountsImport: (file: File) => Promise<StudentProvisionPreviewRow[]>
   applyStudentAccountsImport: (file: File) => Promise<StudentAccountsImportApplyResult>
   fetchAssistantAdmins: () => Promise<AssistantAdminAccount[]>
-  createAssistantAdmin: (values: { name: string; email: string; phoneNumber?: string; password: string; role: 'support_help' | 'department_prints'; departments: string[] }) => Promise<AssistantAdminAccount>
-  updateAssistantAdmin: (assistantId: string, values: { role: 'support_help' | 'department_prints'; departments: string[] }) => Promise<AssistantAdminAccount>
+  createAssistantAdmin: (values: { name: string; email: string; phoneNumber?: string; password: string; role: 'department_prints'; departments: string[] }) => Promise<AssistantAdminAccount>
+  updateAssistantAdmin: (assistantId: string, values: { role: 'department_prints'; departments: string[] }) => Promise<AssistantAdminAccount>
   updateAssistantAdminCredentials: (assistantId: string, values: { name?: string; email?: string; password?: string }) => Promise<AssistantAdminAccount>
   fetchSemesterRegistrations: () => Promise<SemesterRegistration[]>
   createSemesterRegistration: (requestedSemester: string) => Promise<SemesterRegistration>

@@ -410,7 +410,7 @@ function toAssistantAdminAccount(payload: unknown): AssistantAdminAccount {
     name: String(record.name ?? ''),
     email: String(record.email ?? ''),
     phoneNumber: String(record.phoneNumber ?? record.phone_number ?? ''),
-    role: record.role === 'support_help' ? 'support_help' : 'department_prints',
+    role: 'department_prints',
     departments: Array.isArray(record.departments) ? record.departments.map((item) => String(item ?? '').trim()).filter(Boolean) : [],
     firstLoginRequired: record.firstLoginRequired === true,
   }
@@ -826,14 +826,14 @@ export const restDataAdapter: DataAdapter = {
     const payload = await request('/admin/assistants', { method: 'GET' })
     return extractCollection(payload).map(toAssistantAdminAccount)
   },
-  async createAssistantAdmin(values: { name: string; email: string; phoneNumber?: string; password: string; role: 'support_help' | 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
+  async createAssistantAdmin(values: { name: string; email: string; phoneNumber?: string; password: string; role: 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
     const payload = await request('/admin/assistants', {
       method: 'POST',
       body: JSON.stringify(values),
     })
     return toAssistantAdminAccount(payload)
   },
-  async updateAssistantAdmin(assistantId: string, values: { role: 'support_help' | 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
+  async updateAssistantAdmin(assistantId: string, values: { role: 'department_prints'; departments: string[] }): Promise<AssistantAdminAccount> {
     const payload = await request(`/admin/assistants/${assistantId}`, {
       method: 'PATCH',
       body: JSON.stringify(values),

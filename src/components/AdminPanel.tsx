@@ -127,7 +127,7 @@ type DashboardAlert = {
 
 type SupportReplyDrafts = Record<string, string>
 type SupportStatusDrafts = Record<string, SupportRequestStatus>
-type AssistantAdminRole = 'support_help' | 'department_prints'
+type AssistantAdminRole = 'department_prints'
 const ADMIN_EMAIL_DOMAIN = 'kiu.examcard.com'
 
 function nameToEmailPrefix(name: string): string {
@@ -248,17 +248,7 @@ function getAdminCapabilityLabel(scope: AdminCapabilityProfile['scope']) {
 
 function getAdminSections(permissions: Set<AdminPermission>, scope: AdminCapabilityProfile['scope']): NavSection[] {
   if (scope === 'assistant-admin') {
-    const assistantSections = new Set<NavSection>(['students', 'settings'])
-
-    if (permissions.has('manage_support_requests')) {
-      assistantSections.add('support')
-    }
-
-    if (permissions.has('manage_student_profiles')) {
-      assistantSections.add('permit-cards')
-    }
-
-    return Array.from(assistantSections)
+    return ['permit-cards', 'permits', 'settings']
   }
 
   const sections = new Set<NavSection>(['dashboard', 'settings'])
@@ -307,7 +297,7 @@ function getAdminCapabilityProfile(user: AuthUser | null | undefined): AdminCapa
     sections: getAdminSections(permissions, scope),
     canImportFinancials: permissions.has('manage_financials'),
     canGenerateBulkPermits: permissions.has('manage_student_profiles'),
-    canSendReminders: hasAnyPermission(permissions, ['manage_student_profiles', 'manage_financials', 'manage_support_requests']),
+    canSendReminders: hasAnyPermission(permissions, ['manage_student_profiles', 'manage_financials']),
     canExportReports: permissions.has('export_reports'),
   }
 }
@@ -2608,7 +2598,7 @@ export default function AdminPanel() {
     { id: 'dashboard', key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'students', key: 'students', label: 'Students', icon: <Users className="w-5 h-5" />, badge: outstandingStudents > 0 ? outstandingStudents : undefined },
     { id: 'dustbin', key: 'dustbin', label: 'General Dustbin', icon: <Trash2 className="w-5 h-5" />, badge: trashedStudents.length > 0 ? trashedStudents.length : undefined },
-    { id: 'support-requests', key: 'support', label: 'Support Requests', icon: <Bell className="w-5 h-5" />, badge: openSupportRequestCount > 0 ? openSupportRequestCount : undefined },
+    { id: 'support-requests', key: 'support', label: 'Support Requests', icon: <Bell className="w-5 h-5" /> },
     { id: 'sub-admins', key: 'assistants', label: 'Sub-Admins', icon: <Shield className="w-5 h-5" /> },
     { id: 'permit-activity', key: 'permits', label: 'Permit Activity', icon: <FileCheck className="w-5 h-5" />, badge: permitUnreadCount > 0 ? permitUnreadCount : undefined },
     { id: 'permit-cards', key: 'permit-cards', label: 'Permit Cards', icon: <CreditCard className="w-5 h-5" />, badge: clearedStudents > 0 ? clearedStudents : undefined },
@@ -4328,18 +4318,15 @@ export default function AdminPanel() {
                             id="assistant-admin-role"
                             disabled={!canManageAssistantAdmins}
                             value={assistantAdminDraft.role}
-                            onChange={(event) => {
-                              const nextRole = event.target.value === 'support_help' ? 'support_help' : 'department_prints'
+                            onChange={() => {
                               setAssistantAdminDraft((current) => ({
                                 ...current,
-                                role: nextRole,
-                                departments: nextRole === 'department_prints' ? current.departments : [],
+                                role: 'department_prints',
                               }))
                             }}
                             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                           >
                             <option value="department_prints">Department Prints</option>
-                            <option value="support_help">Support and Help</option>
                           </select>
                         </div>
                         {assistantAdminDraft.role === 'department_prints' && (
@@ -4409,7 +4396,7 @@ export default function AdminPanel() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600">
-                                    {assistant.role === 'support_help' ? 'Support and Help' : 'Department Prints'}
+                                    Department Prints
                                   </span>
                                   <button
                                     type="button"
@@ -4430,9 +4417,7 @@ export default function AdminPanel() {
                                 </div>
                               </div>
                               <p className="mt-1 text-xs text-gray-500">{assistant.email}{assistant.phoneNumber ? ` â€¢ ${assistant.phoneNumber}` : ''}</p>
-                              {assistant.role === 'department_prints' && (
-                                <p className="mt-1 text-xs text-gray-500">Departments: {assistant.departments.length > 0 ? assistant.departments.join(', ') : 'None assigned'}</p>
-                              )}
+                              <p className="mt-1 text-xs text-gray-500">Departments: {assistant.departments.length > 0 ? assistant.departments.join(', ') : 'None assigned'}</p>
 
                               {assistantAdminEditingId === assistant.id && (
                                 <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
@@ -4442,18 +4427,15 @@ export default function AdminPanel() {
                                       <select
                                         id={`assistant-edit-role-${assistant.id}`}
                                         value={assistantAdminEditDraft.role}
-                                        onChange={(event) => {
-                                          const nextRole = event.target.value === 'support_help' ? 'support_help' : 'department_prints'
+                                        onChange={() => {
                                           setAssistantAdminEditDraft((current) => ({
                                             ...current,
-                                            role: nextRole,
-                                            departments: nextRole === 'department_prints' ? current.departments : [],
+                                            role: 'department_prints',
                                           }))
                                         }}
                                         className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                       >
                                         <option value="department_prints">Department Prints</option>
-                                        <option value="support_help">Support and Help</option>
                                       </select>
                                     </div>
 
@@ -6028,15 +6010,11 @@ export default function AdminPanel() {
                       <p className="mt-1 text-xs text-gray-400 dark:text-slate-400">Manage the FAQ shown to students in the Help &amp; Support section.</p>
                     </div>
                   </div>
-                  {user?.scope === 'assistant-admin' && user.assistantRole === 'support_help' ? (
-                    <div className="px-6 py-4 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-t border-blue-100 dark:border-blue-800">
-                      <p><strong>â„¹ Your Role:</strong> As a Support agent, you can edit the FAQ to help students find answers to common questions.</p>
-                    </div>
-                  ) : user?.scope === 'assistant-admin' ? (
+                  {user?.scope === 'assistant-admin' && (
                     <div className="px-6 py-4 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-t border-amber-100 dark:border-amber-800">
-                      <p><strong>Limited Access:</strong> Only support/help team members can edit the FAQ.</p>
+                      <p><strong>Limited Access:</strong> FAQ editing is not available to sub-admins.</p>
                     </div>
-                  ) : null}
+                  )}
                   <form className="space-y-4 px-6 py-5" onSubmit={handleSaveFaq}>
                     <div className="space-y-3">
                       {faqDraft.map((item, idx) => (
@@ -6097,7 +6075,7 @@ export default function AdminPanel() {
                     <div className="flex items-center gap-3 pt-1">
                       <button
                         type="submit"
-                        disabled={user?.scope === 'assistant-admin' && user.assistantRole !== 'support_help'}
+                        disabled={user?.scope === 'assistant-admin'}
                         className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Save className="h-4 w-4" />
