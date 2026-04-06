@@ -838,6 +838,7 @@ function getAdminPermissions(user) {
     if (assistantRole === 'invigilator') {
       return [
         'view_students',
+        'view_audit_logs',
       ]
     }
     return [
@@ -2706,6 +2707,43 @@ app.delete('/admin/assistants/:id', authenticate, requireAdminPermission('manage
   response.json({ ok: true })
 })
 
+app.post('/admin/report-forgery', authenticate, (request, response) => {
+  if (request.userRole !== 'admin') {
+    response.status(403).json({ message: 'Only admin accounts can submit forgery reports.' })
+    return
+  }
+  const studentId = typeof request.body?.studentId === 'string' ? request.body.studentId.trim() : ''
+  const reason = typeof request.body?.reason === 'string' ? request.body.reason.trim() : ''
+  const notes = typeof request.body?.notes === 'string' ? request.body.notes.trim() : ''
+
+  if (!studentId) {
+    response.status(400).json({ message: 'studentId is required.' })
+    return
+  }
+  if (!reason) {
+    response.status(400).json({ message: 'A reason for the forgery report is required.' })
+    return
+  }
+
+  const profile = getProfileById(studentId)
+  if (!profile) {
+    response.status(404).json({ message: 'Student profile not found.' })
+    return
+  }
+
+  const reporter = request.user?.name ?? request.user?.email ?? 'Unknown invigilator'
+  insertActivityLog({
+    adminId: request.userId,
+    targetProfileId: studentId,
+    action: 'forgery_reported',
+    details: `Forgery reported by ${reporter}. Reason: ${reason}${notes ? `. Notes: ${notes}` : ''}`,
+    campusId: 'main-campus',
+    campusName: 'Forgery Report',
+  })
+
+  response.json({ ok: true, message: 'Forgery report submitted and logged.' })
+})
+
 app.post('/support-requests', authenticate, upload.single('attachment'), async (request, response) => {
   if (request.userRole !== 'student') {
     response.status(403).json({ message: 'Only student accounts can create support requests.' })
@@ -2990,6 +3028,10 @@ app.delete('/semester-registrations/:id', authenticate, requireAdminPermission('
 })
 
 app.post('/admin/advance-semester', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to advance student semesters.'), (request, response) => {
+  if (request.adminScope !== 'super-admin') {
+    response.status(403).json({ message: 'Only the super admin can advance student semesters.' })
+    return
+  }
   const allStudents = listProfiles('student')
   const settings = getSystemSettings()
   let advanced = 0

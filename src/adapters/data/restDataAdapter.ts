@@ -1029,3 +1029,10 @@ export async function uploadAdminCurriculum(data: Record<string, unknown>): Prom
 export async function resetAdminCurriculum(): Promise<void> {
   await request('/admin/curriculum', { method: 'DELETE' })
 }
+
+export async function reportForgery(studentId: string, reason: string, notes?: string): Promise<void> {
+  await request('/admin/report-forgery', {
+    method: 'POST',
+    body: JSON.stringify({ studentId, reason, notes: notes ?? '' }),
+  })
+}

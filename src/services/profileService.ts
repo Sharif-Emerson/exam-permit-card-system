@@ -1,5 +1,5 @@
 import { activeDataAdapter } from '../adapters/data'
-import { fetchEmailStatus as _fetchEmailStatus, sendTestEmail as _sendTestEmail, fetchSisStatus as _fetchSisStatus, triggerSisSync as _triggerSisSync, fetchPublicPermit as _fetchPublicPermit, fetchAdminCurriculum as _fetchAdminCurriculum, uploadAdminCurriculum as _uploadAdminCurriculum, resetAdminCurriculum as _resetAdminCurriculum } from '../adapters/data/restDataAdapter'
+import { fetchEmailStatus as _fetchEmailStatus, sendTestEmail as _sendTestEmail, fetchSisStatus as _fetchSisStatus, triggerSisSync as _triggerSisSync, fetchPublicPermit as _fetchPublicPermit, fetchAdminCurriculum as _fetchAdminCurriculum, uploadAdminCurriculum as _uploadAdminCurriculum, resetAdminCurriculum as _resetAdminCurriculum, reportForgery as _reportForgery } from '../adapters/data/restDataAdapter'
 import type { EmailStatus, SisStatus, SisSyncResult, PermitScanRecord, CurriculumStatus } from '../adapters/data/restDataAdapter'
 import type { FinancialUpdateValues, StudentAccountsImportApplyResult, StudentProvisionPreviewRow } from '../adapters/data/types'
 import type {
@@ -281,6 +281,10 @@ export async function uploadAdminCurriculum(data: Record<string, unknown>): Prom
 
 export async function resetAdminCurriculum(): Promise<void> {
   return _resetAdminCurriculum()
+}
+
+export async function reportForgery(studentId: string, reason: string, notes?: string): Promise<void> {
+  return _reportForgery(studentId, reason, notes)
 }
 
 export type { CurriculumStatus }

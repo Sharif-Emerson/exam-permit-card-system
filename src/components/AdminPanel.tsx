@@ -18,7 +18,7 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteAssistantAdmin, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync, fetchPublicPermit, fetchAdminCurriculum, uploadAdminCurriculum, resetAdminCurriculum } from '../services/profileService'
+import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteAssistantAdmin, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync, fetchPublicPermit, fetchAdminCurriculum, uploadAdminCurriculum, resetAdminCurriculum, reportForgery } from '../services/profileService'
 import { completeAdminFirstLogin } from '../services/authService'
 import type { SisStatus, SisSyncResult, CurriculumStatus } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
@@ -251,7 +251,7 @@ function getAdminCapabilityLabel(scope: AdminCapabilityProfile['scope']) {
 function getAdminSections(permissions: Set<AdminPermission>, scope: AdminCapabilityProfile['scope'], assistantRole?: AssistantAdminRole): NavSection[] {
   if (scope === 'assistant-admin') {
     if (assistantRole === 'invigilator') {
-      return ['scanner', 'settings']
+      return ['scanner', 'permits', 'settings']
     }
     return ['permit-cards', 'permits', 'settings']
   }
@@ -609,6 +609,11 @@ export default function AdminPanel() {
   const [scanResult, setScanResult] = useState<PermitScanRecord | null>(null)
   const [scanLoading, setScanLoading] = useState(false)
   const [scanError, setScanError] = useState('')
+  const [forgeryReason, setForgeryReason] = useState('')
+  const [forgeryNotes, setForgeryNotes] = useState('')
+  const [forgeryReporting, setForgeryReporting] = useState(false)
+  const [forgeryReportResult, setForgeryReportResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [showForgeryForm, setShowForgeryForm] = useState(false)
   const [searchInputValue, setSearchInputValue] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [showSignOut, setShowSignOut] = useState(false) // 2. Add showSignOut state
@@ -5475,7 +5480,7 @@ export default function AdminPanel() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => { setScanResult(null); setScanInput('') }}
+                            onClick={() => { setScanResult(null); setScanInput(''); setShowForgeryForm(false); setForgeryReason(''); setForgeryNotes(''); setForgeryReportResult(null) }}
                             className="rounded-full p-1 text-white/70 hover:text-white hover:bg-white/20"
                             aria-label="Clear result"
                           >
@@ -5538,6 +5543,92 @@ export default function AdminPanel() {
                               Last updated: {new Date(scanResult.updatedAt).toLocaleString()}
                             </p>
                           )}
+
+                          {/* Report Forgery */}
+                          <div className="mt-4 border-t border-gray-100 dark:border-slate-700 pt-4">
+                            {!showForgeryForm ? (
+                              <button
+                                type="button"
+                                onClick={() => { setShowForgeryForm(true); setForgeryReportResult(null) }}
+                                className="inline-flex items-center gap-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-3 py-1.5 text-xs font-semibold text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50"
+                              >
+                                <ShieldAlert className="h-3.5 w-3.5" />
+                                Report Forgery / Flag Student
+                              </button>
+                            ) : (
+                              <div className="space-y-3">
+                                <p className="text-xs font-semibold text-red-700 dark:text-red-300 flex items-center gap-1.5">
+                                  <ShieldAlert className="h-3.5 w-3.5" />
+                                  Report Forgery for {scanResult.studentName}
+                                </p>
+                                <div>
+                                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:text-slate-400">Reason <span className="text-red-500">*</span></label>
+                                  <select
+                                    value={forgeryReason}
+                                    onChange={(e) => setForgeryReason(e.target.value)}
+                                    className="w-full rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs text-gray-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-red-400"
+                                    aria-label="Forgery reason"
+                                  >
+                                    <option value="">Select reason…</option>
+                                    <option value="Forged permit presented">Forged permit presented</option>
+                                    <option value="Permit belongs to another student">Permit belongs to another student</option>
+                                    <option value="Tampered QR code">Tampered QR code</option>
+                                    <option value="Permit printed without clearance">Permit printed without clearance</option>
+                                    <option value="Other">Other</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:text-slate-400">Additional notes</label>
+                                  <textarea
+                                    rows={2}
+                                    value={forgeryNotes}
+                                    onChange={(e) => setForgeryNotes(e.target.value)}
+                                    placeholder="Any additional observations…"
+                                    className="w-full rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs text-gray-800 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-red-400"
+                                  />
+                                </div>
+                                {forgeryReportResult && (
+                                  <p className={`text-xs rounded px-2 py-1 ${forgeryReportResult.ok ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>
+                                    {forgeryReportResult.ok ? '✓' : '✗'} {forgeryReportResult.message}
+                                  </p>
+                                )}
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={forgeryReporting || !forgeryReason}
+                                    onClick={async () => {
+                                      setForgeryReporting(true)
+                                      setForgeryReportResult(null)
+                                      try {
+                                        await reportForgery(scanResult.profileId, forgeryReason, forgeryNotes)
+                                        setForgeryReportResult({ ok: true, message: 'Forgery report submitted. This incident has been logged for review.' })
+                                        setShowForgeryForm(false)
+                                        setForgeryReason('')
+                                        setForgeryNotes('')
+                                      } catch (err) {
+                                        setForgeryReportResult({ ok: false, message: err instanceof Error ? err.message : 'Failed to submit report.' })
+                                      } finally {
+                                        setForgeryReporting(false)
+                                      }
+                                    }}
+                                    className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                  >
+                                    {forgeryReporting ? 'Submitting…' : 'Submit Report'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setShowForgeryForm(false); setForgeryReason(''); setForgeryNotes(''); setForgeryReportResult(null) }}
+                                    className="inline-flex items-center rounded-lg border border-gray-200 dark:border-slate-600 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            {forgeryReportResult?.ok && !showForgeryForm && (
+                              <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">✓ {forgeryReportResult.message}</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -5921,6 +6012,7 @@ export default function AdminPanel() {
                   <p className="text-sm text-gray-500">System configuration and account information.</p>
                 </div>
 
+                {user?.scope !== 'assistant-admin' && (
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-100 px-6 py-4">
                     <h2 className="font-semibold text-gray-800 dark:text-slate-100">Appearance</h2>
@@ -5943,8 +6035,9 @@ export default function AdminPanel() {
                     </button>
                   </div>
                 </div>
+                )}
 
-                {canManageStudentProfiles && (
+                {user?.scope === 'super-admin' && (
                   <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                     <div className="border-b border-gray-100 px-6 py-4">
                       <h2 className="font-semibold text-gray-800 dark:text-slate-100">Semester Advancement</h2>
@@ -5970,7 +6063,7 @@ export default function AdminPanel() {
                   </div>
                 )}
 
-                {canManageStudentProfiles && (
+                {canManageStudentProfiles && user?.scope !== 'assistant-admin' && (
                   <div className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
                     <div className="border-b border-gray-100 dark:border-slate-700 px-6 py-4">
                       <h2 className="font-semibold text-gray-800 dark:text-slate-100">Curriculum Management</h2>
@@ -6123,7 +6216,7 @@ export default function AdminPanel() {
                   </div>
                 )}
 
-                {canManageFinancials && (
+                {canManageFinancials && user?.scope !== 'assistant-admin' && (
                   <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                     <div className="border-b border-gray-100 px-6 py-4">
                       <h2 className="font-semibold text-gray-800 dark:text-slate-100">Fee Structure</h2>
@@ -6323,10 +6416,15 @@ export default function AdminPanel() {
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                   <div className="border-b border-gray-100 px-6 py-4">
                     <h2 className="font-semibold text-gray-800 dark:text-slate-100">Account Settings</h2>
-                    <p className="mt-1 text-xs text-gray-400">Update your admin name, email, phone number, or password.</p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      {user?.scope === 'assistant-admin'
+                        ? 'Update your email address and password.'
+                        : 'Update your admin name, email, phone number, or password.'}
+                    </p>
                   </div>
                   <form className="space-y-4 px-6 py-5" onSubmit={(event) => void handleSaveAdminSettings(event)}>
                     <div className="grid gap-4 sm:grid-cols-2">
+                      {user?.scope !== 'assistant-admin' && (
                       <div>
                         <label htmlFor="admin-settings-name" className="mb-2 block text-sm font-medium text-gray-700">Full name</label>
                         <input
@@ -6340,6 +6438,7 @@ export default function AdminPanel() {
                           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                         />
                       </div>
+                      )}
                       <div>
                         <label htmlFor="admin-settings-email" className="mb-2 block text-sm font-medium text-gray-700">Email address</label>
                         <input
@@ -6351,6 +6450,7 @@ export default function AdminPanel() {
                           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                         />
                       </div>
+                      {user?.scope !== 'assistant-admin' && (
                       <div>
                         <label htmlFor="admin-settings-phone" className="mb-2 block text-sm font-medium text-gray-700">Phone number</label>
                         <input
@@ -6362,6 +6462,7 @@ export default function AdminPanel() {
                           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                         />
                       </div>
+                      )}
                       <div>
                         <label htmlFor="admin-settings-password" className="mb-2 block text-sm font-medium text-gray-700">New password</label>
                         <div className="relative">
@@ -6422,6 +6523,8 @@ export default function AdminPanel() {
                   </form>
                 </div>
 
+                {user?.scope !== 'assistant-admin' && (
+                <>
                 <div className="rounded-xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-800 px-6 py-4">
                     <div>
@@ -6429,11 +6532,6 @@ export default function AdminPanel() {
                       <p className="mt-1 text-xs text-gray-400 dark:text-slate-400">Manage the FAQ shown to students in the Help &amp; Support section.</p>
                     </div>
                   </div>
-                  {user?.scope === 'assistant-admin' && (
-                    <div className="px-6 py-4 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-t border-amber-100 dark:border-amber-800">
-                      <p><strong>Limited Access:</strong> FAQ editing is not available to sub-admins.</p>
-                    </div>
-                  )}
                   <form className="space-y-4 px-6 py-5" onSubmit={handleSaveFaq}>
                     <div className="space-y-3">
                       {faqDraft.map((item, idx) => (
@@ -6574,6 +6672,8 @@ export default function AdminPanel() {
                     </p>
                   )}
                 </div>
+                </>
+                )}
 
                 <div className="mt-8 rounded-[1.5rem] border border-red-100 bg-red-50 p-6">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
