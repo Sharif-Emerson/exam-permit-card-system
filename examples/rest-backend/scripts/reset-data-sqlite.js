@@ -23,7 +23,13 @@ function hashPassword(password) {
 }
 
 function createPermitToken() {
-	return randomBytes(18).toString('hex')
+	const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+	let normalized = ''
+	const bytes = randomBytes(8)
+	for (let index = 0; index < 8; index += 1) {
+		normalized += alphabet[bytes[index] % alphabet.length]
+	}
+	return `${normalized.slice(0, 4)}-${normalized.slice(4)}`
 }
 
 function createExamAssignments(profile) {

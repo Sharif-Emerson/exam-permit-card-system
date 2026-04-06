@@ -252,7 +252,7 @@ function getAdminSections(permissions: Set<AdminPermission>, scope: AdminCapabil
   if (scope === 'assistant-admin') {
     const sections = new Set<NavSection>(['settings'])
 
-    if (permissions.has('view_students')) {
+    if (permissions.has('view_students') && assistantRole !== 'invigilator') {
       sections.add('students')
     }
 
@@ -1842,9 +1842,9 @@ export default function AdminPanel() {
     // Handle multiline KIU EXAM PERMIT format from QR codes
     if (t.includes('Token:')) {
       const match = t.match(/Token:\s*([^\s\n]+)/)
-      if (match?.[1]) return match[1].trim()
+      if (match?.[1]) return match[1].trim().toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(.{4})(.{4})$/, '$1-$2')
     }
-    return t
+    return t.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(.{4})(.{4})$/, '$1-$2') || t
   }
 
   async function handlePermitLookupByToken(token: string) {
@@ -1888,8 +1888,8 @@ export default function AdminPanel() {
       return
     }
 
-    if (typeof window === 'undefined' || !('BarcodeDetector' in window)) {
-      setCameraError('Camera QR scanning is not supported in this browser. Use manual token paste.')
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Camera access is not available in this browser. Use manual token paste.')
       return
     }
 
@@ -1917,15 +1917,33 @@ export default function AdminPanel() {
 
       const BarcodeDetectorCtor = (window as Window & { BarcodeDetector?: new (options?: { formats?: string[] }) => { detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue?: string }>> } }).BarcodeDetector
       const detector = BarcodeDetectorCtor ? new BarcodeDetectorCtor({ formats: ['qr_code'] }) : null
+      const jsQrDecoder = detector ? null : (await import('jsqr')).default
 
       cameraScanTimerRef.current = window.setInterval(() => {
         void (async () => {
           try {
-            if (!detector || !cameraVideoRef.current || cameraVideoRef.current.readyState < 2) {
+            if (!cameraVideoRef.current || cameraVideoRef.current.readyState < 2) {
               return
             }
-            const codes = await detector.detect(cameraVideoRef.current)
-            const raw = codes.find((item) => item.rawValue)?.rawValue
+
+            let raw = ''
+
+            if (detector) {
+              const codes = await detector.detect(cameraVideoRef.current)
+              raw = codes.find((item) => item.rawValue)?.rawValue ?? ''
+            } else if (jsQrDecoder && cameraVideoRef.current.videoWidth > 0 && cameraVideoRef.current.videoHeight > 0) {
+              const canvas = document.createElement('canvas')
+              canvas.width = cameraVideoRef.current.videoWidth
+              canvas.height = cameraVideoRef.current.videoHeight
+              const context = canvas.getContext('2d', { willReadFrequently: true })
+              if (!context) {
+                return
+              }
+              context.drawImage(cameraVideoRef.current, 0, 0, canvas.width, canvas.height)
+              const image = context.getImageData(0, 0, canvas.width, canvas.height)
+              raw = jsQrDecoder(image.data, image.width, image.height)?.data ?? ''
+            }
+
             if (!raw) {
               return
             }

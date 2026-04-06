@@ -555,7 +555,41 @@ function mapUser(row) {
 }
 
 function createPermitToken() {
-  return randomBytes(18).toString('hex')
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const tokenLength = 8
+  const exists = db.prepare('SELECT 1 FROM profiles WHERE permit_token = ? LIMIT 1')
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const bytes = randomBytes(tokenLength)
+    let normalized = ''
+
+    for (let index = 0; index < tokenLength; index += 1) {
+      normalized += alphabet[bytes[index] % alphabet.length]
+    }
+
+    const formatted = `${normalized.slice(0, 4)}-${normalized.slice(4)}`
+    if (!exists.get(formatted)) {
+      return formatted
+    }
+  }
+
+  throw new Error('Unable to generate a unique permit token.')
+}
+
+function normalizePermitToken(token) {
+  return String(token ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
+function isShortPermitToken(token) {
+  return /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(normalizePermitToken(token))
+}
+
+function formatPermitToken(token) {
+  const normalized = normalizePermitToken(token)
+  if (normalized.length !== 8) {
+    return String(token ?? '').trim()
+  }
+  return `${normalized.slice(0, 4)}-${normalized.slice(4)}`
 }
 
 function createFallbackExamAssignments(fallbackProfile = null) {
@@ -923,7 +957,7 @@ function backfillPermitTokens() {
   const updateToken = db.prepare('UPDATE profiles SET permit_token = ?, updated_at = ? WHERE id = ?')
 
   for (const row of rows) {
-    if (typeof row.permit_token === 'string' && row.permit_token.trim()) {
+    if (typeof row.permit_token === 'string' && row.permit_token.trim() && isShortPermitToken(row.permit_token)) {
       continue
     }
 
@@ -1499,7 +1533,10 @@ export function listProfilesPage({ role, search, status, department, departments
 
 export function getPermitByToken(permitToken) {
   pruneExpiredTrashedProfiles()
-  const row = db.prepare('SELECT * FROM profiles WHERE permit_token = ? AND role = ?').get(permitToken, 'student')
+  const requestedToken = String(permitToken ?? '').trim()
+  const normalizedToken = normalizePermitToken(requestedToken)
+  const storedToken = formatPermitToken(normalizedToken || requestedToken)
+  const row = db.prepare('SELECT * FROM profiles WHERE permit_token = ? AND role = ?').get(storedToken, 'student')
 
   if (!row) {
     return null
