@@ -3304,17 +3304,17 @@ export default function AdminPanel() {
                         key={alert.id}
                         className={`rounded-2xl border p-4 shadow-sm ${
                           alert.tone === 'critical'
-                            ? 'border-red-200 bg-red-50'
+                            ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/40'
                             : alert.tone === 'warning'
-                              ? 'border-amber-200 bg-amber-50'
-                              : 'border-blue-200 bg-blue-50'
+                              ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40'
+                              : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40'
                         }`}
                         title={alert.message}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="text-sm font-semibold text-gray-900 dark:text-white">{alert.title}</p>
-                            <p className="mt-1 text-xs leading-5 text-gray-600">{alert.message}</p>
+                            <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-slate-300">{alert.message}</p>
                           </div>
                           <Bell className="h-4 w-4 text-gray-400" />
                         </div>
@@ -4017,7 +4017,7 @@ export default function AdminPanel() {
                           <button
                             type="button"
                             onClick={handlePurgeEntireTrash}
-                            className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-800 hover:bg-red-100"
+                            className="inline-flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-3 py-1 text-xs font-semibold text-red-800 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/60"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                             Empty trash permanently
@@ -4060,7 +4060,7 @@ export default function AdminPanel() {
                               type="button"
                               disabled={!canManageStudentProfiles}
                               onClick={() => handlePermanentTrashRow(student)}
-                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50"
+                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-3 py-2 text-sm font-medium text-red-800 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/60 disabled:opacity-50"
                             >
                               <Trash2 className="h-4 w-4" />
                               Delete forever
@@ -4097,7 +4097,7 @@ export default function AdminPanel() {
                         <button
                           type="button"
                           onClick={handlePurgeEntireTrash}
-                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-800 hover:bg-red-100"
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-3 py-1 text-xs font-semibold text-red-800 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/60"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           Empty dustbin permanently
@@ -4139,7 +4139,7 @@ export default function AdminPanel() {
                               type="button"
                               disabled={!canManageStudentProfiles}
                               onClick={() => handlePermanentTrashRow(student)}
-                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50"
+                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-3 py-2 text-sm font-medium text-red-800 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/60 disabled:opacity-50"
                             >
                               <Trash2 className="h-4 w-4" />
                               Delete forever
@@ -4162,7 +4162,7 @@ export default function AdminPanel() {
                       type="button"
                       onClick={handleRequestPurgePermitActivity}
                       disabled={!canDeleteAuditLogs || permitActivityLogs.length === 0}
-                      className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50"
+                      className="inline-flex items-center gap-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-4 py-2 text-sm font-medium text-red-800 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/60 disabled:opacity-50"
                     >
                       <Trash2 className="h-4 w-4" />
                       Clear permit activity permanently
@@ -4331,23 +4331,55 @@ export default function AdminPanel() {
                         </div>
                         {assistantAdminDraft.role === 'department_prints' && (
                           <div>
-                            <label htmlFor="assistant-admin-departments" className="mb-2 block text-sm font-medium text-gray-700">Assigned departments</label>
-                            <select
-                              id="assistant-admin-departments"
-                              multiple
-                              disabled={!canManageAssistantAdmins}
-                              value={assistantAdminDraft.departments}
-                              onChange={(event) => {
-                                const selected = Array.from(event.target.selectedOptions).map((option) => option.value)
-                                setAssistantAdminDraft((current) => ({ ...current, departments: selected }))
-                              }}
-                              className="h-32 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                            >
-                              {KIU_DEPARTMENTS.map((department) => (
-                                <option key={department} value={department}>{department}</option>
-                              ))}
-                            </select>
-                            <p className="mt-1 text-xs text-gray-500">Hold Ctrl/Cmd to select multiple departments.</p>
+                            <div className="mb-2 flex items-center justify-between">
+                              <label className="text-sm font-medium text-gray-700 dark:text-slate-300">Assigned departments</label>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  disabled={!canManageAssistantAdmins}
+                                  onClick={() => setAssistantAdminDraft((current) => ({ ...current, departments: [...KIU_DEPARTMENTS] }))}
+                                  className="rounded px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-700 disabled:opacity-50"
+                                >
+                                  Select all
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!canManageAssistantAdmins}
+                                  onClick={() => setAssistantAdminDraft((current) => ({ ...current, departments: [] }))}
+                                  className="rounded px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-600 disabled:opacity-50"
+                                >
+                                  Clear
+                                </button>
+                              </div>
+                            </div>
+                            <div className="h-36 overflow-y-auto rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 p-2 space-y-1">
+                              {KIU_DEPARTMENTS.map((department) => {
+                                const checked = assistantAdminDraft.departments.includes(department)
+                                return (
+                                  <label
+                                    key={department}
+                                    className={`flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors ${checked ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700'} ${!canManageAssistantAdmins ? 'pointer-events-none opacity-50' : ''}`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      disabled={!canManageAssistantAdmins}
+                                      checked={checked}
+                                      onChange={(event) => {
+                                        setAssistantAdminDraft((current) => ({
+                                          ...current,
+                                          departments: event.target.checked
+                                            ? [...current.departments, department]
+                                            : current.departments.filter((d) => d !== department),
+                                        }))
+                                      }}
+                                      className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                    />
+                                    {department}
+                                  </label>
+                                )
+                              })}
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">{assistantAdminDraft.departments.length} of {KIU_DEPARTMENTS.length} selected</p>
                           </div>
                         )}
                       </div>
