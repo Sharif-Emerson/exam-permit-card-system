@@ -45,6 +45,9 @@ test-results/
 playwright/.cache/
 
 # Example backend runtime artifacts
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 examples/rest-backend/data/*.sqlite
 examples/rest-backend/data/*.sqlite-shm
 examples/rest-backend/data/*.sqlite-wal
