@@ -209,6 +209,10 @@ export async function updateAssistantAdminCredentials(assistantId: string, value
   return activeDataAdapter.updateAssistantAdminCredentials(assistantId, values)
 }
 
+export async function deleteAssistantAdmin(assistantId: string): Promise<void> {
+  return activeDataAdapter.deleteAssistantAdmin(assistantId)
+}
+
 export async function fetchSemesterRegistrations(): Promise<SemesterRegistration[]> {
   return activeDataAdapter.fetchSemesterRegistrations()
 }

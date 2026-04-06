@@ -847,6 +847,9 @@ export const restDataAdapter: DataAdapter = {
     })
     return toAssistantAdminAccount(payload)
   },
+  async deleteAssistantAdmin(assistantId: string): Promise<void> {
+    await request(`/admin/assistants/${assistantId}`, { method: 'DELETE' })
+  },
   async fetchSemesterRegistrations(): Promise<SemesterRegistration[]> {
     const payload = await request('/semester-registrations', { method: 'GET' })
     return extractCollection(payload).map(toSemesterRegistration)

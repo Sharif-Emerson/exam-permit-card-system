@@ -38,6 +38,7 @@ import {
   updateAssistantAdmin,
   updateAssistantAdminCredentials,
   clearAdminFirstLoginFlag,
+  deleteAssistantAdmin,
   listProfilesPage,
   listTrashedStudentProfiles,
   permanentlyDeleteTrashedProfile,
@@ -56,6 +57,9 @@ import {
   updateSystemSettings,
   updateProfileFinancials,
   verifyPassword,
+  getCustomCurriculum,
+  saveCustomCurriculum,
+  clearCustomCurriculum,
   // Session helpers
   createSession,
 } from './lib/database.js'
@@ -2102,6 +2106,24 @@ app.post('/admin-activity-logs', authenticate, requireAdminPermission('write_aud
 // --- Bulk Curriculum Sync Helper and Endpoint ---
 import { KIU_CURRICULUM, KIU_DEPARTMENT_DEFAULT_PROGRAM, KIU_SEMESTERS } from '../../src/config/universityData.ts'
 
+// Effective curriculum — updated to custom if uploaded, otherwise falls back to embedded KIU_CURRICULUM
+let effectiveCurriculum = KIU_CURRICULUM
+
+function refreshEffectiveCurriculum() {
+  try {
+    const custom = getCustomCurriculum()
+    if (custom && typeof custom === 'object' && !Array.isArray(custom) && Object.keys(custom).length > 0) {
+      effectiveCurriculum = custom
+    } else {
+      effectiveCurriculum = KIU_CURRICULUM
+    }
+  } catch {
+    effectiveCurriculum = KIU_CURRICULUM
+  }
+}
+// Load any previously uploaded custom curriculum at startup
+refreshEffectiveCurriculum()
+
 function trimStr(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -2112,7 +2134,7 @@ function curriculumKeyCaseInsensitive(name) {
     return null
   }
   const lower = n.toLowerCase()
-  return Object.keys(KIU_CURRICULUM).find((key) => key.toLowerCase() === lower) ?? null
+  return Object.keys(effectiveCurriculum).find((key) => key.toLowerCase() === lower) ?? null
 }
 
 function findCurriculumForStudent(student) {
@@ -2120,23 +2142,23 @@ function findCurriculumForStudent(student) {
   const course = trimStr(student.course)
   const department = trimStr(student.department)
 
-  if (program && KIU_CURRICULUM[program]) {
-    return KIU_CURRICULUM[program]
+  if (program && effectiveCurriculum[program]) {
+    return effectiveCurriculum[program]
   }
-  if (course && KIU_CURRICULUM[course]) {
-    return KIU_CURRICULUM[course]
+  if (course && effectiveCurriculum[course]) {
+    return effectiveCurriculum[course]
   }
 
   const programKey = curriculumKeyCaseInsensitive(program)
   if (programKey) {
-    return KIU_CURRICULUM[programKey]
+    return effectiveCurriculum[programKey]
   }
   const courseKey = curriculumKeyCaseInsensitive(course)
   if (courseKey) {
-    return KIU_CURRICULUM[courseKey]
+    return effectiveCurriculum[courseKey]
   }
 
-  for (const curriculum of Object.values(KIU_CURRICULUM)) {
+  for (const curriculum of Object.values(effectiveCurriculum)) {
     const dc = trimStr(curriculum?.defaultCourse)
     if (dc && (dc === program || dc === course)) {
       return curriculum
@@ -2496,7 +2518,7 @@ app.post('/admin/assistants', authenticate, requireAdminPermission('manage_stude
   const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : ''
   const phoneNumber = typeof request.body?.phoneNumber === 'string' ? normalizePhoneNumber(request.body.phoneNumber) : ''
   const password = typeof request.body?.password === 'string' ? request.body.password.trim() : ''
-  const role = request.body?.role === 'support_help' ? 'support_help' : 'department_prints'
+  const role = ['invigilator', 'support_help', 'department_prints'].includes(request.body?.role) ? request.body.role : 'department_prints'
   const departments = Array.isArray(request.body?.departments) ? request.body.departments.map((item) => String(item ?? '').trim()).filter(Boolean) : []
 
   if (name.length < 2 || name.length > 120) {
@@ -2542,7 +2564,7 @@ app.patch('/admin/assistants/:id', authenticate, requireAdminPermission('manage_
     response.status(403).json({ message: 'Only super admin can update assistant admins.' })
     return
   }
-  const role = request.body?.role === 'support_help' ? 'support_help' : 'department_prints'
+  const role = ['invigilator', 'support_help', 'department_prints'].includes(request.body?.role) ? request.body.role : 'department_prints'
   const departments = Array.isArray(request.body?.departments) ? request.body.departments.map((item) => String(item ?? '').trim()).filter(Boolean) : []
   if (role === 'department_prints' && departments.length === 0) {
     response.status(400).json({ message: 'Assign at least one department for department print assistants.' })
@@ -2606,6 +2628,19 @@ app.patch('/admin/assistants/:id/credentials', authenticate, requireAdminPermiss
   }
 
   response.json(updated)
+})
+
+app.delete('/admin/assistants/:id', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to delete assistant admins.'), (request, response) => {
+  if (request.adminScope !== 'super-admin') {
+    response.status(403).json({ message: 'Only super admin can delete assistant admins.' })
+    return
+  }
+  const deleted = deleteAssistantAdmin(request.params.id)
+  if (!deleted) {
+    response.status(404).json({ message: 'Assistant admin not found.' })
+    return
+  }
+  response.json({ ok: true })
 })
 
 app.post('/support-requests', authenticate, upload.single('attachment'), async (request, response) => {

@@ -239,6 +239,7 @@ ensureColumn('profiles', 'semester TEXT')
 ensureColumn('profiles', "course_units_json TEXT NOT NULL DEFAULT '[]'")
 ensureColumn('system_settings', "deadlines_json TEXT NOT NULL DEFAULT '[]'")
 ensureColumn('system_settings', "currency_code TEXT NOT NULL DEFAULT 'USD'")
+ensureColumn('system_settings', 'custom_curriculum_json TEXT')
 ensureColumn('admin_activity_logs', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")
 ensureColumn('admin_activity_logs', "campus_name TEXT NOT NULL DEFAULT 'Main Campus'")
 ensureColumn('admin_activity_logs', 'is_read INTEGER NOT NULL DEFAULT 0')
@@ -490,12 +491,15 @@ function ensureSystemSettingsRow() {
 function mapSystemSettings(row) {
   const rawDeadlines = parseJsonValue(row?.deadlines_json, [])
   const deadlines = Array.isArray(rawDeadlines) ? rawDeadlines : []
+  const rawCurriculum = parseJsonValue(row?.custom_curriculum_json, null)
+  const customCurriculum = rawCurriculum && typeof rawCurriculum === 'object' && !Array.isArray(rawCurriculum) ? rawCurriculum : null
 
   return {
     local_student_fee: normalizeNumber(row?.local_student_fee ?? defaultSystemFeeSettings.local_student_fee),
     international_student_fee: normalizeNumber(row?.international_student_fee ?? defaultSystemFeeSettings.international_student_fee),
     currency_code: normalizeCurrencyCode(row?.currency_code),
     deadlines,
+    custom_curriculum: customCurriculum,
   }
 }
 
@@ -1211,6 +1215,29 @@ export function updateSystemSettings(updates) {
   return getSystemSettings()
 }
 
+export function getCustomCurriculum() {
+  ensureSystemSettingsRow()
+  const row = db.prepare('SELECT custom_curriculum_json FROM system_settings WHERE id = ?').get('default')
+  const parsed = parseJsonValue(row?.custom_curriculum_json, null)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return null
+  }
+  return parsed
+}
+
+export function saveCustomCurriculum(curriculum) {
+  ensureSystemSettingsRow()
+  const json = JSON.stringify(curriculum)
+  const updatedAt = nowIso()
+  db.prepare('UPDATE system_settings SET custom_curriculum_json = ?, updated_at = ? WHERE id = ?').run(json, updatedAt, 'default')
+}
+
+export function clearCustomCurriculum() {
+  ensureSystemSettingsRow()
+  const updatedAt = nowIso()
+  db.prepare('UPDATE system_settings SET custom_curriculum_json = NULL, updated_at = ? WHERE id = ?').run(updatedAt, 'default')
+}
+
 export function listProfiles(role) {
   pruneExpiredTrashedProfiles()
   const rows = role
@@ -1347,6 +1374,23 @@ export function clearAdminFirstLoginFlag(id) {
     return false
   }
   db.prepare(`UPDATE users SET first_login_required = 0, updated_at = ? WHERE id = ?`).run(nowIso(), id)
+  return true
+}
+
+export function deleteAssistantAdmin(id) {
+  const existing = db.prepare(`SELECT id FROM users WHERE id = ? AND role = 'admin' AND admin_scope = 'assistant-admin'`).get(id)
+  if (!existing) {
+    return false
+  }
+  db.exec('BEGIN')
+  try {
+    db.prepare('DELETE FROM profiles WHERE id = ?').run(id)
+    db.prepare('DELETE FROM users WHERE id = ?').run(id)
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
   return true
 }
 

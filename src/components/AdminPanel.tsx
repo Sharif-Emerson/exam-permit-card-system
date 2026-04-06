@@ -18,7 +18,7 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync, fetchPublicPermit } from '../services/profileService'
+import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteAssistantAdmin, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchEmailStatus, sendTestEmail, fetchSisStatus, triggerSisSync, fetchPublicPermit } from '../services/profileService'
 import { completeAdminFirstLogin } from '../services/authService'
 import type { SisStatus, SisSyncResult } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
@@ -907,6 +907,18 @@ export default function AdminPanel() {
     }
   }
 
+  async function handleDeleteAssistantAdmin(assistantId: string) {
+    if (!canManageAssistantAdmins) return
+    try {
+      setError('')
+      await deleteAssistantAdmin(assistantId)
+      await loadAssistantAdmins({ silent: true })
+      setSuccessMessage('Sub-admin account deleted.')
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete sub-admin.')
+    }
+  }
+
   async function handleCompleteAdminFirstLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const password = adminFirstLoginDraft.password.trim()
@@ -1451,7 +1463,7 @@ export default function AdminPanel() {
   }, [activeSection, canManageStudentProfiles, canManageSupportRequests, canViewPermitActivity, loadActivityLogs, loadStudents, loadSupportRequestQueue, loadTrashedStudents])
 
   useEffect(() => {
-    if (activeSection !== 'settings') {
+    if (activeSection !== 'settings' && activeSection !== 'assistants') {
       return
     }
 
@@ -1461,16 +1473,18 @@ export default function AdminPanel() {
 
     void loadAssistantAdmins()
 
-    // Load email configuration status from backend
-    setEmailApiUnavailable(false)
-    void fetchEmailStatus()
-      .then((status) => { setEmailStatus(status); setEmailApiUnavailable(false) })
-      .catch(() => { setEmailStatus(null); setEmailApiUnavailable(true) })
+    if (activeSection === 'settings') {
+      // Load email configuration status from backend
+      setEmailApiUnavailable(false)
+      void fetchEmailStatus()
+        .then((status) => { setEmailStatus(status); setEmailApiUnavailable(false) })
+        .catch(() => { setEmailStatus(null); setEmailApiUnavailable(true) })
 
-    // Load SIS status from backend
-    void fetchSisStatus()
-      .then((status) => setSisStatus(status))
-      .catch(() => setSisStatus(null))
+      // Load SIS status from backend
+      void fetchSisStatus()
+        .then((status) => setSisStatus(status))
+        .catch(() => setSisStatus(null))
+    }
   }, [activeSection, canManageAssistantAdmins, loadAssistantAdmins])
 
   useEffect(() => {
@@ -4477,22 +4491,22 @@ export default function AdminPanel() {
                       {canManageAssistantAdmins && assistantAdmins.length > 0 && (
                         <div className="space-y-2">
                           {assistantAdmins.map((assistant) => (
-                            <div key={assistant.id} className="rounded-lg border border-gray-200 px-4 py-3">
+                            <div key={assistant.id} className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 px-4 py-3">
                               <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">{assistant.name}</p>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">{assistant.name}</p>
+                                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${assistant.role === 'invigilator' ? 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300'}`}>
+                                    {assistant.role === 'invigilator' ? 'Invigilator' : 'Dept. Prints'}
+                                  </span>
                                   {assistant.firstLoginRequired && (
-                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Awaiting setup</span>
+                                    <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Awaiting setup</span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${assistant.role === 'invigilator' ? 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300'}`}>
-                                    {assistant.role === 'invigilator' ? 'Invigilator' : 'Department Prints'}
-                                  </span>
+                                <div className="flex items-center gap-1.5">
                                   <button
                                     type="button"
                                     onClick={() => handleStartAssistantEdit(assistant)}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+                                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700 px-2 py-1 text-[11px] font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-600"
                                   >
                                     <Pencil className="h-3 w-3" />
                                     Edit
@@ -4500,15 +4514,34 @@ export default function AdminPanel() {
                                   <button
                                     type="button"
                                     onClick={() => assistantAdminCredEditingId === assistant.id ? handleCancelAssistantCredEdit() : handleStartAssistantCredEdit(assistant)}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+                                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700 px-2 py-1 text-[11px] font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-600"
                                   >
                                     <KeyRound className="h-3 w-3" />
                                     Credentials
                                   </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setPendingConfirmation({
+                                      title: `Delete ${assistant.name}?`,
+                                      message: `This will permanently remove the sub-admin account "${assistant.name}" and revoke all their active sessions. This cannot be undone.`,
+                                      confirmLabel: 'Delete account',
+                                      tone: 'danger',
+                                      action: () => handleDeleteAssistantAdmin(assistant.id),
+                                    })}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white dark:border-red-800 dark:bg-slate-700 px-2 py-1 text-[11px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                    Delete
+                                  </button>
                                 </div>
                               </div>
-                              <p className="mt-1 text-xs text-gray-500">{assistant.email}{assistant.phoneNumber ? ` â€¢ ${assistant.phoneNumber}` : ''}</p>
-                              <p className="mt-1 text-xs text-gray-500">{assistant.role === 'invigilator' ? 'Access: All permits (scanner only)' : `Departments: ${assistant.departments.length > 0 ? assistant.departments.join(', ') : 'None assigned'}`}</p>
+                              <p className="mt-1.5 text-[11px] text-gray-500 dark:text-slate-400">
+                                {assistant.role === 'invigilator'
+                                  ? 'Access: All departments · Scanner only'
+                                  : assistant.departments.length > 0
+                                    ? `Departments: ${assistant.departments.join(' · ')}`
+                                    : 'Departments: None assigned'}
+                              </p>
 
                               {assistantAdminEditingId === assistant.id && (
                                 <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">

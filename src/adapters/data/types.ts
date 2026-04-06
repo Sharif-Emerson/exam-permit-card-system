@@ -98,6 +98,7 @@ export interface DataAdapter {
   createAssistantAdmin: (values: { name: string; email: string; phoneNumber?: string; password: string; role: 'department_prints' | 'invigilator'; departments: string[] }) => Promise<AssistantAdminAccount>
   updateAssistantAdmin: (assistantId: string, values: { role: 'department_prints' | 'invigilator'; departments: string[] }) => Promise<AssistantAdminAccount>
   updateAssistantAdminCredentials: (assistantId: string, values: { name?: string; email?: string; password?: string }) => Promise<AssistantAdminAccount>
+  deleteAssistantAdmin: (assistantId: string) => Promise<void>
   fetchSemesterRegistrations: () => Promise<SemesterRegistration[]>
   createSemesterRegistration: (requestedSemester: string) => Promise<SemesterRegistration>
   updateSemesterRegistration: (id: string, values: { status: 'approved' | 'rejected'; adminNote?: string }) => Promise<SemesterRegistration>
