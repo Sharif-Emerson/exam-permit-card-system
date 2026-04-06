@@ -1,6 +1,7 @@
 Param(
   [string]$DataRoot = "$env:USERPROFILE\exam-permit-data",
-  [int]$Port = 4000
+  [int]$Port = 4000,
+  [string]$AllowedOrigins = ""
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,10 +20,17 @@ $env:PORT = "$Port"
 $env:APP_DB_PATH = $dbPath
 $env:APP_UPLOADS_DIR = $uploadsDir
 
+if ($AllowedOrigins.Trim()) {
+  $env:CORS_ALLOWED_ORIGINS = $AllowedOrigins
+}
+
 Write-Host "Starting backend with persistent storage:"
 Write-Host "  PORT=$($env:PORT)"
 Write-Host "  APP_DB_PATH=$($env:APP_DB_PATH)"
 Write-Host "  APP_UPLOADS_DIR=$($env:APP_UPLOADS_DIR)"
+if ($env:CORS_ALLOWED_ORIGINS) {
+  Write-Host "  CORS_ALLOWED_ORIGINS=$($env:CORS_ALLOWED_ORIGINS)"
+}
 
 Push-Location $backendRoot
 try {
