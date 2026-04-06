@@ -252,10 +252,6 @@ function getAdminSections(permissions: Set<AdminPermission>, scope: AdminCapabil
   if (scope === 'assistant-admin') {
     const sections = new Set<NavSection>(['settings'])
 
-    if (permissions.has('view_students') && assistantRole !== 'invigilator') {
-      sections.add('students')
-    }
-
     // Scanner should be visible for invigilator accounts and any assistant role with permit-audit visibility.
     if (assistantRole === 'invigilator' || permissions.has('view_audit_logs')) {
       sections.add('scanner')
@@ -2848,7 +2844,7 @@ export default function AdminPanel() {
       return false
     }
 
-    if (user?.scope === 'assistant-admin' && user.assistantRole === 'invigilator' && item.key === 'students') {
+    if (user?.scope === 'assistant-admin' && item.key === 'students') {
       return false
     }
 
