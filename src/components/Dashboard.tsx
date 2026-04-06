@@ -8,7 +8,6 @@ import {
   Download,
   Eye,
   EyeOff,
-  FileBadge2,
   FileText,
   GraduationCap,
   LayoutDashboard,
@@ -35,32 +34,19 @@ import { DIALOG_Z } from '../constants/dialogLayers'
 import { buildPermitQrPayload } from '../utils/permitQr'
 import BrandMark from './BrandMark'
 import PermitCard from './PermitCard'
-import { KIU_SEMESTERS, getSemestersForProgram } from '../config/universityData'
-import { createSemesterRegistration, createSupportRequest, fetchPermitActivityHistory, fetchSemesterRegistrations, fetchStudentProfileById, fetchSupportRequests, fetchSystemFeeSettings, recordPermitActivity, sendSupportRequestMessage, updateStudentAccount } from '../services/profileService'
+import { createSupportRequest, fetchPermitActivityHistory, fetchStudentProfileById, fetchSupportRequests, fetchSystemFeeSettings, recordPermitActivity, sendSupportRequestMessage, updateStudentAccount } from '../services/profileService'
 import type { PermitActivityRecord, StudentProfile, SupportRequest, UniversityDeadline } from '../types'
 import { FALLBACK_PROFILE_IMAGE } from './PermitCard'
 import SignOutDialog from './SignOutDialog'
 import Faq from './Faq'
 type PermitStatus = 'approved' | 'pending' | 'rejected'
-type PortalSection = 'overview' | 'permit_courses' | 'finance' | 'applications' | 'settings' | 'support'
-const PORTAL_VALID_SECTIONS = new Set<PortalSection>(['overview', 'permit_courses', 'finance', 'applications', 'settings', 'support'])
+type PortalSection = 'overview' | 'permit_courses' | 'finance' | 'printed_permits' | 'settings' | 'support'
+const PORTAL_VALID_SECTIONS = new Set<PortalSection>(['overview', 'permit_courses', 'finance', 'printed_permits', 'settings', 'support'])
 
 function readPortalSectionFromHash(): PortalSection | null {
   if (typeof window === 'undefined') return null
   const hash = window.location.hash.replace(/^#/, '')
   return PORTAL_VALID_SECTIONS.has(hash as PortalSection) ? (hash as PortalSection) : null
-}
-
-type HistoryStatusFilter = PermitStatus | 'all'
-
-type PermitApplicationRecord = {
-  id: string
-  createdAt: string
-  semester: string
-  status: PermitStatus
-  remarks: string
-  courseUnits: string[]
-  documents: string[]
 }
 
 type NotificationItem = {
@@ -89,10 +75,6 @@ type FirstLoginSetupDraft = {
   profileImage: string
 }
 
-type ApplicationDraft = {
-  semester: string
-}
-
 type SupportDraft = {
   subject: string
   message: string
@@ -114,30 +96,6 @@ function formatMoney(value: number, currencyCode: string) {
     }).format(value)
   } catch {
     return `${normalizeCurrencyCode(currencyCode)} ${value.toFixed(2)}`
-  }
-}
-
-function toPermitRecordFromSemesterRequest(input: {
-  id: string
-  requestedSemester: string
-  status: 'pending' | 'approved' | 'rejected'
-  adminNote?: string
-  createdAt: string
-}, fallbackUnits: string[] = []): PermitApplicationRecord {
-  return {
-    id: input.id,
-    createdAt: input.createdAt,
-    semester: input.requestedSemester,
-    status: input.status,
-    remarks: input.adminNote?.trim()
-      ? input.adminNote
-      : input.status === 'approved'
-        ? 'Semester registration approved by admin.'
-        : input.status === 'rejected'
-          ? 'Semester registration rejected by admin.'
-          : 'Awaiting admin approval.',
-    courseUnits: fallbackUnits,
-    documents: [],
   }
 }
 
@@ -247,28 +205,15 @@ function buildPermitBlockers(
   return items
 }
 
-function deriveStatus(student: StudentProfile, history: PermitApplicationRecord[]): PermitStatus {
-  const latestApplication = history[0]
-
-  // Fees cleared — always approved regardless of application history
+function deriveStatus(student: StudentProfile): PermitStatus {
   if (student.feesBalance === 0) {
     return 'approved'
-  }
-
-  // Admin explicitly approved
-  if (latestApplication?.status === 'approved') {
-    return 'approved'
-  }
-
-  // Admin explicitly rejected (only honoured when fees are still outstanding)
-  if (latestApplication?.status === 'rejected') {
-    return 'rejected'
   }
 
   return 'pending'
 }
 
-function buildNotifications(student: StudentProfile, history: PermitApplicationRecord[], permitStatus: PermitStatus): NotificationItem[] {
+function buildNotifications(student: StudentProfile, permitStatus: PermitStatus): NotificationItem[] {
   const baseNotifications: NotificationItem[] = []
 
   if (permitStatus === 'approved') {
@@ -293,16 +238,6 @@ function buildNotifications(student: StudentProfile, history: PermitApplicationR
     })
   }
 
-  if (permitStatus === 'rejected') {
-    baseNotifications.push({
-      id: 'rejected-status',
-      title: 'Permit application rejected',
-      message: history[0]?.remarks || 'Please review the remarks and submit again.',
-      tone: 'red',
-      createdAt: history[0]?.createdAt || new Date().toISOString(),
-    })
-  }
-
   if (student.exams.length > 0) {
     baseNotifications.push({
       id: 'exam-ready',
@@ -313,16 +248,7 @@ function buildNotifications(student: StudentProfile, history: PermitApplicationR
     })
   }
 
-  return [
-    ...history.slice(0, 3).map((item): NotificationItem => ({
-      id: item.id,
-      title: `Application ${item.status}`,
-      message: item.remarks || 'No remarks on file for this application.',
-      tone: item.status === 'approved' ? 'green' : item.status === 'rejected' ? 'red' : 'yellow',
-      createdAt: item.createdAt,
-    })),
-    ...baseNotifications,
-  ]
+  return baseNotifications
 }
 
 function readStudentNotificationReadSet(userId: string): Set<string> {
@@ -485,10 +411,6 @@ export default function Dashboard() {
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => new Set())
   const [deadlines, setDeadlines] = useState<UniversityDeadline[]>([])
   const [feeCurrencyCode, setFeeCurrencyCode] = useState('USD')
-  const [applicationHistory, setApplicationHistory] = useState<PermitApplicationRecord[]>([])
-  const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>('all')
-  const [semesterFilter, setSemesterFilter] = useState('all')
-  const [submittingApplication, setSubmittingApplication] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [loadingSupport, setLoadingSupport] = useState(false)
   const [submittingSupport, setSubmittingSupport] = useState(false)
@@ -500,9 +422,6 @@ export default function Dashboard() {
   // Add state for button-level loading
   const [refreshing, setRefreshing] = useState(false)
 
-  const [applicationDraft, setApplicationDraft] = useState<ApplicationDraft>({
-    semester: KIU_SEMESTERS[0],
-  })
   const [settingsDraft, setSettingsDraft] = useState<SettingsDraft>({
     name: '',
     email: '',
@@ -564,7 +483,7 @@ export default function Dashboard() {
       icon: <CreditCard className="h-4 w-4" />,
       badge: feesBalance > 0 ? 'Due' : isFullyCleared ? '✓' : undefined
     },
-    { key: 'applications', label: 'Applications', icon: <FileText className="h-4 w-4" /> },
+    { key: 'printed_permits', label: 'Printed Permits', icon: <FileText className="h-4 w-4" /> },
     { key: 'settings', label: 'Profile Settings', icon: <Settings2 className="h-4 w-4" /> },
     { key: 'support', label: 'Help & Support', icon: <UserCircle2 className="h-4 w-4" /> },
   ]
@@ -661,12 +580,6 @@ export default function Dashboard() {
       }
 
       if (initializeLocalState) {
-        const semesterRequests = await fetchSemesterRegistrations()
-        setApplicationHistory(
-          semesterRequests
-            .map((entry) => toPermitRecordFromSemesterRequest(entry, profile.status === 'fulfilled' && profile.value?.courseUnits ? profile.value.courseUnits : []))
-            .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-        )
         await Promise.all([
           loadSupportRequests(),
           loadSupportContactsAndHistory(),
@@ -712,7 +625,7 @@ export default function Dashboard() {
   }, [activeSection])
 
   useEffect(() => {
-    if (activeSection === 'applications' && user?.role === 'student') {
+    if (activeSection === 'printed_permits' && user?.role === 'student') {
       void loadSupportContactsAndHistory()
     }
   }, [activeSection, user?.role, loadSupportContactsAndHistory])
@@ -799,12 +712,6 @@ export default function Dashboard() {
       setSuccessMessage('')
       setRefreshing(true)
       await syncStudentProfile({ showLoading: false, clearError: true, syncDrafts: true })
-      const semesterRequests = await fetchSemesterRegistrations()
-      setApplicationHistory(
-        semesterRequests
-          .map((entry) => toPermitRecordFromSemesterRequest(entry, studentData?.courseUnits ?? []))
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-      )
       await Promise.all([
         loadSupportRequests(),
         loadSupportContactsAndHistory(),
@@ -1052,40 +959,6 @@ export default function Dashboard() {
     }
   }
 
-  async function handleApplicationSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!studentData || !user) {
-      return
-    }
-
-    const requestedSemester = applicationDraft.semester.trim()
-    if (!requestedSemester) {
-      setError('Select a semester to register.')
-      return
-    }
-
-    setSubmittingApplication(true)
-    setError('')
-    setSuccessMessage('')
-    try {
-      await createSemesterRegistration(requestedSemester)
-      const semesterRequests = await fetchSemesterRegistrations()
-      setApplicationHistory(
-        semesterRequests
-          .map((entry) => toPermitRecordFromSemesterRequest(entry, studentData.courseUnits ?? []))
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-      )
-      setSuccessMessage('Semester registration submitted and waiting for admin approval.')
-      setActiveSection('applications')
-    } catch (submitError) {
-      const nextError = submitError instanceof Error ? submitError.message : 'Unable to submit semester registration.'
-      setError(nextError)
-    } finally {
-      setSubmittingApplication(false)
-    }
-  }
-
   async function handleSettingsSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -1178,15 +1051,15 @@ export default function Dashboard() {
   }, [qrValue])
 
   const permitStatus = useMemo(() => {
-    return studentData ? deriveStatus(studentData, applicationHistory) : 'pending'
-  }, [applicationHistory, studentData])
+    return studentData ? deriveStatus(studentData) : 'pending'
+  }, [studentData])
 
   const statusView = getStatusPresentation(permitStatus)
   const notifications = useMemo(() => {
     if (!studentData) {
       return []
     }
-    const base = buildNotifications(studentData, applicationHistory, permitStatus)
+    const base = buildNotifications(studentData, permitStatus)
     if (examPeriodDeadline?.dueAt && studentData.feesBalance > 0) {
       base.unshift({
         id: 'exam-period-clearance-reminder',
@@ -1197,19 +1070,7 @@ export default function Dashboard() {
       })
     }
     return base
-  }, [applicationHistory, examPeriodDeadline, permitStatus, studentData])
-
-  const filteredHistory = useMemo(() => {
-    return applicationHistory.filter((record) => {
-      const matchesStatus = statusFilter === 'all' || record.status === statusFilter
-      const matchesSemester = semesterFilter === 'all' || record.semester === semesterFilter
-      return matchesStatus && matchesSemester
-    })
-  }, [applicationHistory, semesterFilter, statusFilter])
-
-  const availableSemesters = useMemo(() => {
-    return getSemestersForProgram(studentData?.course ?? studentData?.program)
-  }, [studentData?.course, studentData?.program])
+  }, [examPeriodDeadline, permitStatus, studentData])
 
   const permitHistoryBySemester = useMemo(() => {
     const seenSemesters = new Set<string>()
@@ -1254,7 +1115,7 @@ export default function Dashboard() {
     () => notifications.filter((n) => !readNotificationIds.has(n.id)).length,
     [notifications, readNotificationIds],
   )
-  const currentSession = applicationHistory[0]?.semester || `${deriveAcademicSession()} ${deriveSemesterLabel()}`
+  const currentSession = studentData?.semester || `${deriveAcademicSession()} ${deriveSemesterLabel()}`
 
   if (loading) {
     return (
@@ -1795,10 +1656,10 @@ export default function Dashboard() {
                   {permitStatus !== 'approved' ? (
                     <button
                       type="button"
-                      onClick={() => setActiveSection('applications')}
+                      onClick={() => setActiveSection('printed_permits')}
                       className="mt-5 inline-flex items-center rounded-full bg-white/80 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-white dark:bg-slate-950/70 dark:text-white dark:hover:bg-slate-900"
                     >
-                      Apply for Permit
+                      View printed permits
                     </button>
                   ) : (
                     <div className="mt-5 flex flex-wrap gap-3">
@@ -1947,46 +1808,22 @@ export default function Dashboard() {
                       <section className="rounded-[2rem] border border-amber-200/80 bg-[linear-gradient(140deg,_rgba(255,251,235,0.95),_rgba(239,246,255,0.92))] p-6 shadow-xl shadow-amber-200/45 backdrop-blur dark:border-amber-900/30 dark:bg-[linear-gradient(140deg,_rgba(69,26,3,0.72),_rgba(15,23,42,0.9))] dark:shadow-none">
                         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Semester Registration</p>
-                            <h2 className="mt-2 text-2xl font-semibold">Register for a new semester</h2>
+                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Printed Permit History</p>
+                            <h2 className="mt-2 text-2xl font-semibold">Track your print activity</h2>
                           </div>
                           <button
                             type="button"
-                            onClick={() => setActiveSection('applications')}
+                            onClick={() => setActiveSection('printed_permits')}
                             className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                           >
-                            <FileBadge2 className="h-4 w-4" />
-                            Open full application view
+                            <FileText className="h-4 w-4" />
+                            Open printed permits
                           </button>
                         </div>
 
-                        <form className="mt-6 space-y-4" onSubmit={(event) => void handleApplicationSubmit(event)}>
-                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Select semester
-                            <select
-                              value={applicationDraft.semester}
-                              onChange={(event) => setApplicationDraft({ semester: event.target.value })}
-                              size={5}
-                              className="mt-2 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-                            >
-                              {availableSemesters.length === 0 ? (
-                                <option value={applicationDraft.semester}>{applicationDraft.semester}</option>
-                              ) : availableSemesters.map((semester) => (
-                                <option key={semester} value={semester}>{semester}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <p className="text-xs text-slate-500 dark:text-slate-300">
-                            After admin approval, your semester and course units will be updated automatically.
-                          </p>
-                          <button
-                            type="submit"
-                            disabled={submittingApplication}
-                            className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
-                          >
-                            {submittingApplication ? 'Submitting...' : 'Submit semester registration'}
-                          </button>
-                        </form>
+                        <p className="mt-5 text-sm text-slate-600 dark:text-slate-300">
+                          The printed permits page shows one row per semester and updates after each print/download action.
+                        </p>
                       </section>
                     </div>
 
@@ -2005,24 +1842,23 @@ export default function Dashboard() {
                       </section>
 
                       <section className="rounded-[2rem] border border-rose-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(254,252,232,0.9))] p-6 shadow-xl shadow-rose-200/45 backdrop-blur dark:border-rose-900/30 dark:bg-[linear-gradient(145deg,_rgba(60,9,9,0.72),_rgba(69,10,10,0.65)_55%,_rgba(51,65,85,0.8))] dark:shadow-none">
-                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Application History</p>
-                        <h2 className="mt-2 text-2xl font-semibold">Recent requests</h2>
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Printed Permit History</p>
+                        <h2 className="mt-2 text-2xl font-semibold">Latest printed semesters</h2>
                         <div className="mt-5 max-h-72 space-y-3 overflow-y-auto pr-1">
-                          {filteredHistory.slice(0, 3).map((record) => (
+                          {permitHistoryBySemester.slice(0, 3).map((record) => (
                             <div key={record.id} className="rounded-3xl border border-rose-100 bg-rose-50/85 p-4 shadow-sm shadow-rose-100/60 dark:border-slate-800 dark:bg-slate-900/70">
                               <div className="flex items-center justify-between gap-3">
                                 <p className="text-sm font-semibold">{record.semester}</p>
-                                <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusPresentation(record.status).badgeClass}`}>
-                                  {record.status}
+                                <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                  {record.action === 'print_permit' ? 'Printed' : 'Downloaded'}
                                 </span>
                               </div>
                               <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">{formatDateTime(record.createdAt)}</p>
-                              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{record.remarks}</p>
                             </div>
                           ))}
-                          {filteredHistory.length === 0 && (
+                          {permitHistoryBySemester.length === 0 && (
                             <div className="rounded-3xl border border-dashed border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-300">
-                              No applications match your filters yet.
+                              No print activity yet. Print or download your permit to create a record.
                             </div>
                           )}
                         </div>
@@ -2031,85 +1867,10 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {activeSection === 'applications' && (
+                {activeSection === 'printed_permits' && (
                   <div className="space-y-6">
-                    <section className="rounded-[2rem] border border-blue-200/80 bg-[linear-gradient(145deg,_rgba(239,246,255,0.96),_rgba(250,245,255,0.92))] p-6 shadow-xl shadow-blue-200/45 backdrop-blur dark:border-blue-900/30 dark:bg-[linear-gradient(145deg,_rgba(15,23,42,0.92),_rgba(30,58,138,0.42))] dark:shadow-none">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Filters</p>
-                          <h2 className="mt-2 text-2xl font-semibold">Filter application history</h2>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[28rem]">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Status
-                            <select
-                              value={statusFilter}
-                              onChange={(event) => setStatusFilter(event.target.value as HistoryStatusFilter)}
-                              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                            >
-                              <option value="all">All statuses</option>
-                              <option value="approved">Approved</option>
-                              <option value="pending">Pending</option>
-                              <option value="rejected">Rejected</option>
-                            </select>
-                          </label>
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Semester
-                            <select
-                              value={semesterFilter}
-                              onChange={(event) => setSemesterFilter(event.target.value)}
-                              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-                            >
-                              <option value="all">All semesters</option>
-                              {availableSemesters.map((semester) => (
-                                <option key={semester} value={semester}>{semester}</option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>
-                      </div>
-                    </section>
-
-                    <section className="rounded-[2rem] border border-red-200/80 bg-[linear-gradient(145deg,_rgba(255,241,242,0.95),_rgba(239,246,255,0.92))] p-6 shadow-xl shadow-red-200/45 backdrop-blur dark:border-red-900/30 dark:bg-[linear-gradient(145deg,_rgba(69,10,10,0.72),_rgba(30,41,59,0.88))] dark:shadow-none">
-                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-600 dark:text-blue-300">Application History</p>
-                        <h2 className="mt-2 text-2xl font-semibold">Permit requests</h2>
-                        <div className="mt-6 max-h-80 overflow-x-auto overflow-y-auto rounded-3xl border border-slate-200 dark:border-slate-800">
-                          <table className="min-w-full text-left text-sm">
-                            <thead className="sticky top-0 bg-slate-50 text-xs uppercase tracking-[0.25em] text-slate-500 dark:bg-slate-900 dark:text-slate-300">
-                              <tr>
-                                <th className="px-5 py-4">Date applied</th>
-                                <th className="px-5 py-4">Semester</th>
-                                <th className="px-5 py-4">Status</th>
-                                <th className="px-5 py-4">Remarks</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                              {filteredHistory.map((record) => (
-                                <tr key={record.id} className="bg-white/80 dark:bg-slate-950/40">
-                                  <td className="px-5 py-4">{formatDateTime(record.createdAt)}</td>
-                                  <td className="px-5 py-4">{record.semester}</td>
-                                  <td className="px-5 py-4">
-                                    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusPresentation(record.status).badgeClass}`}>
-                                      {record.status}
-                                    </span>
-                                  </td>
-                                  <td className="px-5 py-4 text-slate-600 dark:text-slate-300">{record.remarks}</td>
-                                </tr>
-                              ))}
-                              {filteredHistory.length === 0 && (
-                                <tr>
-                                  <td colSpan={4} className="px-5 py-8 text-center text-slate-500 dark:text-slate-300">
-                                    No applications found for the selected filters.
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                    </section>
-
                     <section className="rounded-[2rem] border border-yellow-200/80 bg-[linear-gradient(145deg,_rgba(254,252,232,0.95),_rgba(240,249,255,0.9))] p-6 shadow-xl shadow-yellow-200/45 backdrop-blur dark:border-yellow-900/30 dark:bg-[linear-gradient(145deg,_rgba(66,32,6,0.7),_rgba(15,23,42,0.9))] dark:shadow-none">
-                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Printed Permit History</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-300">Printed Permits</p>
                       <h2 className="mt-2 text-2xl font-semibold">One record per semester</h2>
                       <div className="mt-6 max-h-80 overflow-x-auto overflow-y-auto rounded-3xl border border-slate-200 dark:border-slate-800">
                         <table className="min-w-full text-left text-sm">
