@@ -3146,10 +3146,10 @@ export default function AdminPanel() {
                           role="presentation"
                           className={`mt-3 rounded-2xl border p-4 text-left shadow-sm transition ${
                             alert.tone === 'critical'
-                              ? 'border-red-200 bg-red-50'
+                              ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/40'
                               : alert.tone === 'warning'
-                                ? 'border-amber-200 bg-amber-50'
-                                : 'border-blue-200 bg-blue-50'
+                                ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40'
+                                : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40'
                           } ${isRead ? 'opacity-60' : ''}`}
                         >
                           <button
@@ -3161,7 +3161,7 @@ export default function AdminPanel() {
                             <div className="flex items-start justify-between gap-3">
                               <div>
                                 <p className="text-sm font-semibold text-gray-900 dark:text-white">{alert.title}</p>
-                                <p className="mt-1 text-xs leading-5 text-gray-600">{alert.message}</p>
+                                <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-slate-300">{alert.message}</p>
                               </div>
                               <Bell className="h-4 w-4 shrink-0 text-gray-400" />
                             </div>
@@ -3173,7 +3173,7 @@ export default function AdminPanel() {
                                 handleNotificationAlertAction(alert.onAction)
                                 markThisRead()
                               }}
-                              className="mt-3 rounded-lg border border-white/80 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                              className="mt-3 rounded-lg border border-white/80 bg-white dark:bg-slate-800 dark:border-slate-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700"
                             >
                               {alert.actionLabel}
                             </button>
@@ -3382,29 +3382,29 @@ export default function AdminPanel() {
                 {/* Analytics cards */}
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-8">
                   {/* --- People counts --- */}
-                  <div className="col-span-2 sm:col-span-2 rounded-xl border border-blue-300 bg-[linear-gradient(145deg,_rgba(219,234,254,0.95),_rgba(239,246,255,0.92))] p-5 shadow-sm shadow-blue-200/60">
+                  <div className="col-span-2 sm:col-span-2 rounded-xl border border-blue-300 dark:border-blue-800 bg-[linear-gradient(145deg,_rgba(219,234,254,0.95),_rgba(239,246,255,0.92))] dark:bg-blue-950/60 p-5 shadow-sm shadow-blue-200/60">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Students</p>
-                      <Users className="h-5 w-5 text-blue-500" />
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-300">Students</p>
+                      <Users className="h-5 w-5 text-blue-500 dark:text-blue-400" />
                     </div>
-                    <p className="mt-2 text-4xl font-bold text-blue-700">{totalStudents}</p>
+                    <p className="mt-2 text-4xl font-bold text-blue-700 dark:text-blue-200">{totalStudents}</p>
                     <div className="mt-2 flex gap-3 text-xs text-blue-500">
                       <span className="font-semibold text-emerald-600 dark:text-emerald-400">{clearedStudents} cleared</span>
                       <span className="text-amber-600 dark:text-amber-400">{outstandingStudents} outstanding</span>
                     </div>
-                    <p className="mt-0.5 text-[10px] text-blue-400">enrolled student accounts</p>
+                    <p className="mt-0.5 text-[10px] text-blue-400 dark:text-blue-500">enrolled student accounts</p>
                   </div>
-                  <div className="col-span-2 sm:col-span-2 rounded-xl border border-indigo-300 bg-[linear-gradient(145deg,_rgba(224,231,255,0.95),_rgba(238,242,255,0.92))] p-5 shadow-sm shadow-indigo-200/60">
+                  <div className="col-span-2 sm:col-span-2 rounded-xl border border-indigo-300 dark:border-indigo-800 bg-[linear-gradient(145deg,_rgba(224,231,255,0.95),_rgba(238,242,255,0.92))] dark:bg-indigo-950/60 p-5 shadow-sm shadow-indigo-200/60">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Administrators</p>
-                      <Shield className="h-5 w-5 text-indigo-500" />
+                      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">Administrators</p>
+                      <Shield className="h-5 w-5 text-indigo-500 dark:text-indigo-400" />
                     </div>
-                    <p className="mt-2 text-4xl font-bold text-indigo-700">{1 + assistantAdmins.length}</p>
+                    <p className="mt-2 text-4xl font-bold text-indigo-700 dark:text-indigo-200">{1 + assistantAdmins.length}</p>
                     <div className="mt-2 flex gap-3 text-xs">
-                      <span className="font-semibold text-indigo-600">1 super-admin</span>
-                      <span className="text-indigo-400">{assistantAdmins.length} sub-admin{assistantAdmins.length !== 1 ? 's' : ''}</span>
+                      <span className="font-semibold text-indigo-600 dark:text-indigo-300">1 super-admin</span>
+                      <span className="text-indigo-400 dark:text-indigo-400">{assistantAdmins.length} sub-admin{assistantAdmins.length !== 1 ? 's' : ''}</span>
                     </div>
-                    <p className="mt-0.5 text-[10px] text-indigo-400">active admin accounts</p>
+                    <p className="mt-0.5 text-[10px] text-indigo-400 dark:text-indigo-500">active admin accounts</p>
                   </div>
                   {/* --- Permit stats --- */}
                   <div className="rounded-xl border border-emerald-200 bg-[linear-gradient(145deg,_rgba(209,250,229,0.95),_rgba(236,253,245,0.92))] p-5 shadow-sm shadow-emerald-200/60 dark:border-emerald-800 dark:bg-emerald-950/60">
@@ -3423,29 +3423,29 @@ export default function AdminPanel() {
                     <p className="mt-2 text-3xl font-bold text-amber-700 dark:text-amber-200">{outstandingStudents}</p>
                     <p className="mt-1 text-xs text-amber-400 dark:text-amber-500">balance remaining</p>
                   </div>
-                  <div className="rounded-xl border border-purple-200 bg-[linear-gradient(145deg,_rgba(243,232,255,0.95),_rgba(250,245,255,0.92))] p-5 shadow-sm shadow-purple-200/60">
+                  <div className="rounded-xl border border-purple-200 dark:border-purple-800 bg-[linear-gradient(145deg,_rgba(243,232,255,0.95),_rgba(250,245,255,0.92))] dark:bg-purple-950/60 p-5 shadow-sm shadow-purple-200/60">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-purple-500">Permit Events</p>
-                      <FileCheck className="h-5 w-5 text-purple-400" />
+                      <p className="text-xs font-semibold uppercase tracking-wide text-purple-500 dark:text-purple-300">Permit Events</p>
+                      <FileCheck className="h-5 w-5 text-purple-400 dark:text-purple-300" />
                     </div>
-                    <p className="mt-2 text-3xl font-bold text-purple-700">{permitEventCount}</p>
-                    <p className="mt-1 text-xs text-purple-400">prints &amp; downloads</p>
+                    <p className="mt-2 text-3xl font-bold text-purple-700 dark:text-purple-200">{permitEventCount}</p>
+                    <p className="mt-1 text-xs text-purple-400 dark:text-purple-400">prints &amp; downloads</p>
                   </div>
-                  <div className="rounded-xl border border-slate-300 bg-[linear-gradient(145deg,_rgba(241,245,249,0.95),_rgba(248,250,252,0.92))] p-5 shadow-sm shadow-slate-200/60">
+                  <div className="rounded-xl border border-slate-300 dark:border-slate-600 bg-[linear-gradient(145deg,_rgba(241,245,249,0.95),_rgba(248,250,252,0.92))] dark:bg-slate-700/60 p-5 shadow-sm shadow-slate-200/60">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issued</p>
-                      <CreditCard className="h-5 w-5 text-slate-400" />
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Issued</p>
+                      <CreditCard className="h-5 w-5 text-slate-400 dark:text-slate-300" />
                     </div>
-                    <p className="mt-2 text-3xl font-bold text-slate-800">{permitStatusCounts.issued}</p>
-                    <p className="mt-1 text-xs text-slate-500">active permits</p>
+                    <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">{permitStatusCounts.issued}</p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">active permits</p>
                   </div>
-                  <div className="rounded-xl border border-rose-200 bg-[linear-gradient(145deg,_rgba(255,228,230,0.95),_rgba(255,241,242,0.92))] p-5 shadow-sm shadow-rose-200/60">
+                  <div className="rounded-xl border border-rose-200 dark:border-rose-800 bg-[linear-gradient(145deg,_rgba(255,228,230,0.95),_rgba(255,241,242,0.92))] dark:bg-rose-950/60 p-5 shadow-sm shadow-rose-200/60">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">Expired</p>
-                      <Shield className="h-5 w-5 text-rose-400" />
+                      <p className="text-xs font-semibold uppercase tracking-wide text-rose-500 dark:text-rose-300">Expired</p>
+                      <Shield className="h-5 w-5 text-rose-400 dark:text-rose-300" />
                     </div>
-                    <p className="mt-2 text-3xl font-bold text-rose-700">{permitStatusCounts.expired}</p>
-                    <p className="mt-1 text-xs text-rose-400">expired records</p>
+                    <p className="mt-2 text-3xl font-bold text-rose-700 dark:text-rose-200">{permitStatusCounts.expired}</p>
+                    <p className="mt-1 text-xs text-rose-400 dark:text-rose-400">expired records</p>
                   </div>
                 </div>
 
@@ -3591,7 +3591,7 @@ export default function AdminPanel() {
                             <tr key={log.id} className="hover:bg-gray-50">
                               <td className="px-5 py-3 font-medium text-gray-800 dark:text-slate-100">{student?.name ?? log.targetProfileId}</td>
                               <td className="px-5 py-3">
-                                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.action === 'print_permit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.action === 'print_permit' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'}`}>
                                   {log.action === 'print_permit' ? 'Printed' : 'Downloaded'}
                                 </span>
                               </td>
@@ -4211,20 +4211,20 @@ export default function AdminPanel() {
 
                 {activeSection === 'support' && (
                 <div className="grid gap-4 lg:grid-cols-3">
-                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-5 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-500">Open</p>
-                    <p className="mt-2 text-3xl font-bold text-amber-700">{supportRequests.filter((request) => request.status === 'open').length}</p>
-                    <p className="mt-1 text-xs text-amber-500">Awaiting the first admin response</p>
+                  <div className="rounded-xl border border-amber-100 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-500 dark:text-amber-400">Open</p>
+                    <p className="mt-2 text-3xl font-bold text-amber-700 dark:text-amber-300">{supportRequests.filter((request) => request.status === 'open').length}</p>
+                    <p className="mt-1 text-xs text-amber-500 dark:text-amber-400">Awaiting the first admin response</p>
                   </div>
-                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">In Progress</p>
-                    <p className="mt-2 text-3xl font-bold text-blue-700">{supportRequests.filter((request) => request.status === 'in_progress').length}</p>
-                    <p className="mt-1 text-xs text-blue-500">Active cases still being worked</p>
+                  <div className="rounded-xl border border-blue-100 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-500 dark:text-blue-400">In Progress</p>
+                    <p className="mt-2 text-3xl font-bold text-blue-700 dark:text-blue-300">{supportRequests.filter((request) => request.status === 'in_progress').length}</p>
+                    <p className="mt-1 text-xs text-blue-500 dark:text-blue-400">Active cases still being worked</p>
                   </div>
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Resolved</p>
-                    <p className="mt-2 text-3xl font-bold text-emerald-700">{supportRequests.filter((request) => request.status === 'resolved').length}</p>
-                    <p className="mt-1 text-xs text-emerald-500">Closed with an admin response</p>
+                  <div className="rounded-xl border border-emerald-100 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50 p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500 dark:text-emerald-400">Resolved</p>
+                    <p className="mt-2 text-3xl font-bold text-emerald-700 dark:text-emerald-300">{supportRequests.filter((request) => request.status === 'resolved').length}</p>
+                    <p className="mt-1 text-xs text-emerald-500 dark:text-emerald-400">Closed with an admin response</p>
                   </div>
                 </div>
                 )}
@@ -4725,7 +4725,7 @@ export default function AdminPanel() {
                               <td className="px-5 py-3 font-medium text-gray-800 dark:text-slate-100">{student?.name ?? log.targetProfileId}</td>
                               <td className="px-5 py-3 text-gray-500">{student?.studentId ?? '-'}</td>
                               <td className="px-5 py-3">
-                                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.action === 'print_permit' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.action === 'print_permit' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'}`}>
                                   {log.action === 'print_permit' ? 'Printed' : 'Downloaded'}
                                 </span>
                               </td>
@@ -5226,29 +5226,29 @@ export default function AdminPanel() {
                   <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
                     <h2 className="mb-4 font-semibold text-gray-800 dark:text-slate-100">Permit Issuance Summary</h2>
                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                      <div className="rounded-lg bg-blue-50 p-4 text-center">
-                        <p className="text-2xl font-bold text-blue-700">
+                      <div className="rounded-lg bg-blue-50 dark:bg-blue-950/50 p-4 text-center">
+                        <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
                           {permitActivityLogs.filter((l) => l.action === 'print_permit').length}
                         </p>
-                        <p className="mt-1 text-xs text-blue-500">Total Prints</p>
+                        <p className="mt-1 text-xs text-blue-500 dark:text-blue-400">Total Prints</p>
                       </div>
-                      <div className="rounded-lg bg-purple-50 p-4 text-center">
-                        <p className="text-2xl font-bold text-purple-700">
+                      <div className="rounded-lg bg-purple-50 dark:bg-purple-950/50 p-4 text-center">
+                        <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
                           {permitActivityLogs.filter((l) => l.action === 'download_permit').length}
                         </p>
-                        <p className="mt-1 text-xs text-purple-500">Total Downloads</p>
+                        <p className="mt-1 text-xs text-purple-500 dark:text-purple-400">Total Downloads</p>
                       </div>
-                      <div className="rounded-lg bg-emerald-50 p-4 text-center">
-                        <p className="text-2xl font-bold text-emerald-700">
+                      <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/50 p-4 text-center">
+                        <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
                           {new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
                         </p>
-                        <p className="mt-1 text-xs text-emerald-500">Students with Activity</p>
+                        <p className="mt-1 text-xs text-emerald-500 dark:text-emerald-400">Students with Activity</p>
                       </div>
-                      <div className="rounded-lg bg-gray-50 p-4 text-center">
-                        <p className="text-2xl font-bold text-gray-700">
+                      <div className="rounded-lg bg-gray-50 dark:bg-slate-800 p-4 text-center">
+                        <p className="text-2xl font-bold text-gray-700 dark:text-slate-200">
                           {totalStudents - new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
                         </p>
-                        <p className="mt-1 text-xs text-gray-500">No Activity Yet</p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">No Activity Yet</p>
                       </div>
                     </div>
                   </div>
@@ -5256,21 +5256,21 @@ export default function AdminPanel() {
                   <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
                     <h2 className="mb-4 font-semibold text-gray-800 dark:text-slate-100">Integration Readiness</h2>
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-                        <p className="text-xs uppercase tracking-wide text-emerald-500">Student Database Sync</p>
-                        <p className="mt-1 text-sm font-semibold text-emerald-800">Available Through REST Profiles</p>
+                      <div className="rounded-xl border border-emerald-100 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50 p-4">
+                        <p className="text-xs uppercase tracking-wide text-emerald-500 dark:text-emerald-400">Student Database Sync</p>
+                        <p className="mt-1 text-sm font-semibold text-emerald-800 dark:text-emerald-200">Available Through REST Profiles</p>
                       </div>
-                      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-                        <p className="text-xs uppercase tracking-wide text-emerald-500">Exam Scheduling</p>
-                        <p className="mt-1 text-sm font-semibold text-emerald-800">Available Through Assigned Exams</p>
+                      <div className="rounded-xl border border-emerald-100 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50 p-4">
+                        <p className="text-xs uppercase tracking-wide text-emerald-500 dark:text-emerald-400">Exam Scheduling</p>
+                        <p className="mt-1 text-sm font-semibold text-emerald-800 dark:text-emerald-200">Available Through Assigned Exams</p>
                       </div>
-                      <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">
-                        <p className="text-xs uppercase tracking-wide text-amber-500">Notification Gateway</p>
-                        <p className="mt-1 text-sm font-semibold text-amber-800">In-App Only In This Demo</p>
+                      <div className="rounded-xl border border-amber-100 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-4">
+                        <p className="text-xs uppercase tracking-wide text-amber-500 dark:text-amber-400">Notification Gateway</p>
+                        <p className="mt-1 text-sm font-semibold text-amber-800 dark:text-amber-200">In-App Only In This Demo</p>
                       </div>
-                      <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-                        <p className="text-xs uppercase tracking-wide text-blue-500">Payment Verification</p>
-                        <p className="mt-1 text-sm font-semibold text-blue-800">Supported Through Financial Updates</p>
+                      <div className="rounded-xl border border-blue-100 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 p-4">
+                        <p className="text-xs uppercase tracking-wide text-blue-500 dark:text-blue-400">Payment Verification</p>
+                        <p className="mt-1 text-sm font-semibold text-blue-800 dark:text-blue-200">Supported Through Financial Updates</p>
                       </div>
                     </div>
                   </div>
@@ -5430,10 +5430,10 @@ export default function AdminPanel() {
                     <p className="mt-1 text-xs text-amber-500 dark:text-amber-400">Outstanding â€” Blocked</p>
                   </div>
                   <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-center dark:border-blue-900 dark:bg-blue-950/50">
-                    <p className="text-2xl font-bold text-blue-700">
+                    <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
                       {new Set(permitActivityLogs.map((l) => l.targetProfileId)).size}
                     </p>
-                    <p className="mt-1 text-xs text-blue-500">Have Printed / Downloaded</p>
+                    <p className="mt-1 text-xs text-blue-500 dark:text-blue-400">Have Printed / Downloaded</p>
                   </div>
                 </div>
 
@@ -5476,7 +5476,7 @@ export default function AdminPanel() {
                           </div>
                           <span
                             className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              cleared ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                              cleared ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'
                             }`}
                           >
                             {cleared ? 'Cleared' : 'Blocked'}
@@ -5594,12 +5594,12 @@ export default function AdminPanel() {
                             </span>
                           )}
                           {summary.printCount > 0 && (
-                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                            <span className="rounded-full bg-blue-100 dark:bg-blue-900/50 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">
                               Printed {summary.printCount}x
                             </span>
                           )}
                           {summary.downloadCount > 0 && (
-                            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">
+                            <span className="rounded-full bg-purple-100 dark:bg-purple-900/50 px-2 py-0.5 text-[10px] font-medium text-purple-700 dark:text-purple-300">
                               Downloaded {summary.downloadCount}x
                             </span>
                           )}
