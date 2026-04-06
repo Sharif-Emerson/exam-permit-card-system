@@ -651,6 +651,7 @@ export default function AdminPanel() {
   const [savingFeeStructure, setSavingFeeStructure] = useState(false)
   const [savingDeadlines, setSavingDeadlines] = useState(false)
   const [emailStatus, setEmailStatus] = useState<{ configured: boolean; provider: string; from: string; host: string | null } | null>(null)
+  const [emailApiUnavailable, setEmailApiUnavailable] = useState(false)
   const [emailTestRecipient, setEmailTestRecipient] = useState('')
   const [emailTestSending, setEmailTestSending] = useState(false)
   const [emailTestResult, setEmailTestResult] = useState<{ ok: boolean; message: string } | null>(null)
@@ -1450,9 +1451,10 @@ export default function AdminPanel() {
     void loadAssistantAdmins()
 
     // Load email configuration status from backend
+    setEmailApiUnavailable(false)
     void fetchEmailStatus()
-      .then((status) => setEmailStatus(status))
-      .catch(() => setEmailStatus(null))
+      .then((status) => { setEmailStatus(status); setEmailApiUnavailable(false) })
+      .catch(() => { setEmailStatus(null); setEmailApiUnavailable(true) })
 
     // Load SIS status from backend
     void fetchSisStatus()
@@ -6129,7 +6131,9 @@ export default function AdminPanel() {
                     </div>
                   </div>
 
-                  {emailStatus === null ? (
+                  {emailApiUnavailable ? (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">Backend server is unreachable — make sure it is running to use email features.</p>
+                  ) : emailStatus === null ? (
                     <p className="text-xs text-sky-400 dark:text-sky-500">Loading email statusâ€¦</p>
                   ) : (
                     <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -6164,9 +6168,10 @@ export default function AdminPanel() {
                         type="email"
                         required
                         placeholder="recipient@example.com"
+                        disabled={emailApiUnavailable}
                         value={emailTestRecipient}
                         onChange={(e) => { setEmailTestRecipient(e.target.value); setEmailTestResult(null) }}
-                        className="w-full rounded-lg border border-sky-200 dark:border-sky-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+                        className="w-full rounded-lg border border-sky-200 dark:border-sky-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:opacity-50"
                       />
                     </div>
                     <button
@@ -6177,9 +6182,14 @@ export default function AdminPanel() {
                       {emailTestSending ? 'Sendingâ€¦' : 'Send test email'}
                     </button>
                   </form>
-                  {emailTestResult && (
+                  {emailApiUnavailable && (
+                    <p className="mt-3 text-xs font-medium text-amber-600 dark:text-amber-400">
+                      Start the backend server: run <code className="rounded bg-amber-100 dark:bg-amber-900 px-1 text-amber-800 dark:text-amber-200">npm run dev:rest</code> in your terminal, then reload this page.
+                    </p>
+                  )}
+                  {!emailApiUnavailable && emailTestResult && (
                     <p className={`mt-3 text-xs font-medium ${emailTestResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {emailTestResult.ok ? 'âœ“' : 'âœ—'} {emailTestResult.message}
+                      {emailTestResult.ok ? '✓' : '✗'} {emailTestResult.message}
                     </p>
                   )}
                 </div>
