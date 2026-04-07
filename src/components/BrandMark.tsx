@@ -1,4 +1,5 @@
-import { institutionName, institutionLogo } from '../config/branding'
+import { institutionName } from '../config/branding'
+import InstitutionLogo from './InstitutionLogo'
 
 type BrandMarkProps = {
   align?: 'left' | 'center'
@@ -45,10 +46,10 @@ export default function BrandMark({
       `}</style>
       <div className="brand-ribbon-border h-20 w-20">
         <div className="flex h-full w-full items-center justify-center rounded-full bg-white shadow-sm dark:bg-slate-900">
-          <img
-            src={institutionLogo}
+          <InstitutionLogo
             alt={`${institutionName} logo`}
             className="h-full w-full rounded-full object-cover"
+            fallbackClassName="flex h-full w-full items-center justify-center rounded-full bg-emerald-700 text-base font-black tracking-[0.18em] text-white"
             draggable={false}
           />
         </div>

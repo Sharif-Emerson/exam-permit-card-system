@@ -5,7 +5,8 @@ import { backendProvider, publicApiBaseUrl } from '../config/provider'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { resetPassword } from '../services/authService'
-import { institutionLogo, institutionName } from '../config/branding'
+import { institutionName } from '../config/branding'
+import InstitutionLogo from './InstitutionLogo'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -252,10 +253,10 @@ export default function Login() {
         <div className="space-y-6 rounded-3xl border border-emerald-200 bg-white/95 p-6 shadow-lg shadow-emerald-100/60 dark:border-emerald-900/60 dark:bg-slate-950/85 dark:shadow-none sm:p-8 sm:space-y-8">
           <div className="text-center">
           <div className="mx-auto flex w-full max-w-xs flex-col items-center">
-            <img
-              src={institutionLogo}
+            <InstitutionLogo
               alt={`${institutionName} logo`}
               className="h-40 w-40 rounded-full border-4 border-emerald-500 object-cover shadow-lg sm:h-48 sm:w-48"
+              fallbackClassName="flex h-40 w-40 items-center justify-center rounded-full border-4 border-emerald-500 bg-emerald-700 text-3xl font-black tracking-[0.18em] text-white shadow-lg sm:h-48 sm:w-48 sm:text-4xl"
               draggable={false}
             />
             <h1 className="mt-3 text-2xl font-bold text-emerald-700 dark:text-emerald-400 sm:text-3xl">

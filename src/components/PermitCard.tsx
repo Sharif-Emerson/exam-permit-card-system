@@ -3,6 +3,7 @@ import { useCallback } from 'react'
 import { generalExamRules } from '../config/examRules'
 import { institutionLogo as defaultLogo, institutionName as defaultName, examPermitConfig } from '../config/branding'
 import type { StudentProfile } from '../types'
+import InstitutionLogo from './InstitutionLogo'
 
 /** Split stored course unit strings into code + title (no venue). Supports "CODE: Title" or "CODE - Title". */
 function parseCourseUnitRow(unit: string, index: number): { serial: number; code: string; title: string } {
@@ -170,14 +171,29 @@ export default function PermitCard({ studentData, qrCodeUrl, onRefresh, onSignOu
           </div>
           <div className="text-center mb-6 sm:mb-8 border-b border-slate-200 pb-5 print:hidden">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-600 mb-2">Official Examination Access Card</p>
-            {logo && <img src={logo} alt="Permit Logo" className="h-12 w-12 rounded-full border border-white/80 object-cover mx-auto mb-2" />}
+            {logo && (
+              <InstitutionLogo
+                src={logo}
+                alt="Permit Logo"
+                className="mx-auto mb-2 h-12 w-12 rounded-full border border-white/80 object-cover"
+                fallbackClassName="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-white/80 bg-emerald-700 text-[10px] font-black tracking-[0.12em] text-white"
+              />
+            )}
             <div className="text-2xl sm:text-3xl font-bold text-emerald-700">{name}</div>
           </div>
 
           {/* Print-only permit header with custom logo */}
           <div className={`mb-5 hidden rounded-xl border-2 px-4 py-4 text-center print:mb-4 print:block ${departmentTheme.headerClass}`}>
             <div className="flex flex-col items-center gap-2">
-              {logo && <img src={logo} alt="Permit Logo" className="h-14 w-14 rounded-full border border-white/80 object-cover" draggable={false} />}
+              {logo && (
+                <InstitutionLogo
+                  src={logo}
+                  alt="Permit Logo"
+                  className="h-14 w-14 rounded-full border border-white/80 object-cover"
+                  fallbackClassName="flex h-14 w-14 items-center justify-center rounded-full border border-white/80 bg-emerald-700 text-xs font-black tracking-[0.12em] text-white"
+                  draggable={false}
+                />
+              )}
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-slate-800">Official Examination Permit</p>
                 <p className="mt-0.5 text-sm font-bold text-slate-900">{name}</p>

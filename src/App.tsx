@@ -15,8 +15,9 @@ import { ThemeProvider } from './context/ThemeContext'
 import { ConfirmationProvider } from './context/ConfirmationContext'
 import { UnsavedChangesProvider } from './context/UnsavedChangesContext'
 import { useUnsavedChanges } from './hooks/useUnsavedChanges'
-import { institutionLogo, institutionName } from './config/branding'
+import { institutionName } from './config/branding'
 import InvigilatorCheckIn from './components/InvigilatorCheckIn'
+import InstitutionLogo from './components/InstitutionLogo'
 
 const Login = lazy(() => import('./components/Login'))
 const Dashboard = lazy(() => import('./components/Dashboard'))
@@ -33,10 +34,10 @@ function AppLoadingScreen() {
         <div
           className="absolute inset-0 rounded-full border-4 border-emerald-100 border-t-emerald-500 dark:border-slate-800 dark:border-t-emerald-400 kiu-spin"
         />
-        <img
-          src={institutionLogo}
+        <InstitutionLogo
           alt={institutionName}
-          className="h-20 w-20 object-contain"
+          className="h-20 w-20 rounded-full object-cover"
+          fallbackClassName="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-700 text-lg font-black tracking-[0.18em] text-white"
           draggable={false}
         />
       </div>
