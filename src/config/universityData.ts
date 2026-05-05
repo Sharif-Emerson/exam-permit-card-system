@@ -282,10 +282,13 @@ export const KIU_CURRICULUM: Record<string, KiuProgramCurriculum> = {
         { unitName: 'COS 3105: Communication Systems', venue: 'Main Hall', time: '09:00 AM' }
       ],
       'Year 3 Semester 2': [
-        { unitName: 'COS 3201: Artificial Intelligence', venue: 'Lab 1', time: '09:00 AM' },
-        { unitName: 'COS 3202: Computer Graphics', venue: 'Lab 2', time: '02:00 PM' },
-        { unitName: 'COS 3203: Final Year Project', venue: 'Project Lab', time: '09:00 AM' },
-        { unitName: 'UCC 3200: Entrepreneurship Skills', venue: 'Auditorium', time: '02:00 PM' }
+        { unitName: 'UCC3000: Research report', venue: 'Project Lab', time: '09:00 AM' },
+        { unitName: 'COS 3202: Algorithm Analysis & Design', venue: 'Lab 1', time: '11:00 AM' },
+        { unitName: 'CSB 3203: Artificial Intelligence', venue: 'Lab 2', time: '02:00 PM' },
+        { unitName: 'COS 3204: Mobile Application Development', venue: 'Lab 3', time: '04:00 PM' },
+        { unitName: 'ITE 3205: Network & Information Security', venue: 'Main Hall', time: '09:00 AM' },
+        { unitName: 'COS 3205: Computer Graphics', venue: 'Auditorium', time: '02:00 PM' },
+        { unitName: 'COS 3207: Optimization Techniques', venue: 'Room 12', time: '09:00 AM' }
       ]
     }
   },
