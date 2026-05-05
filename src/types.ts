@@ -3,6 +3,7 @@ export type AdminScope = 'super-admin' | 'registrar' | 'finance' | 'operations' 
 export type StudentCategory = 'local' | 'international'
 export type StudentGender = 'male' | 'female' | 'other'
 export type EnrollmentStatus = 'active' | 'on_leave' | 'graduated'
+export type StudentSession = 'day' | 'evening' | 'weekend'
 export type AdminPermission =
   | 'view_students'
   | 'manage_student_profiles'
@@ -36,6 +37,7 @@ export interface DatabaseProfileRow {
   college?: string | null
   department?: string | null
   semester?: string | null
+  session?: StudentSession | null
   course_units_json?: string | null
   course_units?: string[] | null
   exam_date: string | null
@@ -73,6 +75,7 @@ export interface StudentProfile {
   college?: string
   department?: string
   semester?: string
+  session?: StudentSession
   courseUnits?: string[]
   examDate: string
   examTime: string
@@ -303,6 +306,7 @@ export interface CreateStudentInput {
   college?: string
   department?: string
   semester?: string
+  session?: StudentSession
   courseUnits?: string[]
   profileImage?: string | null
   totalFees: number

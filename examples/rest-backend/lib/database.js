@@ -64,6 +64,7 @@ db.exec(`
     college TEXT,
     department TEXT,
     semester TEXT,
+    session TEXT CHECK (session IS NULL OR session IN ('day', 'evening', 'weekend')),
     course_units_json TEXT NOT NULL DEFAULT '[]',
     exam_date TEXT,
     exam_time TEXT,

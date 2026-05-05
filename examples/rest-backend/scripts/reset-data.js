@@ -199,6 +199,7 @@ async function reseedDatabase(preservedAdmins = new Map()) {
 	ensureColumn(db, 'profiles', 'college TEXT')
 	ensureColumn(db, 'profiles', 'department TEXT')
 	ensureColumn(db, 'profiles', 'semester TEXT')
+	ensureColumn(db, 'profiles', "session TEXT CHECK (session IS NULL OR session IN ('day', 'evening', 'weekend'))")
 	ensureColumn(db, 'profiles', "course_units_json TEXT NOT NULL DEFAULT '[]'")
 	ensureColumn(db, 'users', 'phone_number TEXT')
 	ensureColumn(db, 'users', "campus_id TEXT NOT NULL DEFAULT 'main-campus'")

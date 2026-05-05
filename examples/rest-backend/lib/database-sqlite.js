@@ -1644,6 +1644,7 @@ export function createStudentProfile(input) {
   const nextCollege = input.college ?? null
   const nextDepartment = input.department ?? null
   const nextSemester = input.semester ?? null
+  const nextSession = input.session === 'day' || input.session === 'evening' || input.session === 'weekend' ? input.session : null
   const nextProfileImage = input.profile_image ?? null
   const nextTotalFees = normalizeNumber(input.total_fees)
   const nextAmountPaid = normalizeNumber(input.amount_paid)
@@ -1686,10 +1687,10 @@ export function createStudentProfile(input) {
     db.prepare(`
       INSERT INTO profiles (
         id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, gender, enrollment_status, course, program, college,
-        department, semester, course_units_json, exam_date, exam_time, venue, seat_number,
+        department, semester, session, course_units_json, exam_date, exam_time, venue, seat_number,
         instructions, profile_image, permit_token, exams_json, total_fees, amount_paid, first_login_required, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       profileId,
       nextEmail,
@@ -1707,6 +1708,7 @@ export function createStudentProfile(input) {
       nextCollege,
       nextDepartment,
       nextSemester,
+      nextSession,
       serializeCourseUnits(input.course_units ?? []),
       input.exam_date ?? null,
       input.exam_time ?? null,

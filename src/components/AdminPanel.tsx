@@ -520,6 +520,7 @@ function createEmptyStudentDraft(feeSettings: SystemFeeSettings = DEFAULT_SYSTEM
     department: '',
     currentYearOfStudy: '',
     semester: '',
+    session: undefined,
     courseUnitsText: '',
     profileImage: '',
     totalFees: formatFeeDraftValue(getFeeForStudentCategory(feeSettings, studentCategory)),
@@ -7460,6 +7461,23 @@ export default function AdminPanel() {
                   >
                     <option value="">Select Semester</option>
                     {getSemestersForProgram(createDraft.program).map((semester) => <option key={semester} value={semester}>{semester}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="create-student-session" className="mb-1 block text-xs font-medium text-gray-700">Session</label>
+                  <select
+                    id="create-student-session"
+                    value={createDraft.session ?? ''}
+                    onChange={(event) => {
+                      const val = event.target.value
+                      setCreateDraft((c) => ({ ...c, session: (val === 'day' || val === 'evening' || val === 'weekend') ? val : undefined }))
+                    }}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="">Not specified</option>
+                    <option value="day">Day</option>
+                    <option value="evening">Evening</option>
+                    <option value="weekend">Weekend</option>
                   </select>
                 </div>
                 <div>

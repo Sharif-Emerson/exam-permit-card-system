@@ -575,6 +575,7 @@ export const restDataAdapter: DataAdapter = {
     if (typeof values.college === 'string') payload.college = values.college || null
     if (typeof values.department === 'string') payload.department = values.department || null
     if (typeof values.semester === 'string') payload.semester = values.semester || null
+    if (values.session === 'day' || values.session === 'evening' || values.session === 'weekend') payload.session = values.session
     if (Array.isArray(values.courseUnits)) payload.course_units = values.courseUnits
     if ('profileImage' in values) payload.profile_image = values.profileImage ?? null
     if (typeof values.instructions === 'string') payload.instructions = values.instructions || null

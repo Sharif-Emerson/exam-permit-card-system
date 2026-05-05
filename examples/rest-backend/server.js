@@ -1302,6 +1302,9 @@ app.post('/profiles', authenticate, requireAdminPermission('manage_student_profi
   const examTime = typeof request.body.exam_time === 'string' ? request.body.exam_time.trim() : ''
   const venue = typeof request.body.venue === 'string' ? request.body.venue.trim() : ''
   const seatNumber = typeof request.body.seat_number === 'string' ? request.body.seat_number.trim() : ''
+  const session = request.body.session === 'day' || request.body.session === 'evening' || request.body.session === 'weekend'
+    ? request.body.session
+    : null
 
   if (name.length < 2 || name.length > 120) {
     response.status(400).json({ message: 'Name must be between 2 and 120 characters long.' })
@@ -1426,6 +1429,7 @@ app.post('/profiles', authenticate, requireAdminPermission('manage_student_profi
       college: college || null,
       department: department || null,
       semester: semester || null,
+      session: session || null,
       course_units: courseUnits,
       profile_image: typeof profileImage === 'undefined' ? null : profileImage,
       total_fees: resolvedTotalFees,
