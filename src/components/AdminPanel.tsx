@@ -1419,10 +1419,8 @@ export default function AdminPanel() {
       return
     }
 
-    if (activeSection === 'support') {
-      void loadSupportRequestQueue()
-    }
-  }, [activeSection, canManageSupportRequests, loadSupportRequestQueue])
+    void loadSupportRequestQueue()
+  }, [canManageSupportRequests, loadSupportRequestQueue])
 
   useEffect(() => {
     void loadFeeSettings()
@@ -1481,7 +1479,7 @@ export default function AdminPanel() {
       if (canViewPermitActivity) {
         void loadActivityLogs({ silent: true })
       }
-      if (canManageSupportRequests && activeSection === 'support') {
+      if (canManageSupportRequests) {
         void loadSupportRequestQueue({ silent: true })
       }
     }, 30000)
@@ -1489,7 +1487,7 @@ export default function AdminPanel() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [activeSection, canManageStudentProfiles, canManageSupportRequests, canViewPermitActivity, loadActivityLogs, loadStudents, loadSupportRequestQueue, loadTrashedStudents])
+  }, [canManageStudentProfiles, canManageSupportRequests, canViewPermitActivity, loadActivityLogs, loadStudents, loadSupportRequestQueue, loadTrashedStudents])
 
   useEffect(() => {
     if (activeSection !== 'settings' && activeSection !== 'assistants') {

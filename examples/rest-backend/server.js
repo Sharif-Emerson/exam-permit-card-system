@@ -44,6 +44,7 @@ import {
   permanentlyDeleteTrashedProfile,
   permanentlyPurgeAllTrashedProfiles,
   listSupportRequests,
+  listSupportNotificationAdminEmails,
   listSemesterRegistrations,
   createSemesterRegistration,
   updateSemesterRegistrationStatus,
@@ -63,7 +64,7 @@ import {
   // Session helpers
   createSession,
 } from './lib/database.js'
-import { sendSms } from './lib/notification.js'
+import { sendSms, sendEmail } from './lib/notification.js'
 import * as oidcFlow from './lib/oidc-flow.js'
 import { getSisStatus, previewSisConnection } from './lib/sis-client.js'
 import { isPermitIntegrityEnabled, signPermitPayload, verifyPermitPayload } from './lib/permit-integrity.js'
@@ -170,6 +171,39 @@ async function notifyStudentOnAdminSupportReply(requestRecord, adminMessage) {
     }
   } catch (error) {
     console.warn('[support-notify] SMS failed:', error instanceof Error ? error.message : error)
+  }
+}
+
+async function notifyAdminsOnStudentSupportActivity({ kind, requestRecord, studentProfile, messagePreview = '' }) {
+  if (!requestRecord?.id) {
+    return
+  }
+  try {
+    const emails = listSupportNotificationAdminEmails()
+    if (emails.length === 0) {
+      return
+    }
+    const studentLabel = studentProfile?.name ?? studentProfile?.email ?? 'A student'
+    const studentEmail = typeof studentProfile?.email === 'string' ? studentProfile.email : ''
+    const subjectLine = requestRecord.subject ? String(requestRecord.subject).trim() : ''
+    const subject = kind === 'new'
+      ? `[Exam Portal] New support request: ${subjectLine || '(no subject)'}`
+      : `[Exam Portal] New student message: ${subjectLine || '(no subject)'}`
+    const actionLine = kind === 'new'
+      ? `${studentLabel}${studentEmail ? ` (${studentEmail})` : ''} submitted a new support request.`
+      : `${studentLabel}${studentEmail ? ` (${studentEmail})` : ''} sent a new message on a support thread.`
+    const baseUrl = typeof process.env.APP_PUBLIC_URL === 'string' ? process.env.APP_PUBLIC_URL.trim().replace(/\/$/, '') : ''
+    const openHint = baseUrl
+      ? `Open Support Requests: ${baseUrl}/#support`
+      : 'Sign in to the admin portal and open Support Requests.'
+    const preview = typeof messagePreview === 'string' && messagePreview.trim()
+      ? `\n\nPreview:\n${messagePreview.trim().slice(0, 500)}`
+      : ''
+    const text = `${actionLine}\n\nRequest ID: ${requestRecord.id}\n${openHint}${preview}`
+
+    await Promise.allSettled(emails.map((to) => sendEmail(to, subject, text)))
+  } catch (error) {
+    console.warn('[support-notify] Admin email notification failed:', error instanceof Error ? error.message : error)
   }
 }
 
@@ -2754,6 +2788,14 @@ app.post('/support-requests', authenticate, upload.single('attachment'), async (
     return
   }
 
+  const studentProfile = getProfileById(request.userId)
+  void notifyAdminsOnStudentSupportActivity({
+    kind: 'new',
+    requestRecord: created,
+    studentProfile,
+    messagePreview: message,
+  })
+
   response.status(201).json(created)
 })
 
@@ -2892,6 +2934,18 @@ app.post('/support-requests/:id/messages', authenticate, upload.single('attachme
     response.status(404).json({ message: 'Support request not found.' })
     return
   }
+
+  const studentProfile = getProfileById(request.userId)
+  const preview = attachmentUrl && !message.trim()
+    ? `(attachment: ${attachmentName || 'file'})`
+    : message
+  void notifyAdminsOnStudentSupportActivity({
+    kind: 'reply',
+    requestRecord: updated,
+    studentProfile,
+    messagePreview: preview,
+  })
+
   response.status(201).json(updated)
 })
 

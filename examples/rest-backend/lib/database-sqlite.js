@@ -75,6 +75,7 @@ db.exec(`
     college TEXT,
     department TEXT,
     semester TEXT,
+    session TEXT CHECK (session IS NULL OR session IN ('day', 'evening', 'weekend')),
     course_units_json TEXT NOT NULL DEFAULT '[]',
     exam_date TEXT,
     exam_time TEXT,
@@ -236,6 +237,7 @@ ensureColumn('profiles', 'program TEXT')
 ensureColumn('profiles', 'college TEXT')
 ensureColumn('profiles', 'department TEXT')
 ensureColumn('profiles', 'semester TEXT')
+ensureColumn('profiles', "session TEXT CHECK (session IS NULL OR session IN ('day', 'evening', 'weekend'))")
 ensureColumn('profiles', "course_units_json TEXT NOT NULL DEFAULT '[]'")
 ensureColumn('system_settings', "deadlines_json TEXT NOT NULL DEFAULT '[]'")
 ensureColumn('system_settings', "currency_code TEXT NOT NULL DEFAULT 'USD'")
@@ -2040,6 +2042,29 @@ function listSupportMessagesByRequestIds(requestIds) {
   return collection
 }
 
+/** Emails for admins who can manage support requests (for new-request / student-reply alerts). */
+export function listSupportNotificationAdminEmails() {
+  const rows = db.prepare(`
+    SELECT email FROM users
+    WHERE role = 'admin'
+      AND email IS NOT NULL
+      AND TRIM(email) != ''
+      AND (
+        admin_scope IS NULL
+        OR admin_scope != 'assistant-admin'
+        OR (admin_scope = 'assistant-admin' AND assistant_role IN ('support_help', 'department_prints'))
+      )
+  `).all()
+  const unique = new Set()
+  for (const row of rows) {
+    const normalized = String(row.email ?? '').trim().toLowerCase()
+    if (normalized) {
+      unique.add(normalized)
+    }
+  }
+  return [...unique]
+}
+
 export function listSupportRequests({ studentId } = {}) {
   const params = []
   const whereSql = studentId ? 'WHERE support_requests.student_id = ?' : ''
@@ -2455,10 +2480,10 @@ export function restoreStudentProfile(trashId, restoredByAdminId = null) {
     db.prepare(`
       INSERT INTO profiles (
         id, email, phone_number, role, name, campus_id, campus_name, student_id, student_category, gender, enrollment_status, course, program, college,
-        department, semester, course_units_json, exam_date, exam_time, venue, seat_number, instructions, profile_image,
+        department, semester, session, course_units_json, exam_date, exam_time, venue, seat_number, instructions, profile_image,
         permit_token, permit_print_grant_month, permit_print_grants_remaining, exams_json, total_fees, amount_paid, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       profileRow.id,
       profileRow.email,
@@ -2476,6 +2501,7 @@ export function restoreStudentProfile(trashId, restoredByAdminId = null) {
       profileRow.college ?? null,
       profileRow.department ?? null,
       profileRow.semester ?? null,
+      profileRow.session === 'day' || profileRow.session === 'evening' || profileRow.session === 'weekend' ? profileRow.session : null,
       profileRow.course_units_json ?? '[]',
       profileRow.exam_date ?? null,
       profileRow.exam_time ?? null,
