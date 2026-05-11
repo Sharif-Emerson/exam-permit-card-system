@@ -144,6 +144,7 @@ export function mapProfile(row: DatabaseProfileRow): AppProfile {
     college: row.college ?? 'Not assigned',
     department: row.department ?? 'Not assigned',
     semester: row.semester ?? 'Not assigned',
+    session: row.session ?? undefined,
     courseUnits: Array.isArray(row.course_units) ? row.course_units : [],
     examDate: pickScheduleField(row.exam_date, primaryExam?.examDate, 'Not scheduled', isPlaceholderExamDate),
     examTime: pickScheduleField(row.exam_time, primaryExam?.examTime, 'Not scheduled', isPlaceholderExamTime),

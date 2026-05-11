@@ -1244,6 +1244,7 @@ export default function AdminPanel() {
           college: editDraft.college,
           department: editDraft.department,
           semester: editDraft.semester,
+          session: editDraft.session,
           courseUnits,
           totalFees: totalFeesNum,
           exams: editDraft.exams,
@@ -2227,6 +2228,7 @@ export default function AdminPanel() {
       college: student.college ?? '',
       department: student.department ?? '',
       semester: student.semester ?? '',
+      session: student.session ?? '',
       courseUnitsText: student.courseUnits?.join('\n') ?? '',
       totalFees: student.totalFees.toFixed(2),
       exams: student.exams ?? [],
@@ -7164,6 +7166,20 @@ export default function AdminPanel() {
                     )}
                   </select>
                 </div>
+              </div>
+              <div>
+                <label htmlFor="edit-student-session" className="mb-1 block text-xs font-medium text-gray-700">Session</label>
+                <select
+                  id="edit-student-session"
+                  value={editDraft.session || ''}
+                  onChange={(e) => setEditDraft((d) => ({ ...d, session: e.target.value || null }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                >
+                  <option value="">Select Session</option>
+                  <option value="day">Day</option>
+                  <option value="evening">Evening</option>
+                  <option value="weekend">Weekend</option>
+                </select>
               </div>
               <div>
                 <label htmlFor="edit-student-course-units" className="mb-1 block text-xs font-medium text-gray-700">Course Units</label>

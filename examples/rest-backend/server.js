@@ -1490,6 +1490,9 @@ app.patch('/profiles/:id/admin', authenticate, requireAdminPermission('manage_st
   const college = typeof request.body.college === 'string' ? request.body.college.trim() : undefined
   const department = typeof request.body.department === 'string' ? request.body.department.trim() : undefined
   const semester = typeof request.body.semester === 'string' ? request.body.semester.trim() : undefined
+  const session = request.body.session === 'day' || request.body.session === 'evening' || request.body.session === 'weekend'
+    ? request.body.session
+    : undefined
   const courseUnits = Array.isArray(request.body.course_units)
     ? request.body.course_units.map((unit) => String(unit ?? '').trim()).filter(Boolean)
     : undefined
@@ -1590,6 +1593,7 @@ app.patch('/profiles/:id/admin', authenticate, requireAdminPermission('manage_st
   if (typeof college !== 'undefined') updates.college = college || null
   if (typeof department !== 'undefined') updates.department = department || null
   if (typeof semester !== 'undefined') updates.semester = semester || null
+  if (typeof session !== 'undefined') updates.session = session
   if (typeof courseUnits !== 'undefined') updates.course_units = courseUnits
   if (typeof profileImage !== 'undefined') updates.profile_image = profileImage
   if (typeof totalFees !== 'undefined') updates.total_fees = totalFees

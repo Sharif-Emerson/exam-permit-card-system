@@ -280,6 +280,7 @@ export interface AdminProfileUpdateInput {
   college?: string
   department?: string
   semester?: string
+  session?: StudentSession
   courseUnits?: string[]
   profileImage?: string | null
   totalFees?: number

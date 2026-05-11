@@ -1840,6 +1840,9 @@ export function adminUpdateStudentProfile(profileId, updates) {
   const nextCollege = 'college' in updates ? (updates.college ?? null) : profileRow.college
   const nextDepartment = 'department' in updates ? (updates.department ?? null) : profileRow.department
   const nextSemester = 'semester' in updates ? (updates.semester ?? null) : profileRow.semester
+  const nextSession = 'session' in updates
+    ? (updates.session === 'day' || updates.session === 'evening' || updates.session === 'weekend' ? updates.session : null)
+    : profileRow.session
   const nextCourseUnitsJson = 'course_units' in updates
     ? serializeCourseUnits(updates.course_units)
     : profileRow.course_units_json
@@ -1887,7 +1890,7 @@ export function adminUpdateStudentProfile(profileId, updates) {
 
     db.prepare(`
       UPDATE profiles
-      SET email = ?, phone_number = ?, name = ?, student_id = ?, student_category = ?, gender = ?, enrollment_status = ?, course = ?, program = ?, college = ?, department = ?, semester = ?, course_units_json = ?, profile_image = ?, total_fees = ?, exams_json = ?, exam_date = ?, exam_time = ?, venue = ?, seat_number = ?, instructions = ?, updated_at = ?
+      SET email = ?, phone_number = ?, name = ?, student_id = ?, student_category = ?, gender = ?, enrollment_status = ?, course = ?, program = ?, college = ?, department = ?, semester = ?, session = ?, course_units_json = ?, profile_image = ?, total_fees = ?, exams_json = ?, exam_date = ?, exam_time = ?, venue = ?, seat_number = ?, instructions = ?, updated_at = ?
       WHERE id = ?
     `).run(
       nextEmail,
@@ -1902,6 +1905,7 @@ export function adminUpdateStudentProfile(profileId, updates) {
       nextCollege,
       nextDepartment,
       nextSemester,
+      nextSession,
       nextCourseUnitsJson,
       nextProfileImage,
       nextTotalFees,
