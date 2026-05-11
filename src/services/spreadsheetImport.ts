@@ -1,3 +1,18 @@
+/** Read a cell using the same header normalization as column keys (underscores/spaces stripped). */
+function getField(entries: Record<string, unknown>, ...headerAliases: string[]): unknown {
+  for (const alias of headerAliases) {
+    const key = normalizeHeader(alias)
+    if (!key || !(key in entries)) {
+      continue
+    }
+    const value = entries[key]
+    if (value !== '' && value != null) {
+      return value
+    }
+  }
+  return undefined
+}
+
 function mapRowsToFinancialImportRows(rows: unknown[][]): FinancialImportRow[] {
   const [headerRow, ...dataRows] = rows;
   if (!headerRow) return [];
@@ -10,33 +25,54 @@ function mapRowsToFinancialImportRows(rows: unknown[][]): FinancialImportRow[] {
         }
         return result;
       }, {});
-      const studentName = typeof normalizedEntries.student_name === 'string' && normalizedEntries.student_name.trim()
-        ? normalizedEntries.student_name.trim()
+      const studentNameRaw = getField(normalizedEntries, 'student_name', 'name', 'full_name');
+      const studentName = typeof studentNameRaw === 'string' && studentNameRaw.trim()
+        ? studentNameRaw.trim()
         : undefined;
       let studentId: string | undefined = undefined;
       let email: string | undefined = undefined;
-      if (typeof normalizedEntries.student_id_or_email === 'string') {
-        const value = normalizedEntries.student_id_or_email.trim();
+      let userId: string | undefined = undefined;
+
+      const combinedRaw = getField(normalizedEntries, 'student_id_or_email');
+      if (typeof combinedRaw === 'string') {
+        const value = combinedRaw.trim();
         if (value.includes('@')) {
-          email = value;
+          email = value.toLowerCase();
         } else if (value) {
           studentId = value;
         }
       }
-      const amountPaid = parseNumber(normalizedEntries.amount_paid);
-      const totalFees = parseNumber(normalizedEntries.total_fees);
+
+      const emailCol = getField(normalizedEntries, 'email', 'e_mail');
+      if (!email && typeof emailCol === 'string' && emailCol.trim().includes('@')) {
+        email = emailCol.trim().toLowerCase();
+      }
+
+      const sidRaw = getField(normalizedEntries, 'student_id', 'registration_number', 'reg_number', 'student_number');
+      if (!studentId && typeof sidRaw === 'string' && sidRaw.trim()) {
+        studentId = sidRaw.trim();
+      }
+
+      const userIdRaw = getField(normalizedEntries, 'user_id', 'profile_id');
+      if (typeof userIdRaw === 'string' && userIdRaw.trim()) {
+        userId = userIdRaw.trim();
+      }
+
+      const amountPaid = parseNumber(getField(normalizedEntries, 'amount_paid', 'paid', 'payment'));
+      const totalFees = parseNumber(getField(normalizedEntries, 'total_fees', 'fees', 'tuition'));
       return {
         rowNumber: index + 2,
         studentName,
         studentId,
         email,
+        userId,
         amountPaid,
         totalFees,
       };
     })
     .filter((row) => {
       // Only allow updates, not creation
-      const hasId = row.studentId || row.email;
+      const hasId = Boolean(row.studentId || row.email || row.userId);
       const canUpdate = hasId && (typeof row.amountPaid === 'number' || typeof row.totalFees === 'number');
       return Boolean(canUpdate);
     });
