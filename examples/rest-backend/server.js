@@ -2112,7 +2112,8 @@ app.post('/profiles/:id/permit-admin-print', authenticate, requireAdminPermissio
     campusName: request.user?.campusName,
   })
 
-  rotateStudentPermitToken(studentId)
+  // Do not rotate token after print — printed permit token must remain valid for invigilator scanning
+  // rotateStudentPermitToken(studentId)
 
   const updated = getProfileById(studentId)
   if (!updated) {
@@ -2469,7 +2470,8 @@ app.post('/permit-activity', authenticate, (request, response) => {
   })
 
   consumeStudentPermitPrintGrant(request.userId)
-  rotateStudentPermitToken(request.userId)
+  // Do not rotate token after print — printed permit token must remain valid for invigilator scanning
+  // rotateStudentPermitToken(request.userId)
 
   response.status(201).json({ ok: true })
 })
