@@ -40,6 +40,13 @@ function extractPermitTokenFromScanInput(raw: string): string {
       return parts[1].trim()
     }
   }
+  // Handle multiline KIU EXAM PERMIT QR format
+  if (t.includes('Token:')) {
+    const match = t.match(/Token:\s*([^\s\n]+)/)
+    if (match?.[1]) {
+      return match[1].trim().toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(.{4})(.{4})$/, '$1-$2')
+    }
+  }
   // Normalize tokens that may include spaces, dashes, or lowercase letters.
   return t.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(.{4})(.{4})$/, '$1-$2') || t
 }
