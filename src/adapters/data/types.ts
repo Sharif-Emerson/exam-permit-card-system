@@ -84,6 +84,7 @@ export interface DataAdapter {
   permanentlyDeleteTrashedStudent: (trashId: string) => Promise<void>
   permanentlyPurgeAllTrashedStudents: () => Promise<number>
   grantStudentPermitPrintAccess: (studentId: string, additionalPrints: number, adminId: string) => Promise<StudentProfile>
+  recordAdminPermitPrintEvent: (studentId: string) => Promise<StudentProfile>
   recordPermitActivity: (studentId: string, action: PermitActivityAction) => Promise<void>
   fetchPermitActivityHistory: () => Promise<PermitActivityRecord[]>
   fetchSupportContacts: () => Promise<SupportContact[]>

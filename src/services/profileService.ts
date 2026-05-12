@@ -120,6 +120,10 @@ export async function grantStudentPermitPrintAccess(studentId: string, additiona
   return activeDataAdapter.grantStudentPermitPrintAccess(studentId, additionalPrints, adminId)
 }
 
+export async function recordAdminPermitPrintEvent(studentId: string): Promise<StudentProfile> {
+  return activeDataAdapter.recordAdminPermitPrintEvent(studentId)
+}
+
 export async function recordPermitActivity(studentId: string, action: PermitActivityAction) {
   return activeDataAdapter.recordPermitActivity(studentId, action)
 }

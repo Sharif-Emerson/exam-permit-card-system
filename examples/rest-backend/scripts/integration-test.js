@@ -575,6 +575,22 @@ async function main() {
 
     assert.equal(deletedStudentLoginAttempt.status, 401)
 
+    await request(baseUrl, `/profiles/${primaryStudent.id}/financials`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${financeLogin.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ amountPaid: 400000, totalFees: 400000 }),
+    })
+
+    const profileBeforePermitEvents = await request(baseUrl, `/profiles/${primaryStudent.id}`, {
+      headers: {
+        Authorization: `Bearer ${studentLogin.token}`,
+      },
+    })
+    const permitTokenBefore = profileBeforePermitEvents.permit_token
+
     await request(baseUrl, '/permit-activity', {
       method: 'POST',
       headers: {
@@ -584,6 +600,13 @@ async function main() {
       body: JSON.stringify({ studentId: primaryStudent.id, action: 'download_permit' }),
     })
 
+    const profileAfterDownload = await request(baseUrl, `/profiles/${primaryStudent.id}`, {
+      headers: {
+        Authorization: `Bearer ${studentLogin.token}`,
+      },
+    })
+    assert.notEqual(permitTokenBefore, profileAfterDownload.permit_token)
+
     await request(baseUrl, '/permit-activity', {
       method: 'POST',
       headers: {
@@ -592,6 +615,27 @@ async function main() {
       },
       body: JSON.stringify({ studentId: primaryStudent.id, action: 'print_permit' }),
     })
+
+    const profileAfterPrint = await request(baseUrl, `/profiles/${primaryStudent.id}`, {
+      headers: {
+        Authorization: `Bearer ${studentLogin.token}`,
+      },
+    })
+    assert.notEqual(profileAfterDownload.permit_token, profileAfterPrint.permit_token)
+
+    await request(baseUrl, `/profiles/${primaryStudent.id}/permit-admin-print`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${adminLogin.token}`,
+      },
+    })
+
+    const profileAfterAdminPrint = await request(baseUrl, `/profiles/${primaryStudent.id}`, {
+      headers: {
+        Authorization: `Bearer ${studentLogin.token}`,
+      },
+    })
+    assert.notEqual(profileAfterPrint.permit_token, profileAfterAdminPrint.permit_token)
 
     const activityLogs = await request(baseUrl, '/admin-activity-logs', {
       headers: {

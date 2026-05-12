@@ -701,6 +701,12 @@ export const restDataAdapter: DataAdapter = {
 
     return ensureStudentProfile(mapProfile(toDatabaseProfileRow(result)))
   },
+  async recordAdminPermitPrintEvent(studentId: string): Promise<StudentProfile> {
+    const payload = await request(`/profiles/${encodeURIComponent(studentId)}/permit-admin-print`, {
+      method: 'POST',
+    })
+    return ensureStudentProfile(mapProfile(toDatabaseProfileRow(payload)))
+  },
   async recordPermitActivity(studentId: string, action: PermitActivityAction) {
     await request('/permit-activity', {
       method: 'POST',

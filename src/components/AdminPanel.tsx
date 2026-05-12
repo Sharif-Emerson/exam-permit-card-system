@@ -18,7 +18,7 @@ import { useTheme } from '../context/ThemeContext'
 import { downloadFinancialImportTemplate } from '../services/adminImportTemplate'
 import { downloadAdminDashboardCsv, downloadAdminDashboardExcel, printAdminDashboardReport } from '../services/adminDashboardExport'
 import { downloadPermitActivityCsv } from '../services/permitActivityExport'
-import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteAssistantAdmin, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchSisStatus, triggerSisSync, fetchPublicPermit, fetchAdminCurriculum, uploadAdminCurriculum, resetAdminCurriculum, reportForgery } from '../services/profileService'
+import { adminUpdateStudentProfile, advanceAllStudentSemesters, bulkSyncCurriculum, clearStudentBalance, createAssistantAdmin, createStudentProfile, deleteAdminActivityLog, deleteAssistantAdmin, deleteSupportRequest, deleteStudentProfile, fetchAdminActivityLogsPage, fetchAssistantAdmins, fetchStudentProfilesPage, fetchSupportRequests, fetchSystemFeeSettings, fetchTrashedStudentProfiles, grantStudentPermitPrintAccess, importStudentFinancials, markActivityLogRead, markAllPermitActivityLogsRead, permanentlyDeleteTrashedStudent, permanentlyPurgeAllTrashedStudents, purgePermitActivityLogs, recordAdminPermitPrintEvent, restoreStudentProfile, updateAssistantAdmin, updateAssistantAdminCredentials, updateStudentAccount, updateStudentFinancials, updateSupportRequest, updateSystemFeeSettings, fetchStudentProfileById, fetchSisStatus, triggerSisSync, fetchPublicPermit, fetchAdminCurriculum, uploadAdminCurriculum, resetAdminCurriculum, reportForgery } from '../services/profileService'
 import { completeAdminFirstLogin } from '../services/authService'
 import type { SisStatus, SisSyncResult, CurriculumStatus } from '../services/profileService'
 import { loadFaqs, saveFaqs } from './faqStorage'
@@ -2141,7 +2141,13 @@ export default function AdminPanel() {
       setSuccessMessage('')
       const { default: QRCode } = await import('qrcode')
 
-      const qrEntries = await Promise.all(printableStudents.map(async (student) => {
+      const refreshedStudents: StudentProfile[] = []
+      for (const student of printableStudents) {
+        const updated = await recordAdminPermitPrintEvent(student.id)
+        refreshedStudents.push(updated)
+      }
+
+      const qrEntries = await Promise.all(refreshedStudents.map(async (student) => {
         const qrValue = buildPermitQrPayload(student)
 
         const qrCodeUrl = await QRCode.toDataURL(qrValue, { errorCorrectionLevel: 'M', margin: 1, width: 160 })
@@ -2149,15 +2155,16 @@ export default function AdminPanel() {
         return [student.id, qrCodeUrl] as const
       }))
 
-      setBulkPrintStudents(printableStudents)
+      setBulkPrintStudents(refreshedStudents)
       setBulkPrintQrCodes(Object.fromEntries(qrEntries))
-      setSuccessMessage(`Preparing ${printableStudents.length} permit(s) for printing.`)
+      setSuccessMessage(`Preparing ${refreshedStudents.length} permit(s) for printing.`)
 
       const previousTitle = document.title
       const cleanup = () => {
         setBulkPrintStudents([])
         setBulkPrintQrCodes({})
         document.title = previousTitle
+        void loadStudents({ silent: true })
       }
 
       window.addEventListener('afterprint', cleanup, { once: true })

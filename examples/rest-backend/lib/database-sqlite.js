@@ -748,6 +748,10 @@ function getStudentPermitOutputCountForMonth(profileId, monthKey = getCurrentPer
     WHERE target_profile_id = ?
       AND action IN ('print_permit', 'download_permit')
       AND substr(created_at, 1, 7) = ?
+      AND (
+        json_extract(details, '$.source') IS NULL
+        OR json_extract(details, '$.source') = 'student-portal'
+      )
   `).get(profileId, monthKey)?.total ?? 0)
 }
 
@@ -1629,6 +1633,20 @@ export function consumeStudentPermitPrintGrant(profileId) {
     nowIso(),
     profileId,
   )
+
+  return getProfileById(profileId)
+}
+
+/** Assign a new permit token so previously printed or downloaded copies no longer match the live record. */
+export function rotateStudentPermitToken(profileId) {
+  const profileRow = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profileId)
+
+  if (!profileRow || profileRow.role !== 'student') {
+    return null
+  }
+
+  const newToken = createPermitToken()
+  db.prepare('UPDATE profiles SET permit_token = ?, updated_at = ? WHERE id = ?').run(newToken, nowIso(), profileId)
 
   return getProfileById(profileId)
 }

@@ -25,6 +25,7 @@ import {
   getUploadsDir,
   adminUpdateStudentProfile,
   consumeStudentPermitPrintGrant,
+  rotateStudentPermitToken,
   getUserByEmail,
   getUserByPhoneNumber,
   getUserByStudentId,
@@ -2081,6 +2082,54 @@ app.post('/profiles/:id/permit-print-grants', authenticate, requireAdminPermissi
   }
 })
 
+app.post('/profiles/:id/permit-admin-print', authenticate, requireAdminPermission('manage_student_profiles', 'You do not have permission to print student permits.'), (request, response) => {
+  const studentId = request.params.id
+  const profile = getProfileById(studentId)
+
+  if (!profile || profile.role !== 'student') {
+    response.status(404).json({ message: 'Student profile not found.' })
+    return
+  }
+
+  if (!canAccessProfile(profile, request)) {
+    response.status(403).json({ message: 'You do not have access to this student profile.' })
+    return
+  }
+
+  if (!requireAssistantDepartmentAccess(request, response, profile)) {
+    return
+  }
+
+  insertActivityLog({
+    adminId: request.userId,
+    targetProfileId: studentId,
+    action: 'print_permit',
+    details: {
+      source: 'admin-bulk-print',
+      semester: profile.semester ?? null,
+    },
+    campusId: request.user?.campusId,
+    campusName: request.user?.campusName,
+  })
+
+  rotateStudentPermitToken(studentId)
+
+  const updated = getProfileById(studentId)
+  if (!updated) {
+    response.status(404).json({ message: 'Student profile not found.' })
+    return
+  }
+
+  const permitSignature = signPermitPayload({
+    permitToken: updated.permit_token ?? '',
+    profileId: updated.id,
+    cleared: Number(updated.amount_paid ?? 0) >= Number(updated.total_fees ?? 0),
+    updatedAt: updated.updated_at ?? '',
+  })
+
+  response.json({ ...updated, permit_signature: permitSignature ?? null })
+})
+
 app.post('/admin-activity-logs', authenticate, requireAdminPermission('write_audit_logs', 'You do not have permission to record admin activity.'), (request, response) => {
   insertActivityLog({
     adminId: request.body.admin_id ?? request.userId,
@@ -2420,6 +2469,7 @@ app.post('/permit-activity', authenticate, (request, response) => {
   })
 
   consumeStudentPermitPrintGrant(request.userId)
+  rotateStudentPermitToken(request.userId)
 
   response.status(201).json({ ok: true })
 })
