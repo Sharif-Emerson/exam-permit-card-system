@@ -1866,24 +1866,39 @@ export default function AdminPanel() {
     setCameraActive(false)
   }, [])
 
-  const startCameraScanner = useCallback(async () => {
-    if (cameraActive || cameraStarting) {
-      return
+  async function requestCameraStream(): Promise<MediaStream> {
+    if (typeof window === 'undefined') {
+      throw new Error('Browser environment not detected.')
     }
 
-    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      setCameraError('Camera access is not available in this browser. Use manual token paste.')
+    const constraints: MediaStreamConstraints = {
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false,
+    }
+
+    if (navigator.mediaDevices?.getUserMedia) {
+      return navigator.mediaDevices.getUserMedia(constraints)
+    }
+
+    const legacyGetUserMedia = (navigator as any).getUserMedia ?? (navigator as any).webkitGetUserMedia ?? (navigator as any).mozGetUserMedia
+    if (typeof legacyGetUserMedia !== 'function') {
+      throw new Error('Camera access is not available in this browser. Use manual token paste.')
+    }
+
+    return new Promise<MediaStream>((resolve, reject) => {
+      legacyGetUserMedia.call(navigator, constraints, resolve, reject)
+    })
+  }
+
+  const startCameraScanner = useCallback(async () => {
+    if (cameraActive || cameraStarting) {
       return
     }
 
     try {
       setCameraStarting(true)
       setCameraError('')
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
-        audio: false,
-      })
+      const stream = await requestCameraStream()
 
       const videoEl = cameraVideoRef.current
       if (!videoEl) {
