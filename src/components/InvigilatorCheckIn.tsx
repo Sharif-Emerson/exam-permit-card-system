@@ -40,7 +40,8 @@ function extractPermitTokenFromScanInput(raw: string): string {
       return parts[1].trim()
     }
   }
-  return t
+  // Normalize tokens that may include spaces, dashes, or lowercase letters.
+  return t.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(.{4})(.{4})$/, '$1-$2') || t
 }
 
 export default function InvigilatorCheckIn() {
