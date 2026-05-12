@@ -917,7 +917,7 @@ export function listProfilesPage({ role, search, status, department, program, co
 }
 
 export function getPermitByToken(permitToken) {
-  const row = db.prepare('SELECT * FROM profiles WHERE permit_token = ? AND role = ?').get(permitToken, 'student')
+  const row = db.prepare('SELECT * FROM profiles WHERE LOWER(permit_token) = LOWER(?) AND role = ?').get(permitToken, 'student')
 
   if (!row) {
     return null

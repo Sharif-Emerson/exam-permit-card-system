@@ -1825,9 +1825,11 @@ export default function AdminPanel() {
     // Handle multiline KIU EXAM PERMIT format from QR codes
     if (t.includes('Token:')) {
       const match = t.match(/Token:\s*([^\s\n]+)/)
-      if (match?.[1]) return match[1].trim().toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(.{4})(.{4})$/, '$1-$2')
+      if (match?.[1]) return match[1].trim()
     }
-    return t.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(.{4})(.{4})$/, '$1-$2') || t
+    // For direct token input: normalize to hex (remove spaces, dashes, convert to lowercase)
+    // Database tokens are 36-char hex strings, so keep them as-is
+    return t.replace(/[\s-]/g, '').toLowerCase() || t
   }
 
   async function handlePermitLookupByToken(token: string) {
