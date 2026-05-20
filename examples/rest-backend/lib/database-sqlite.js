@@ -556,15 +556,29 @@ function mapUser(row) {
   }
 }
 
-function createPermitToken() {
+function createPermitToken(studentIdForHmac, semesterForHmac) {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   const tokenLength = 8
   const exists = db.prepare('SELECT 1 FROM profiles WHERE permit_token = ? LIMIT 1')
+  const secret = process.env.PERMIT_TOKEN_SECRET || 'default-secret'
+
+  // Generate deterministic token based on student ID + semester if provided
+  // This ensures the same semester always produces the same token
+  let source = studentIdForHmac && semesterForHmac
+    ? createHash('sha256').update(`${studentIdForHmac}:${semesterForHmac}:${secret}`).digest()
+    : randomBytes(tokenLength)
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    const bytes = randomBytes(tokenLength)
-    let normalized = ''
+    let bytes = source
+    // Mix with random bytes on retry attempts to ensure uniqueness
+    if (attempt > 0) {
+      bytes = Buffer.concat([
+        source.slice(0, tokenLength / 2),
+        randomBytes(tokenLength / 2)
+      ])
+    }
 
+    let normalized = ''
     for (let index = 0; index < tokenLength; index += 1) {
       normalized += alphabet[bytes[index] % alphabet.length]
     }
@@ -1736,7 +1750,7 @@ export function createStudentProfile(input) {
       input.seat_number ?? null,
       input.instructions ?? null,
       nextProfileImage,
-      createPermitToken(),
+      createPermitToken(profileId, nextSemester),
       serializeExamAssignments(exams),
       nextTotalFees,
       nextAmountPaid,
@@ -1898,6 +1912,9 @@ export function adminUpdateStudentProfile(profileId, updates) {
   const nextProfileImage = 'profile_image' in updates ? (updates.profile_image ?? null) : profileRow.profile_image
   const nextTotalFees = typeof updates.total_fees === 'number' ? updates.total_fees : profileRow.total_fees
   const updatedAt = nowIso()
+  // Regenerate permit token if semester changes so each semester has a unique, valid token
+  const semesterChanged = 'semester' in updates && updates.semester !== profileRow.semester
+  const nextPermitToken = semesterChanged ? createPermitToken(profileId, nextSemester) : profileRow.permit_token
 
   db.exec('BEGIN')
 
@@ -1910,7 +1927,7 @@ export function adminUpdateStudentProfile(profileId, updates) {
 
     db.prepare(`
       UPDATE profiles
-      SET email = ?, phone_number = ?, name = ?, student_id = ?, student_category = ?, gender = ?, enrollment_status = ?, course = ?, program = ?, college = ?, department = ?, semester = ?, session = ?, course_units_json = ?, profile_image = ?, total_fees = ?, exams_json = ?, exam_date = ?, exam_time = ?, venue = ?, seat_number = ?, instructions = ?, updated_at = ?
+      SET email = ?, phone_number = ?, name = ?, student_id = ?, student_category = ?, gender = ?, enrollment_status = ?, course = ?, program = ?, college = ?, department = ?, semester = ?, session = ?, course_units_json = ?, profile_image = ?, total_fees = ?, exams_json = ?, exam_date = ?, exam_time = ?, venue = ?, seat_number = ?, instructions = ?, permit_token = ?, updated_at = ?
       WHERE id = ?
     `).run(
       nextEmail,
@@ -1935,6 +1952,7 @@ export function adminUpdateStudentProfile(profileId, updates) {
       nextVenue,
       nextSeatNumber,
       nextInstructions,
+      nextPermitToken,
       updatedAt,
       profileId,
     )
